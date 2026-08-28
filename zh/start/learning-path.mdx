@@ -1,14 +1,120 @@
 ---
 title: "学习路径"
 description: "先读心智模型，再按你的宿主或框架选择一条实战路径。"
+icon: route
+keywords:
+  - learning path
+  - Source
+  - Memory
+  - Handoff
+  - fail-open
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+先读心智模型，再跑通本地 Server，然后只选一条路径走完最小闭环。查契约时离开 101，打开官方文档。
 
-## 本页将覆盖
+<Steps titleSize="h3">
+  <Step title="读心智模型" icon="brain">
+    先立住 Source、Memory、Handoff、Experience / Skill，再读 Scope 和 fail-open。从[心智模型总览](/zh/mental-model/overview)开始。
+  </Step>
+  <Step title="跑通本地 Server" icon="server">
+    官方前提是 macOS 或 Linux、Python 3.11+ 和 `uv`。安装与健康检查写在[安装并运行 Server](/zh/basic-usage/install-and-run)。更细的命令和部署看[官方安装指南](https://oceanbase.github.io/powercontext/zh/docs/how-to/install-and-run/)。
+  </Step>
+  <Step title="选一条实战路径" icon="route">
+    用下面的身份 Tab 选路，并走完该路径的最小闭环。不要同时开四条线。
+  </Step>
+  <Step title="查契约时离开 101" icon="book-open">
+    HTTP、配置默认值、OpenAPI 和逐步 how-to 属于[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。101 只教怎么用、怎么玩。
+  </Step>
+</Steps>
 
-- 建议顺序：心智模型 → 基础用法 → 再进入框架 / 通用 Agent / 编程 Agent
-- 每条路径要完成的最小闭环是什么
-- 什么时候应该回到官方文档查契约
+<Warning>
+官方安装路径是 macOS 或 Linux。本页不写 Windows 变通，避免把它写成未验证教程。
+</Warning>
+
+<Tip>
+显式 Memory 不必先配 inference provider。只有要从 Source 自动抽取 Memory 时，才需要配置生成模型。
+</Tip>
+
+## 按身份选路
+
+<Tabs>
+  <Tab title="我写 Python Agent">
+    顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [常用 API 串讲](/zh/basic-usage/api-tour) → [框架集成](/zh/frameworks/overview)。
+
+    最小闭环是：Python Client 跑通 `remember`、`search` 和 `prepare_context`，再接到 LangGraph 或 LangChain。Pydantic AI 仍是预览，不能当成可独立安装的路径。
+  </Tab>
+  <Tab title="我用编程 Agent">
+    顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [编程 Agent](/zh/coding-agents/overview)，再选 Codex、Claude Code、DSH、OpenCode 或 Pi。
+
+    最小闭环是：`powercontext setup <host>`、`powercontext doctor`，然后在新会话里召回一条你自己写下的 Memory。
+  </Tab>
+  <Tab title="我用 Hermes / OpenClaw">
+    顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [Hermes](/zh/common-agents/hermes) 或 [OpenClaw](/zh/common-agents/openclaw)。
+
+    最小闭环是：`powercontext setup <host>`、`powercontext doctor`，再把对应宿主页贴给 Agent，让它自己完成配置。Hermes 在 setup 之后还要运行 `hermes memory setup`，并选择 PowerContext。逐步命令见[官方 Hermes 指南](https://oceanbase.github.io/powercontext/zh/docs/how-to/configure-hermes/)。
+  </Tab>
+</Tabs>
+
+## 最小闭环
+
+做到这些，再往下翻 tricks。
+
+<Columns cols={2}>
+  <Card title="基础用法" icon="book-open" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始闭环">
+    Client 能 `remember`、`search`、`prepare_context`，并且你分得清 Source 和 Memory。
+  </Card>
+  <Card title="框架集成" icon="boxes" href="/zh/frameworks/overview" arrow="true" cta="看适配器">
+    图或 agent 连上同一个 Server，召回和采集 fail-open。Pydantic AI 只读预览页。
+  </Card>
+  <Card title="通用 Agent" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="去可贴配置">
+    setup、doctor，再把宿主页交给 Agent。Agent 能自己完成配置。
+  </Card>
+  <Card title="编程 Agent" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="看合同">
+    setup、doctor，新会话能召回你写下的 Memory。Hook 做 recall / capture，插件做显式写。
+  </Card>
+</Columns>
+
+<AccordionGroup>
+  <Accordion title="什么时候回官方文档" icon="book-open">
+    安装细节、OpenAPI、配置项、某个宿主的逐步 how-to，以及部署，都回[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。
+
+    常用入口：[核心概念](https://oceanbase.github.io/powercontext/zh/docs/explanation/core-concepts/)、[安装和运行](https://oceanbase.github.io/powercontext/zh/docs/how-to/install-and-run/)、[HTTP API](https://oceanbase.github.io/powercontext/zh/docs/reference/http-api/)、[配置](https://oceanbase.github.io/powercontext/zh/docs/reference/configuration/)、[部署 Server](https://oceanbase.github.io/powercontext/zh/docs/how-to/deploy-server/)。
+  </Accordion>
+  <Accordion title="本站暂不单列的官方集成" icon="puzzle">
+    WorkBuddy 和 Bub 在官方仓库里有集成。101 只在这里点到，不单开页面。需要时回[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。
+  </Accordion>
+  <Accordion title="适配器成熟度" icon="boxes">
+    Pydantic AI 适配器是预览：未发布到 PyPI，当前也没有受支持的独立安装方式。LangChain 和 LangGraph 从 Git subdirectory 安装。不要把三者写成同一成熟度。
+  </Accordion>
+</AccordionGroup>
+
+## 把这段交给 Agent
+
+<Prompt description="让 Agent 按你的宿主选路，而不是把 101 当成官方 reference。" icon="bot" actions={["copy", "cursor"]}>
+你在带读者学习 PowerContext 101。本站是实战教程，不是官方 reference。
+
+先问读者用的是哪种宿主或框架：Python Agent、编程 Agent（Codex / Claude Code / DSH / OpenCode / Pi），还是 Hermes / OpenClaw。
+
+然后按当前站点的学习路径页指路：
+
+- 概念问题先读 `/zh/mental-model/overview`
+- 安装与 API 闭环走 `/zh/basic-usage/install-and-run`
+- LangGraph / LangChain / Pydantic AI 走 `/zh/frameworks/overview`。Pydantic AI 仍是预览，不能当成可独立安装
+- Hermes / OpenClaw 走 `/zh/common-agents/overview`
+- 编程 Agent 与 hooks 走 `/zh/coding-agents/overview`
+
+查 HTTP、配置默认值、OpenAPI 或部署时，打开 https://oceanbase.github.io/powercontext/zh/docs/ ，不要在 101 展开契约。
+
+不要把 RFC 或未合并设计当成已上线行为。
+</Prompt>
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="继续心智模型" icon="brain" href="/zh/mental-model/overview" arrow="true" cta="先立住词汇">
+    还没把 Source 和 Memory 分开？先读总览。
+  </Card>
+  <Card title="直接去安装" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="跑通 Server">
+    词汇已经够用？去跑本地 Server。
+  </Card>
+</Columns>
