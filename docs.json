@@ -3,6 +3,9 @@
   "theme": "maple",
   "name": "PowerContext 101",
   "description": "PowerContext 使用与开发实战：心智模型、常用 API、框架集成、通用 Agent 与编程 Agent。",
+  "search": {
+    "prompt": "搜索"
+  },
   "colors": {
     "primary": "#0b6ff4",
     "light": "#68adff",
