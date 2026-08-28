@@ -1,54 +1,298 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "theme": "maple",
+  "name": "PowerContext 101",
+  "description": "PowerContext 使用与开发实战：心智模型、常用 API、框架集成、通用 Agent 与编程 Agent。",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#0b6ff4",
+    "light": "#68adff",
+    "dark": "#064faa"
   },
   "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
+  "logo": {
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png"
+  },
+  "fonts": {
+    "family": "Noto Sans",
+    "heading": {
+      "family": "IBM Plex Sans"
+    }
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "background": {
+    "decoration": "gradient",
+    "color": {
+      "light": "#f7f9fc",
+      "dark": "#071024"
+    }
+  },
+  "styling": {
+    "codeblocks": {
+      "theme": {
+        "light": "github-light",
+        "dark": "github-dark"
       }
-    ],
+    }
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "开始学习",
+      "href": "/zh/start/learning-path"
+    }
+  },
+  "navigation": {
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Official Docs",
+          "href": "https://oceanbase.github.io/powercontext/",
+          "icon": "book-open"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "GitHub",
+          "href": "https://github.com/oceanbase/powercontext",
+          "icon": "code"
         }
       ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
+    },
+    "languages": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "language": "zh",
+        "default": true,
+        "navbar": {
+          "primary": {
+            "type": "button",
+            "label": "开始学习",
+            "href": "/zh/start/learning-path"
+          }
+        },
+        "tabs": [
+          {
+            "tab": "开始",
+            "icon": "house",
+            "pages": [
+              {
+                "group": "本站",
+                "pages": [
+                  "zh/start/index",
+                  "zh/start/learning-path"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "心智模型",
+            "icon": "brain",
+            "pages": [
+              {
+                "group": "核心理念",
+                "pages": [
+                  "zh/mental-model/overview",
+                  "zh/mental-model/source",
+                  "zh/mental-model/memory",
+                  "zh/mental-model/handoff",
+                  "zh/mental-model/experience-and-skill",
+                  "zh/mental-model/scope",
+                  "zh/mental-model/fail-open"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "基础用法",
+            "icon": "book-open",
+            "pages": [
+              {
+                "group": "入门闭环",
+                "pages": [
+                  "zh/basic-usage/install-and-run",
+                  "zh/basic-usage/api-tour",
+                  "zh/basic-usage/source-and-memory",
+                  "zh/basic-usage/handoff-loop",
+                  "zh/basic-usage/experience-skill-review"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "框架集成",
+            "icon": "boxes",
+            "pages": [
+              {
+                "group": "框架",
+                "pages": [
+                  "zh/frameworks/overview",
+                  "zh/frameworks/pydantic-ai",
+                  "zh/frameworks/langgraph",
+                  "zh/frameworks/langchain",
+                  "zh/frameworks/tricks"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "通用 Agent",
+            "icon": "bot",
+            "pages": [
+              {
+                "group": "接入与进阶",
+                "pages": [
+                  "zh/common-agents/overview",
+                  "zh/common-agents/hermes",
+                  "zh/common-agents/openclaw",
+                  "zh/common-agents/agent-self-extension"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "编程 Agent",
+            "icon": "terminal",
+            "pages": [
+              {
+                "group": "合同",
+                "pages": [
+                  "zh/coding-agents/overview",
+                  "zh/coding-agents/hooks-and-plugins",
+                  "zh/coding-agents/extend-hooks"
+                ]
+              },
+              {
+                "group": "宿主",
+                "pages": [
+                  "zh/coding-agents/codex",
+                  "zh/coding-agents/claude-code",
+                  "zh/coding-agents/dsh",
+                  "zh/coding-agents/opencode",
+                  "zh/coding-agents/pi"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "language": "en",
+        "navbar": {
+          "primary": {
+            "type": "button",
+            "label": "Start learning",
+            "href": "/en/start/learning-path"
+          }
+        },
+        "tabs": [
+          {
+            "tab": "Start",
+            "icon": "house",
+            "pages": [
+              {
+                "group": "This site",
+                "pages": [
+                  "en/start/index",
+                  "en/start/learning-path"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Mental Model",
+            "icon": "brain",
+            "pages": [
+              {
+                "group": "Core ideas",
+                "pages": [
+                  "en/mental-model/overview",
+                  "en/mental-model/source",
+                  "en/mental-model/memory",
+                  "en/mental-model/handoff",
+                  "en/mental-model/experience-and-skill",
+                  "en/mental-model/scope",
+                  "en/mental-model/fail-open"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Basic Usage",
+            "icon": "book-open",
+            "pages": [
+              {
+                "group": "First loop",
+                "pages": [
+                  "en/basic-usage/install-and-run",
+                  "en/basic-usage/api-tour",
+                  "en/basic-usage/source-and-memory",
+                  "en/basic-usage/handoff-loop",
+                  "en/basic-usage/experience-skill-review"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Frameworks",
+            "icon": "boxes",
+            "pages": [
+              {
+                "group": "Integrations",
+                "pages": [
+                  "en/frameworks/overview",
+                  "en/frameworks/pydantic-ai",
+                  "en/frameworks/langgraph",
+                  "en/frameworks/langchain",
+                  "en/frameworks/tricks"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Common Agents",
+            "icon": "bot",
+            "pages": [
+              {
+                "group": "Setup and advanced",
+                "pages": [
+                  "en/common-agents/overview",
+                  "en/common-agents/hermes",
+                  "en/common-agents/openclaw",
+                  "en/common-agents/agent-self-extension"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Coding Agents",
+            "icon": "terminal",
+            "pages": [
+              {
+                "group": "Contract",
+                "pages": [
+                  "en/coding-agents/overview",
+                  "en/coding-agents/hooks-and-plugins",
+                  "en/coding-agents/extend-hooks"
+                ]
+              },
+              {
+                "group": "Hosts",
+                "pages": [
+                  "en/coding-agents/codex",
+                  "en/coding-agents/claude-code",
+                  "en/coding-agents/dsh",
+                  "en/coding-agents/opencode",
+                  "en/coding-agents/pi"
+                ]
+              }
+            ]
+          }
+        ]
       }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
-    }
+    ]
   },
   "contextual": {
     "options": [
@@ -64,9 +308,34 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/oceanbase/powercontext",
+      "discord": "https://discord.com/invite/74cF8vbNEs"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/zh",
+      "destination": "/zh/start"
+    },
+    {
+      "source": "/zh/index",
+      "destination": "/zh/start"
+    },
+    {
+      "source": "/zh/learning-path",
+      "destination": "/zh/start/learning-path"
+    },
+    {
+      "source": "/en",
+      "destination": "/en/start"
+    },
+    {
+      "source": "/en/index",
+      "destination": "/en/start"
+    },
+    {
+      "source": "/en/learning-path",
+      "destination": "/en/start/learning-path"
+    }
+  ]
 }
