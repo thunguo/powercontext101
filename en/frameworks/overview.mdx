@@ -1,13 +1,13 @@
 ---
 title: "Framework integrations overview"
-description: "Separate Server inference, Pydantic AI adapters, LangGraph nodes, and LangChain middleware before choosing a path."
+description: "Choose LangGraph or LangChain for a first integration. Read Server inference and the Pydantic AI Preview adapter only when you need them."
 ---
 
 <Warning>
 Packaging is not uniform. The Pydantic AI Agent adapter is Preview and currently has no working standalone install. LangGraph and LangChain are source-install only and are not published to PyPI.
 </Warning>
 
-PowerContext has four Python framework paths. They share a Server contract, but not an abstraction. In particular, Pydantic AI inference inside the Server is separate from the Preview adapter for Pydantic AI agents.
+PowerContext has four Python framework paths. They share a Server contract, but not an abstraction. For a first agent integration, choose LangGraph or LangChain; both can be installed from source. Pydantic AI inference inside the Server only configures generation, embedding, and reranking. It is not an agent adapter. Read the Preview adapter for Pydantic AI agents only when you need it. Do not use it as the first page.
 
 ## Four boundaries, not one
 
@@ -51,25 +51,25 @@ Server-side Pydantic AI inference sits inside Server composition. It supplies ge
 ## Minimum usage: choose the boundary
 
 ```text
-Need generation, embedding, or reranking inside the Server?
-  -> Pydantic AI Server inference
-Need agent-side Memory tools plus per-run recall?
-  -> Pydantic AI Capability (Preview)
-Need only three Pydantic AI Memory tools?
-  -> Pydantic AI Toolset (Preview)
 Need async LangGraph tools, recall, and per-run Scope?
   -> LangGraph
 Need sync or async LangChain request recall, with optional completed-turn Source capture?
   -> LangChain
+Need generation, embedding, or reranking inside the Server?
+  -> Pydantic AI Server inference (read when needed)
+Need agent-side Memory tools plus per-run recall?
+  -> Pydantic AI Capability (Preview; read when needed)
+Need only three Pydantic AI Memory tools?
+  -> Pydantic AI Toolset (Preview; read when needed)
 ```
 
-| Requirement | Read next |
-|---|---|
-| Configure Source extraction, Experience / Skill / Handoff generation, embedding, or reranking | [Pydantic AI Server inference](/en/frameworks/pydantic-ai-server-inference) |
-| Review the Preview Capability, Toolset, and capture lifecycle | [Pydantic AI Agent adapter](/en/frameworks/pydantic-ai) |
-| Add three Memory tools and transient recall to an async graph | [LangGraph](/en/frameworks/langgraph) |
-| Add request-level recall and optional completed-turn Source capture | [LangChain](/en/frameworks/langchain) |
-| Expose selected explicit operations without framework lifecycle hooks | MCP, with no automatic prepare, capture, or flush |
+| When | Requirement | Read next |
+|---|---|---|
+| First integration | Add three Memory tools and transient recall to an async graph | [LangGraph](/en/frameworks/langgraph) |
+| First integration | Add request-level recall and optional completed-turn Source capture | [LangChain](/en/frameworks/langchain) |
+| Read when needed | Configure Source extraction, Experience / Skill / Handoff generation, embedding, or reranking | [Pydantic AI Server inference](/en/frameworks/pydantic-ai-server-inference) |
+| Read when needed | Review the Preview Capability, Toolset, and capture lifecycle | [Pydantic AI Agent adapter](/en/frameworks/pydantic-ai) |
+| Read when needed | Expose selected explicit operations without framework lifecycle hooks | MCP, with no automatic prepare, capture, or flush |
 
 ## Capability matrix
 
@@ -165,4 +165,13 @@ Capture needs a separate privacy decision. Pydantic AI excludes thinking parts a
 If any checklist item is unknown, stop at the integration's model-free or Server-only check before adding an external model provider.
 </Check>
 
-Continue with [Pydantic AI Server inference](/en/frameworks/pydantic-ai-server-inference) so Server model configuration does not get mixed with the Preview agent adapter.
+<Columns cols={2}>
+  <Card title="LangGraph" icon="git-branch" href="/en/frameworks/langgraph" arrow="true" cta="First integration">
+    Add three Memory tools and per-turn transient recall to an async graph. Install it from source.
+  </Card>
+  <Card title="LangChain" icon="link" href="/en/frameworks/langchain" arrow="true" cta="First integration">
+    Add recall on every model request, with optional completed-turn Source capture. Install it from source.
+  </Card>
+</Columns>
+
+Read [Pydantic AI Server inference](/en/frameworks/pydantic-ai-server-inference) when you need generation, embedding, or reranking inside the Server. The [Pydantic AI Agent adapter](/en/frameworks/pydantic-ai) is still Preview and currently has no working standalone install, so do not use it as the first page.

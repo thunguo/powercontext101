@@ -129,14 +129,19 @@
             "icon": "boxes",
             "pages": [
               {
-                "group": "框架",
+                "group": "第一次接入",
                 "pages": [
                   "zh/frameworks/overview",
-                  "zh/frameworks/pydantic-ai-server-inference",
-                  "zh/frameworks/pydantic-ai",
                   "zh/frameworks/langgraph",
                   "zh/frameworks/langchain",
                   "zh/frameworks/tricks"
+                ]
+              },
+              {
+                "group": "需要时再读",
+                "pages": [
+                  "zh/frameworks/pydantic-ai-server-inference",
+                  "zh/frameworks/pydantic-ai"
                 ]
               }
             ]
@@ -246,14 +251,19 @@
             "icon": "boxes",
             "pages": [
               {
-                "group": "Integrations",
+                "group": "First integration",
                 "pages": [
                   "en/frameworks/overview",
-                  "en/frameworks/pydantic-ai-server-inference",
-                  "en/frameworks/pydantic-ai",
                   "en/frameworks/langgraph",
                   "en/frameworks/langchain",
                   "en/frameworks/tricks"
+                ]
+              },
+              {
+                "group": "Read when needed",
+                "pages": [
+                  "en/frameworks/pydantic-ai-server-inference",
+                  "en/frameworks/pydantic-ai"
                 ]
               }
             ]

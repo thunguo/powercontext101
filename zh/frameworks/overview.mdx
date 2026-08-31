@@ -1,13 +1,13 @@
 ---
 title: "框架集成总览"
-description: "先区分 Server inference、Pydantic AI adapter、LangGraph node 和 LangChain middleware，再选择接入路径。"
+description: "第一次接入先选 LangGraph 或 LangChain。Server inference 和 Pydantic AI Preview adapter 需要时再读。"
 ---
 
 <Warning>
 各路径的 packaging 状态不同。Pydantic AI Agent adapter 仍是 Preview，当前没有可用的独立安装方式。LangGraph 和 LangChain 只能从 source 安装，尚未发布到 PyPI。
 </Warning>
 
-PowerContext 有四条 Python 框架路径。它们共用 Server contract，但不是同一种抽象。尤其要分清：Server 内的 Pydantic AI inference，与面向 Pydantic AI Agent 的 Preview adapter 是两条独立路径。
+PowerContext 有四条 Python 框架路径。它们共用 Server contract，但不是同一种抽象。第一次接入 Agent 时，先选 LangGraph 或 LangChain；这两条路径可以从 source 安装。尤其要分清：Server 内的 Pydantic AI inference 只配置 generation、embedding 和 reranking，并不是 Agent adapter。面向 Pydantic AI Agent 的 Preview adapter 需要时再读，不要当作第一页。
 
 ## 四种边界，不是一套封装
 
@@ -51,25 +51,25 @@ Server-side Pydantic AI inference 位于 Server composition 内，为 generation
 ## 最小用法：先选择边界
 
 ```text
-Need generation, embedding, or reranking inside the Server?
-  -> Pydantic AI Server inference
-Need agent-side Memory tools plus per-run recall?
-  -> Pydantic AI Capability (Preview)
-Need only three Pydantic AI Memory tools?
-  -> Pydantic AI Toolset (Preview)
 Need async LangGraph tools, recall, and per-run Scope?
   -> LangGraph
 Need sync or async LangChain request recall, with optional completed-turn Source capture?
   -> LangChain
+Need generation, embedding, or reranking inside the Server?
+  -> Pydantic AI Server inference (read when needed)
+Need agent-side Memory tools plus per-run recall?
+  -> Pydantic AI Capability (Preview; read when needed)
+Need only three Pydantic AI Memory tools?
+  -> Pydantic AI Toolset (Preview; read when needed)
 ```
 
-| 需求 | 下一页 |
-|---|---|
-| 配置 Source extraction、Experience / Skill / Handoff generation、embedding 或 reranking | [Pydantic AI Server inference](/zh/frameworks/pydantic-ai-server-inference) |
-| 查看 Preview Capability、Toolset 与 capture lifecycle | [Pydantic AI Agent adapter](/zh/frameworks/pydantic-ai) |
-| 为 async graph 增加三个 Memory tools 和临时 recall | [LangGraph](/zh/frameworks/langgraph) |
-| 增加 request-level recall，并可选 capture completed-turn Source | [LangChain](/zh/frameworks/langchain) |
-| 不使用框架 lifecycle hook，只暴露部分显式操作 | MCP；没有 automatic prepare、capture 或 flush |
+| 时机 | 需求 | 下一页 |
+|---|---|---|
+| 第一次接入 | 为 async graph 增加三个 Memory tools 和临时 recall | [LangGraph](/zh/frameworks/langgraph) |
+| 第一次接入 | 增加 request-level recall，并可选 capture completed-turn Source | [LangChain](/zh/frameworks/langchain) |
+| 需要时再读 | 配置 Source extraction、Experience / Skill / Handoff generation、embedding 或 reranking | [Pydantic AI Server inference](/zh/frameworks/pydantic-ai-server-inference) |
+| 需要时再读 | 查看 Preview Capability、Toolset 与 capture lifecycle | [Pydantic AI Agent adapter](/zh/frameworks/pydantic-ai) |
+| 需要时再读 | 不使用框架 lifecycle hook，只暴露部分显式操作 | MCP；没有 automatic prepare、capture 或 flush |
 
 ## 能力矩阵
 
@@ -165,4 +165,13 @@ Capture 还需要单独的隐私决定。Pydantic AI 会排除 thinking part，�
 只要有一项还不确定，就先停在 integration 的 model-free 或 Server-only 检查，不要继续叠加外部模型 provider。
 </Check>
 
-下一页先看 [Pydantic AI Server inference](/zh/frameworks/pydantic-ai-server-inference)，避免把 Server 模型配置与 Preview Agent adapter 混在一起。
+<Columns cols={2}>
+  <Card title="LangGraph" icon="git-branch" href="/zh/frameworks/langgraph" arrow="true" cta="第一次接入">
+    为 async graph 增加三个 Memory tools 和按 turn 的临时 recall。从 source 安装。
+  </Card>
+  <Card title="LangChain" icon="link" href="/zh/frameworks/langchain" arrow="true" cta="第一次接入">
+    为每次 model request 增加 recall，并可按需捕获 completed-turn Source。从 source 安装。
+  </Card>
+</Columns>
+
+需要配置 Server 内的 generation、embedding 或 reranking 时，再读 [Pydantic AI Server inference](/zh/frameworks/pydantic-ai-server-inference)。[Pydantic AI Agent adapter](/zh/frameworks/pydantic-ai) 仍是 Preview，当前没有可用的独立安装方式，不要当作第一页。
