@@ -1,14 +1,329 @@
 ---
 title: "常用 API 串讲"
-description: "用 Python Client 把 remember、search、prepare_context、修订和停用串成一条闭环。"
+description: "用 async Python Client 完成 explicit Memory 的写入、搜索、准备、修订、停用和历史读取。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+这一页只用最小 Server。没有 generation model，也不需要 vector search。
 
-## 本页将覆盖
+目标很具体：写入一条项目决策，确认它能被搜索和组装进 `PreparedContext`，然后修订、停用，并验证历史还在。
 
-- PowerContextClient 连接本地 Server
-- remember_memory → search_memory → prepare_context
-- 把 citation 传回 Server 来修订或停用
+## 接口怎么分工
+
+PowerContext 的远程接口都连接同一个 Server 和持久数据。
+
+| 接口 | 适合什么 |
+|---|---|
+| HTTP | 跨语言服务集成；完整契约以 OpenAPI 为准 |
+| Python Client | Python 应用的 typed async 调用 |
+| MCP | Agent-facing 的精选工具面，不等于完整 HTTP API |
+| CLI | 安装、诊断、Server 管理和人工 Review |
+
+HTTP 契约可从当前 Server 查看：
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/redoc
+http://127.0.0.1:8000/openapi.json
+```
+
+开启 Server auth 后，这三个 discovery route 也需要 Bearer header。不要把 token 放进 URL。
+
+## 准备示例项目
+
+上一页已经安装了 client extra。新建 `api_tour.py`，使用下面的完整脚本。
+
+```python
+import asyncio
+import os
+from uuid import uuid4
+
+from powercontext.client import PowerContextClient, ServerResponseError
+from powercontext.http import (
+    GetMemoryEntryRequest,
+    ListMemoryEntriesRequest,
+    PrepareContextRequest,
+    RememberMemoryRequest,
+    RetireMemoryEntryRequest,
+    ReviseMemoryEntryRequest,
+    SearchMemoryRequest,
+)
+
+
+SERVER_URL = os.getenv(
+    "POWERCONTEXT_CLIENT_SERVER_URL",
+    "http://127.0.0.1:8000",
+)
+API_TOKEN = os.getenv("POWERCONTEXT_CLIENT_API_TOKEN")
+
+
+async def main() -> None:
+    scope_id = f"project:powercontext-101:{uuid4().hex}"
+
+    async with PowerContextClient(
+        SERVER_URL,
+        token=API_TOKEN,
+        timeout=10.0,
+    ) as client:
+        capabilities = await client.get_capabilities()
+        print("search modes:", [mode.value for mode in capabilities.search_modes])
+        print("scope:", scope_id)
+
+        request = RememberMemoryRequest(
+            scope_id=scope_id,
+            kind="decision",
+            text=(
+                "Regenerate and inspect the checked-in client before "
+                "running contract tests."
+            ),
+            reason="PowerContext 101 API tour",
+        )
+
+        remembered = await client.remember_memory(request)
+        assert remembered.entry is not None
+        original = remembered.entry
+        print("memory:", remembered.memory)
+        print("entry citation:", original.citation)
+        print("source refs:", original.source_refs)
+
+        duplicate = await client.remember_memory(request)
+        assert duplicate.memory == remembered.memory
+        assert duplicate.entry is None
+        print("duplicate write: no-op")
+
+        search = await client.search_memory(
+            SearchMemoryRequest(
+                scope_id=scope_id,
+                query="What should happen before contract tests?",
+                mode="auto",
+                limit=5,
+            )
+        )
+        assert search.hits
+        print("used search mode:", search.mode)
+        for hit in search.hits:
+            print(
+                "hit:",
+                hit.text,
+                hit.score,
+                [item.value for item in hit.matched_by],
+                hit.citation,
+            )
+
+        prepared = await client.prepare_context(
+            PrepareContextRequest(
+                scope_id=scope_id,
+                query="What should happen before contract tests?",
+                max_bytes=8000,
+            )
+        )
+        assert prepared.status == "ready"
+        assert prepared.content is not None
+        assert len(prepared.content.encode("utf-8")) == prepared.content_bytes
+        print("context schema:", prepared.schema_)
+        print("context bytes:", prepared.content_bytes)
+        print(prepared.content)
+
+        exact = await client.get_memory_entry(
+            GetMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=original.citation,
+            )
+        )
+        assert exact == original
+
+        revised = await client.revise_memory_entry(
+            ReviseMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=original.citation,
+                kind="decision",
+                text=(
+                    "Regenerate the checked-in client, inspect the diff, "
+                    "and then run contract tests."
+                ),
+                reason="Add the generated-diff check",
+            )
+        )
+        assert revised.entry is not None
+        current = revised.entry
+        print("revised memory:", revised.memory)
+        print("current citation:", current.citation)
+
+        historical = await client.get_memory_entry(
+            GetMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=original.citation,
+            )
+        )
+        assert historical.text == original.text
+        print("old citation remains readable")
+
+        try:
+            await client.retire_memory_entry(
+                RetireMemoryEntryRequest(
+                    scope_id=scope_id,
+                    citation=original.citation,
+                    reason="Demonstrate stale citation",
+                )
+            )
+        except ServerResponseError as exc:
+            assert exc.status_code == 409
+            assert exc.code == "revision_conflict"
+            print("stale citation rejected:", exc.code, exc.request_id)
+        else:
+            raise AssertionError("the stale citation should have conflicted")
+
+        retired = await client.retire_memory_entry(
+            RetireMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=current.citation,
+                reason="The tutorial lifecycle is complete",
+            )
+        )
+        assert retired.entry is not None
+        assert retired.entry.state == "inactive"
+
+        active = await client.list_memory_entries(
+            ListMemoryEntriesRequest(scope_id=scope_id)
+        )
+        assert active.entries == []
+
+        audit = await client.list_memory_entries(
+            ListMemoryEntriesRequest(
+                scope_id=scope_id,
+                include_inactive=True,
+            )
+        )
+        assert len(audit.entries) == 1
+        assert audit.entries[0].state == "inactive"
+        print("inactive history remains readable")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+运行：
+
+```bash
+uv run python api_tour.py
+```
+
+每次运行使用唯一 Scope，避免上一次教程数据让 duplicate、entry count 或 Revision 断言失效。真实项目应改用稳定的 project/tenant Scope，而不是随机值。
+
+## 这段代码验证了什么
+
+### Explicit Memory 不需要 Source
+
+`remember_memory` 直接写入已经确认的长期知识。示例中 `source_refs` 通常为空。
+
+首次有效写入返回：
+
+- exact Memory Artifact ref；
+- logical `entry_id`；
+- exact `entry_version_id`；
+- current entry content 和 state。
+
+完全重复的 active content 是 no-op。它返回当前 Memory ref，但 `entry` 是 `null`。因此，不要假设每次 `remember_memory` 都有 `response.entry.citation`。
+
+### Search 的 empty 有两种
+
+Scope 从未有过 Memory：
+
+```text
+memory = null
+mode = null
+hits = []
+```
+
+Scope 有 Memory，但 query 没匹配：
+
+```text
+memory = current exact ref
+mode = fts/vector/hybrid
+hits = []
+```
+
+两者都是 HTTP 200 下的正常领域结果。
+
+### PreparedContext 已经是最终 envelope
+
+`prepared.content` 已包含 trust marker、边界和 Citation。宿主可以把它作为不可信历史证据注入当前模型请求，不需要重新拼 search hits。
+
+`status="empty"` 时：
+
+```text
+content = null
+content_bytes = 0
+```
+
+`status="ready"` 时，实际 UTF-8 bytes 必须等于 `content_bytes`，并且不超过 request 的 `max_bytes`。
+
+### Exact read 与 mutation 的版本规则不同
+
+旧 Citation 可用于 `get_memory_entry` 读取历史。
+
+`revise_memory_entry` 和 `retire_memory_entry` 只接受 current-head Citation。任何 Memory mutation 推进 Revision 后，旧 Citation 会返回 HTTP 409 `revision_conflict`。
+
+用 mutation response 返回的新 Citation 继续下一步。
+
+### Retire 不删除
+
+retire 后：
+
+- 默认 list 不再显示条目；
+- active search / recall 不再选择它；
+- `include_inactive=True` 仍能审计；
+- exact historical read 仍然有效。
+
+## Client 错误怎么处理
+
+Python Client 保留 HTTP status、稳定 error code、Server message 和 `X-PowerContext-Request-ID`。
+
+```python
+from powercontext.client import (
+    InvalidResponseError,
+    ServerResponseError,
+    TransportError,
+)
+
+try:
+    ...
+except ServerResponseError as exc:
+    print(exc.status_code, exc.code, exc.server_message, exc.request_id)
+except TransportError as exc:
+    print("HTTP transport failed:", exc)
+except InvalidResponseError as exc:
+    print("Response violated the generated contract:", exc)
+```
+
+常见状态：
+
+| HTTP | 含义 |
+|---|---|
+| 401 | Bearer token 缺失或错误 |
+| 404 | exact immutable value 不存在 |
+| 409 | current head、Citation 或 expected version 冲突 |
+| 422 | request 或 capability 不满足契约 |
+| 503 | 必需 Runtime binding / dependency 不可用 |
+
+409 后先重新读取当前值，再决定是否重试。不要猜 Revision。
+
+## MCP 与 HTTP 不是同一覆盖面
+
+MCP 是给 Agent 的精选工具面。HTTP 是完整 application contract。
+
+`POST /v1/context/prepare` 和 Python Client 的 `prepare_context` 不作为 MCP tool 暴露，因为最终 PreparedContext 通常由 Hook 或 framework adapter 在请求时自动准备。MCP 也不等于每个 integration 的自动 capture 和 flush 生命周期。
+
+## 完成检查
+
+脚本应证明：
+
+- 首次 remember 返回 exact entry Citation；
+- duplicate 是 `entry=None` 的 no-op；
+- FTS/auto search 找到 active entry；
+- PreparedContext 是 `ready` 且字节数一致；
+- revise 后旧 Citation 仍可 exact read；
+- 旧 Citation mutation 返回 409；
+- retire 后默认 list 为空，audit 仍能读取 inactive entry。
+
+下一页比较[显式 Memory 与 Source extraction](/zh/basic-usage/source-and-memory)。

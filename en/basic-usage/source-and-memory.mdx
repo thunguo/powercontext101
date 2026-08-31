@@ -1,14 +1,332 @@
 ---
 title: "Source and Memory in practice"
-description: "Capture evidence, write or extract Memory, then verify recall across sessions."
+description: "Compare explicit Memory with Source extraction and verify real lineage through position, cursor, and source_refs."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+The previous page wrote already-curated Memory directly. This page follows the other path: capture Source first, then let a generation pipeline extract durable knowledge from the evidence.
 
-## This page will cover
+Both paths may produce Memory. Their prerequisites, lineage, and failure behavior differ.
 
-- The boundary between explicit remember and Source extraction
-- Active versus inactive entries and historical Revisions
-- How the same scope recovers Memory in a later session
+## Compare the two paths
+
+| Path | Model required | Creates Source first | Best fit |
+|---|---:|---:|---|
+| `remember_memory` | No | No | A fact, decision, or constraint you already know should be retained |
+| capture → flush/scheduler → extraction | Yes | Yes | Finding reusable knowledge in a set of work evidence |
+
+When the agent already has an explicit instruction to remember a decision, direct remember is simpler. Do not manufacture a Source merely to create prettier lineage.
+
+Conversely, a prompt captured automatically by a host should usually remain Source evidence first. Whether it deserves Memory is a later decision.
+
+## Check extraction capability
+
+```bash
+powercontext capabilities
+```
+
+You need:
+
+```text
+Memory extraction: enabled
+```
+
+When it is disabled:
+
+- capture still succeeds;
+- the Source remains in the journal;
+- a pending Source window cannot run model extraction;
+- configure generation and restart the Server with `--env-file`.
+
+```bash
+powercontext config init --output .env
+powercontext config show --env-file .env
+powercontext config validate --env-file .env
+powercontext server run --env-file .env
+```
+
+Scheduling is a separate setting. This page calls `flush_memory` directly and does not depend on the periodic scheduler.
+
+## Complete lineage script
+
+Create `source_memory.py`:
+
+```python
+import asyncio
+import os
+from uuid import uuid4
+
+from powercontext.client import PowerContextClient
+from powercontext.http import (
+    CaptureContentSourceRequest,
+    FlushMemoryRequest,
+    ListMemoryEntriesRequest,
+    PrepareContextRequest,
+    SearchMemoryRequest,
+)
+
+
+SERVER_URL = os.getenv(
+    "POWERCONTEXT_CLIENT_SERVER_URL",
+    "http://127.0.0.1:8000",
+)
+API_TOKEN = os.getenv("POWERCONTEXT_CLIENT_API_TOKEN")
+
+
+async def main() -> None:
+    scope_id = f"project:powercontext-101:{uuid4().hex}"
+    source_id = "openapi-task-1"
+
+    async with PowerContextClient(
+        SERVER_URL,
+        token=API_TOKEN,
+        timeout=30.0,
+    ) as client:
+        capabilities = await client.get_capabilities()
+        if not capabilities.memory_extraction:
+            raise RuntimeError(
+                "Memory extraction is disabled. Configure a generation "
+                "model and restart the Server with --env-file."
+            )
+
+        request = CaptureContentSourceRequest(
+            scope_id=scope_id,
+            source_id=source_id,
+            content=(
+                "Decision: after changing the OpenAPI contract, regenerate "
+                "and inspect the checked-in client before contract tests."
+            ),
+            metadata={
+                "origin": "powercontext-101",
+                "chapter": "source-and-memory",
+            },
+        )
+
+        captured = await client.capture_content_source(request)
+        assert captured.status == "accepted"
+        print("source:", captured.source)
+        print("position:", captured.position)
+
+        replayed = await client.capture_content_source(request)
+        assert replayed.source == captured.source
+        assert replayed.position == captured.position
+        print("identical replay kept the original position")
+
+        flushed = await client.flush_memory(
+            FlushMemoryRequest(scope_id=scope_id)
+        )
+        print("flush status:", flushed.status)
+        print(
+            "cursor:",
+            flushed.previous_cursor,
+            "->",
+            flushed.current_cursor,
+            "high watermark:",
+            flushed.high_watermark,
+        )
+        print("processed source count:", flushed.processed_source_count)
+        print("memory:", flushed.memory)
+
+        if flushed.current_cursor < captured.position:
+            raise RuntimeError(
+                "The cursor has not reached the captured Source yet. "
+                "Flush again or inspect the generation failure."
+            )
+
+        page = await client.list_memory_entries(
+            ListMemoryEntriesRequest(
+                scope_id=scope_id,
+                include_inactive=True,
+            )
+        )
+
+        linked = [
+            entry
+            for entry in page.entries
+            if captured.source in entry.source_refs
+        ]
+
+        if not linked:
+            print(
+                "The Source window was consumed, but extraction produced "
+                "no Memory entry linked to this Source. This is a valid "
+                "no-op; inspect the model output and content, then retry "
+                "with a new Source ID if you need a positive lineage check."
+            )
+
+        for entry in linked:
+            print("entry:", entry.kind, entry.text)
+            print("citation:", entry.citation)
+            print("source refs:", entry.source_refs)
+            assert captured.source in entry.source_refs
+
+        search = await client.search_memory(
+            SearchMemoryRequest(
+                scope_id=scope_id,
+                query="What should happen before contract tests?",
+                mode="auto",
+                limit=10,
+            )
+        )
+        print("search mode:", search.mode)
+        print("hits:", len(search.hits))
+
+        prepared = await client.prepare_context(
+            PrepareContextRequest(
+                scope_id=scope_id,
+                query="What should happen before contract tests?",
+            )
+        )
+        print("prepared status:", prepared.status)
+        print(prepared.content)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run it:
+
+```bash
+uv run python source_memory.py
+```
+
+Generation output is inherently variable. The tutorial uses an explicit durable decision to make a candidate likely, but it does not prescribe fixed model wording. The stable assertions are position, cursor, exact SourceRef, and entry lineage.
+
+## What to inspect at each step
+
+### Capture
+
+Success is HTTP 202 with:
+
+- `status="accepted"`;
+- an exact content SourceRef;
+- a numeric scope-local `position`.
+
+A replay with the same identity and serialized payload bytes returns the original position.
+
+This idempotency check is not semantic canonicalization. Reordering metadata keys may change serialized bytes and produce `source_conflict`. A real retry should reuse the same serialized input.
+
+Changing content under the same identity must never overwrite the old Source. It returns HTTP 409.
+
+### Flush
+
+Determine Source consumption from:
+
+- `previous_cursor`;
+- `current_cursor`;
+- `processed_source_count`;
+- the capture response `position`.
+
+The current cursor must reach or pass the captured position.
+
+The scheduler may finish first, so a manual flush returning `idle` can be correct when the cursor has already reached the position.
+
+### Memory lineage
+
+Do not rely on similar search text. Find an entry whose `source_refs` contains the exact SourceRef returned by capture.
+
+That proves the Memory entry came from this Source.
+
+### Extraction no-op
+
+This is valid:
+
+```text
+status = processed
+processed_source_count > 0
+current_cursor advanced
+memory = null, or no linked entry
+```
+
+The model may produce no candidate, or deduplication may remove candidates identical to active content. The Source was consumed even though Memory did not change.
+
+## Use stricter assertions for vector verification
+
+When `capabilities.search_modes` includes `vector`, you may add:
+
+```python
+vector = await client.search_memory(
+    SearchMemoryRequest(
+        scope_id=scope_id,
+        query="generated client contract tests",
+        mode="vector",
+        limit=50,
+    )
+)
+```
+
+This lineage has completed an embedding round trip only when:
+
+- response `mode == "vector"`;
+- a hit Citation identifies the source-linked entry from this run;
+- `matched_by` contains `vector`.
+
+A hit for older Memory, an empty hit list, or `mode=None` proves nothing about this Source's vector projection.
+
+An explicit `vector` request returns HTTP 422 when vector capability is unavailable. It does not fall back to FTS.
+
+## Cross-session recall depends on Scope
+
+The script uses a random Scope for repeatable tests. To verify recall across sessions:
+
+1. replace it with a stable value such as `project:powercontext-101`;
+2. run capture and flush once;
+3. start a new Python process or agent session that runs only search and prepare;
+4. connect both processes to the same Server with exactly the same Scope.
+
+If the second process finds nothing, check in this order:
+
+- Server URL;
+- database home or URL;
+- final `scope_id`;
+- whether the entry is active;
+- query relevance.
+
+A session ID is not a project Scope.
+
+## Active, inactive, and history
+
+An extracted entry uses the same lifecycle as explicit Memory:
+
+- revise creates another entry version;
+- retire marks the current entry inactive;
+- default listing, search, and PreparedContext use active content;
+- `include_inactive=True` and exact read preserve audit history.
+
+Source lineage is stored with the entry version. Revision adds new evidence while exact historical evidence remains available on the old version.
+
+## Troubleshooting
+
+### Capture succeeded, but flush returns 503
+
+Check generation capability and provider credentials. The Source remains stored, so the pending window may be retried after configuration is repaired.
+
+### Flush is processed, but no linked entry exists
+
+This is an allowed no-op. Check whether the Source contains reusable knowledge, then inspect generation output and deduplication.
+
+### The cursor never reaches the position
+
+Inspect readiness, generation diagnostics, and scheduler or flush errors. Do not report an unprocessed window as Memory.
+
+### Search has a hit, but lineage differs
+
+The query found older similar Memory in the same Scope. Use `source_refs` and the exact entry Citation as proof.
+
+### The second capture conflicts
+
+Content or metadata bytes changed under one `source_id`. Use a new ID for a new event; reuse the original input for a retry.
+
+## Completion check
+
+This page should prove that:
+
+- capture creates Source, not Memory;
+- replay keeps the original position;
+- the flush cursor reaches the capture position;
+- the source-linked entry is identified through exact `source_refs`;
+- a processed window may validly produce no-op;
+- cross-process recall depends on stable Scope;
+- an inactive entry leaves default recall while history remains.
+
+Continue with the [Handoff loop](/en/basic-usage/handoff-loop).

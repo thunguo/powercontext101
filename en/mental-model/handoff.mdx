@@ -1,14 +1,220 @@
 ---
 title: "Handoff"
-description: "A Handoff packages current work for inspection. Commit only when the user wants a durable milestone."
+description: "A Handoff packages current work for inspection. Commit happens only when the work needs a durable milestone."
 ---
 
+Memory keeps project knowledge that should matter later. Handoff handles work in progress: the objective, verified state, blockers, and what the receiver should do next.
+
+A Memory entry is often short. A useful Handoff gives the receiver enough evidence to check the state and decide whether they have the capability and authorization to continue.
+
+## Choose Memory or Handoff
+
+| Content | Use |
+|---|---|
+| “Regenerate the client before running contract tests.” | Memory |
+| “The client is generated, tests have not run, and command X is next.” | Handoff |
+| “The project requires Python 3.11 or later.” | Memory |
+| “This session changed files A and B; file C still needs inspection.” | Handoff |
+
+A durable conclusion may become Memory. The full current state of one task belongs in Handoff rather than one oversized Memory entry.
+
+## Two API layers
+
+PowerContext has a low-level Handoff lifecycle and a higher-level Work continuity loop.
+
+### Low-level lifecycle
+
+```text
+PrepareHandoff
+→ HandoffDraft
+→ finalize
+→ PreparedHandoff
+→ continue from prepared
+→ optional commit
+→ committed Handoff Revision
+```
+
+### Work loop
+
+```text
+Work Contract
+→ handoff_current_work
+→ Prepared Handoff
+→ optional commit
+→ continue
+→ acknowledge
+→ Task Outcome
+→ Work continuity projection
+```
+
+The higher-level operations store Work Contracts, boundaries, receipts, and outcomes as Source records while reusing the low-level Handoff model.
+
+## Prepared Handoff comes before commit
+
+`finalize` turns a draft into `PreparedHandoff`. It validates content and direct evidence, reads the current Handoff head, and sets `base`:
+
+- no current head means `base=None`;
+- an existing committed head becomes the exact base ref.
+
+This operation does not write a Handoff Artifact.
+
+A Prepared Handoff may be serialized and passed to another process or session. The receiver may continue directly from it. A Server restart does not invalidate the value while the caller still has it, but it never becomes `latest` without a commit.
+
 <Note>
-TODO: Body copy is not written yet. This page is an outline stub.
+`handoff_current_work` does not commit automatically either. It does capture a Handoff boundary Source, so it is not a zero-write preview API.
 </Note>
 
-## This page will cover
+## Commit saves a milestone
 
-- When to use Memory versus Handoff
-- Work Contract to Prepared Handoff to Acknowledgement to Task Outcome
-- A Handoff Report is a projection and does not rewrite history
+Commit only when the user wants a durable milestone.
+
+The operation checks that:
+
+1. the Prepared Handoff Scope matches the request;
+2. `base` still equals the current head;
+3. content and lineage are valid.
+
+The first commit creates Revision 1. Later milestones in the same lifecycle create subsequent Revisions.
+
+Retrying the same Prepared Handoff with identical content is idempotent. It returns the current Revision instead of creating a duplicate.
+
+### Stale base
+
+Two workers may prepare different Handoffs from one base. Once the first commits, the second base is stale and commit returns a Revision conflict. Read the new head, inspect the change, and prepare again.
+
+Do not resolve this conflict by incrementing a guessed revision number.
+
+## Three continue selections
+
+| selection | What it reads | Selected Revision |
+|---|---|---|
+| `prepared` | A Prepared Handoff supplied by the caller | No committed Revision |
+| `exact` | A specified historical Revision | The specified Revision, plus current |
+| `latest` | The current committed head | Selected equals current |
+
+Every Handoff resolution is `untrusted_history`. It lists state, next action, Citations, and unavailable evidence, but it does not prove that the content remains fresh.
+
+The receiver checks:
+
+- whether referenced files and Sources remain readable;
+- whether the live workspace matches the description;
+- whether the required capability is available;
+- whether the current user authorizes continuation.
+
+## Acknowledgement binds an exact target
+
+After discovering a Handoff through `latest`, take the exact selected Revision from the response and acknowledge that exact target.
+
+An accepted acknowledgement requires:
+
+- all evidence available;
+- live state confirmed;
+- capability confirmed;
+- authorization confirmed;
+- `prepared` or `exact` selection, not `latest`.
+
+If any check fails, record needs clarification, declined, or the actual state. Do not mark accepted merely to complete the workflow.
+
+Acknowledgement does not grant permission. It records what the receiver checked and whether they will continue.
+
+## Task Outcome closes the loop
+
+Task Outcome records the overall result with one of `succeeded`, `partial`, `blocked`, `failed`, `cancelled`, or `unknown`. `skipped` and `timed_out` belong to individual TaskCheck records, not Task Outcome status. Both layers should preserve the actual state.
+
+For a committed Handoff to appear covered, the Outcome must:
+
+1. link an accepted acknowledgement receipt;
+2. bind that receipt to an exact committed Handoff Revision;
+3. appear after the receipt;
+4. use the same Scope.
+
+An unrelated Outcome in the same Scope does not cover the Handoff.
+
+## Handoff Report is a projection
+
+Work continuity and Handoff Report derive views from the Source journal and committed Handoff history. They do not rewrite the underlying Sources, Handoffs, or Outcomes.
+
+Projection handles malformed work Sources fail-soft. Invalid records increase `invalid_record_count`, while valid history remains visible.
+
+The current Work continuity projection includes up to the latest 64 valid events and retains total and truncated metadata. This is a display bound, not deletion from the journal.
+
+## Walk through the OpenAPI example
+
+### 1. Work Contract
+
+```text
+Objective: complete the OpenAPI client update
+In scope: regenerate the checked-in client
+Acceptance: contract tests pass
+```
+
+### 2. Current work
+
+```text
+State: client generation completed
+Disposition: continuable
+Next action: run contract tests
+```
+
+Each state and next action cites exact Source or Artifact evidence.
+
+### 3. Temporary transfer
+
+`handoff_current_work` returns a Prepared Handoff. Pass it to the receiver and continue without committing.
+
+Check that `latest` is still empty. That is expected.
+
+### 4. Durable milestone
+
+After the user asks to keep the milestone, commit the Prepared Handoff:
+
+```text
+handoff/HANDOFF_ID@1
+```
+
+### 5. Continue and acknowledge
+
+The receiver continues from latest, inspects the exact selected `@1`, then acknowledges exact `@1`.
+
+### 6. Outcome
+
+After contract tests run, record Task Outcome and cite the acknowledgement receipt SourceRef. Work continuity should show transfer accepted and outcome covered.
+
+## Failure does not always roll everything back
+
+The higher-level work loop spans several durable operations. `handoff_current_work` captures a boundary Source before returning the Prepared Handoff. If a later commit fails:
+
+- the boundary Source remains;
+- there is no new committed Handoff Revision;
+- continuity may show the boundary event, but it is not a durable milestone.
+
+Documentation and callers should report that actual state.
+
+## Common mistakes
+
+<AccordionGroup>
+  <Accordion title="Why is my Prepared Handoff missing from Handoff Report?">
+    Report focuses on committed history. A Prepared Handoff without commit is not a durable milestone.
+  </Accordion>
+  <Accordion title="Why can I not acknowledge latest directly?">
+    Latest may change with the head. Read the exact Revision selected by latest, then bind acknowledgement to that immutable target.
+  </Accordion>
+  <Accordion title="All evidence is readable. Why can I not mark accepted?">
+    Readable evidence may be stale and says nothing about receiver capability or authorization. Accepted also requires live-state, capability, and authorization checks.
+  </Accordion>
+  <Accordion title="Can I reuse a Prepared Handoff after a commit conflict?">
+    Read the new head first. The old base is stale, so a direct retry will conflict again.
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+- Are Memory and Handoff separated as durable knowledge and current task state?
+- Are Prepared and committed Handoffs separate?
+- Does the page mention the boundary Source written by `handoff_current_work`?
+- Does latest discovery become exact acknowledgement?
+- Do receiver checks cover evidence, live state, capability, and authorization?
+- Does Outcome link an accepted receipt?
+- Does Report remain a projection?
+
+Continue with [Experience and Skill](/en/mental-model/experience-and-skill). Once work finishes, exact evidence may support reusable judgment, but Review still controls approval.

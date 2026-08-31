@@ -1,14 +1,232 @@
 ---
 title: "Memory"
-description: "Memory stores reusable decisions, constraints, state, and next steps. Revisions and retirements keep history."
+description: "Memory keeps selected project knowledge and preserves history through immutable Revisions and entry versions."
 ---
 
+Memory is for information that will influence later work: a decision already made, a constraint that still applies, the current project state, or a concrete next step.
+
+It is not a container for the full conversation. A conversation may first become Source evidence. Only the parts worth reusing across tasks belong in Memory.
+
+## What belongs in Memory
+
+These are reasonable Memory entries:
+
+- “Regenerate the checked-in client after the public HTTP contract changes.”
+- “This project requires Python 3.11 or later.”
+- “OpenClaw project mode still isolates data by agent.”
+- “Run contract tests next and inspect generated-code drift.”
+
+They remain useful in another session or several days later.
+
+Temporary debug output, greetings, and one-off tool progress usually should not become Memory directly. Keep the Source first, then extract what matters.
+
+## Memory is not an overwritable text row
+
+PowerContext Memory has three identity layers:
+
+```text
+Memory Artifact Revision
+└── logical entry_id
+    └── immutable entry_version_id
+```
+
+### Artifact Revision
+
+An effective change to the Memory lifecycle creates another immutable Artifact Revision. The Revision stores the manifest and change set at that point.
+
+### Logical entry
+
+`entry_id` identifies one piece of long-term knowledge. A revision of its content remains the same logical entry.
+
+### Entry version
+
+`entry_version_id` identifies the exact content version. A revision creates a new entry version and retains its `previous_version_id`, evidence, and creating Memory Revision.
+
+An `entry_id` alone is therefore not an exact citation. Maintenance operations also need the relevant Memory Revision and entry-version ID.
+
+## The manifest defines current state
+
+The manifest in a Memory Revision is the authoritative directory for that Revision. Each item records:
+
+- a stable `entry_id`;
+- an exact `entry_version_id`;
+- the content hash;
+- `active` or `inactive` state.
+
+`retire` changes an entry to inactive so default recall stops selecting it. The content and historical Revisions remain available.
+
+Revision is not in-place replacement either. It creates the next entry version, and the next Memory Revision points its manifest at that version.
+
+## Two write paths
+
+### Explicit write
+
+When you know what should be retained, call `remember_memory` directly:
+
+```json
+{
+  "scope_id": "project:powercontext-101",
+  "kind": "decision",
+  "text": "Regenerate and inspect the checked-in client before running contract tests."
+}
+```
+
+This path:
+
+- needs no model;
+- needs no Source first;
+- may include `expected_revision` for concurrency control;
+- returns a Memory ref and exact entry Citation when content changes; a canonical duplicate no-op may return the current Memory ref with `entry=null`.
+
+### Extraction from Source
+
+The automatic path captures Source first, then lets the scheduler or `flush_memory` process a Source window:
+
+```text
+Source window
+→ bounded evidence
+→ model candidate
+→ domain validation
+→ canonicalization and deduplication
+→ atomic Memory commit
+→ cursor update
+```
+
+Model output is an untrusted candidate. It may cite only evidence IDs supplied to that operation, not an arbitrary Source or Artifact outside the request.
+
+PowerContext commits the Memory Revision, entry versions, and active search projections in one transaction. A failure cannot leave a committed Revision with a missing index update.
+
+Canonical duplicate content may become no-op instead of manufacturing a new Revision with no semantic change.
+
 <Note>
-TODO: Body copy is not written yet. This page is an outline stub.
+Explicit writes and Source extraction can both produce Memory, but their lineage differs. To prove that an entry came from a particular Source, inspect its exact `source_refs` rather than relying on text similarity.
 </Note>
 
-## This page will cover
+## Revise and retire
 
-- What belongs in Memory and what does not
-- Explicit writes need no model; extraction from a Source needs a generation pipeline
-- Retire removes an entry from active recall without deleting history
+A revision targets the current exact Citation. New content creates another entry version, while the old version remains readable.
+
+Retirement also needs an exact target:
+
+```text
+Memory Revision + entry_id + entry_version_id
+```
+
+After retirement:
+
+- default active listing and recall stop returning the entry;
+- `include_inactive` supports audit;
+- old Artifact Revisions and entry versions still exist.
+
+If another worker advanced the Memory head, an older Citation conflicts. Read the current state and inspect the difference before deciding what to do. Do not guess the next Revision.
+
+## How search works
+
+Memory search does more than rank every text by one similarity score. It selects the current Memory head, then chooses a mode from the request and available capabilities.
+
+| mode | Requirement | Behavior |
+|---|---|---|
+| `fts` | FTS projection available | Recall from query-term evidence |
+| `vector` | Complete embedding model, profile, dimension, and backend vector capability | Vector retrieval only |
+| `hybrid` | FTS and vector available | Merge both result sets |
+| `auto` | Runtime selection | Prefer hybrid, otherwise use FTS |
+
+If query embedding is temporarily unavailable or times out, `auto` may fall back to FTS when FTS is available. An explicit `vector` or `hybrid` request must not silently change modes; the caller receives a capability error.
+
+### Fusion and reranking
+
+Hybrid search combines FTS and vector ranks with reciprocal rank fusion. The current RRF constant is 60.
+
+Vector admission converts unit-normalized L2 distance to cosine similarity and applies a minimum similarity threshold. Results keep `matched_by`, showing whether FTS, vector, or both contributed.
+
+Optional reranking runs after retrieval. It may change final order, but it does not modify Memory or the search index. Once reranking begins, it uses the selected Revision snapshot instead of silently switching when another write advances the head.
+
+## PreparedContext is not a copied search response
+
+`prepare_context` retrieves coarse candidates, then a builder selects final content under one shared UTF-8 byte budget.
+
+The current builder uses several explicit limits:
+
+- up to 16 coarse Memory candidates;
+- up to 8 Experience candidates;
+- up to 8 final items in total;
+- at most 2 final Experience items;
+- up to 2000 bytes per item.
+
+These are current implementation details and may change. The stable contract is that final content fits `max_bytes`, includes exact Citations, and is labeled `untrusted_history`.
+
+The result states are:
+
+```text
+empty → content is null, content_bytes is 0
+ready → content is nonblank, content_bytes matches UTF-8 bytes
+```
+
+PreparedContext is input for this request. It does not become new Memory automatically.
+
+## Walk through the OpenAPI example
+
+Write Memory explicitly:
+
+```json
+{
+  "scope_id": "project:powercontext-101",
+  "kind": "decision",
+  "text": "Regenerate and inspect the checked-in client before running contract tests."
+}
+```
+
+Search it:
+
+```json
+{
+  "scope_id": "project:powercontext-101",
+  "query": "What should happen before contract tests?",
+  "mode": "fts",
+  "limit": 5
+}
+```
+
+Inspect the response:
+
+1. Does `memory_ref` identify the current exact Revision?
+2. Are `entry_id` and `entry_version_id` present?
+3. Does `matched_by` match the requested mode?
+4. Does the Citation from `prepare_context` point to the same entry version?
+
+Then revise the content:
+
+```text
+Regenerate the checked-in client, inspect the diff, and then run contract tests.
+```
+
+The old Citation remains valid for historical reading, but it no longer identifies the current entry for revise or retire.
+
+## Easy misdiagnoses
+
+### `auto` returned FTS instead of hybrid
+
+Check the embedding model, profile ID, dimension, backend vector capability, and whether current Memory heads have complete vector projections.
+
+### Flush processed Sources but created no Revision
+
+The model may have returned no-op, or canonicalization may have found duplicate content. Inspect Source lineage and the change set.
+
+### Search returned a hit, but PreparedContext is empty
+
+PreparedContext also applies relevance, deduplication, and byte-budget constraints. A search hit is not guaranteed final selection.
+
+### The Memory head changed during reranking
+
+The current search keeps the Revision snapshot selected at the start. A later search reads the new head.
+
+## Checklist
+
+- Are Artifact Revision, entry ID, and entry-version ID separate?
+- Is retire understood as deactivate rather than delete?
+- Does explicit write remain model-free and Source-free?
+- Does an extraction candidate pass evidence and domain validation?
+- Are `auto` fallback and explicit vector/hybrid failure different?
+- Is PreparedContext still temporary, untrusted, and bounded?
+
+Continue with [Handoff](/en/mental-model/handoff). Memory answers what the project should remember later. Handoff answers who continues the current work and where they begin.

@@ -1,14 +1,201 @@
 ---
 title: "Source"
-description: "A Source keeps original work evidence. Capturing a prompt does not create Memory."
+description: "A Source keeps identifiable work evidence. Journal position, processing cursor, and Memory belong to later layers."
 ---
 
+A Source records what happened. A user prompt, task result, or host-captured turn may all become Sources.
+
+It does not decide whether the content deserves long-term retention. Memory, Experience, Skill, and Handoff handle those later decisions.
+
+## Stable identity
+
+PowerContext refers to a Source with two fields:
+
+```text
+SourceRef
+├── source_type
+└── source_id
+```
+
+The full identity also includes `scope_id`. The same `source_type` and `source_id` may exist independently in different Scopes.
+
+For the built-in content Source, capture returns a SourceRef and a scope-local journal position:
+
+```json
+{
+  "status": "accepted",
+  "source": {
+    "source_type": "content",
+    "source_id": "openapi-task-1"
+  },
+  "position": 1
+}
+```
+
+A `source_id` should be stable and reproducible. Hosts often derive it from the Scope, session, turn, or content so a retry stays idempotent.
+
+## Captured and referenced Sources
+
+A Source adapter uses one of two materialization modes.
+
+| Mode | What PowerContext stores | How it is read |
+|---|---|---|
+| `captured` | A content snapshot and metadata | Directly from persistence |
+| `referenced` | A reference to material managed elsewhere | Resolved by the adapter when read |
+
+Captured Sources suit prompts, task results, and event text. Referenced Sources suit material owned by another system.
+
+The distinction is practical. Captured content is a snapshot. Material behind a referenced Source may have changed by the next resolution.
+
+## One journal per Scope
+
+A persisted Source receives a monotonically increasing position. A position:
+
+- starts at 1;
+- has meaning only within its Scope;
+- shares one sequence across Source adapters;
+- is not consumed again by an idempotent retry.
+
+Suppose two content Sources arrive in order:
+
+```text
+content/openapi-task-1 → position 1
+content/openapi-task-2 → position 2
+```
+
+The Source journal establishes order. It does not say which Source has been processed or whether Memory exists.
+
+## The trigger selects a window
+
+`SourceWindowTrigger` is pure policy. It compares the high watermark with the current cursor and returns the next bounded window:
+
+```text
+state.sequence = 0
+high_watermark = 2
+limit = 1
+
+ProcessSourceWindow(after=0, through=1)
+```
+
+The next activation returns:
+
+```text
+ProcessSourceWindow(after=1, through=2)
+```
+
+Once the cursor reaches 2, there is no action.
+
+The window is `(after, through]`: exclusive at `after`, inclusive at `through`. `source_window_limit` limits one processing batch, not the total journal length.
+
+The trigger does not call a model or perform extraction. It returns state and actions.
+
+## The cursor tracks consumption
+
+Two numbers are easy to confuse:
+
+- cursor `sequence`: the Source position processed by the application;
+- stored cursor `generation`: the concurrency-control version of the cursor row.
+
+A cursor may say that processing reached position 12 while the row generation is 4. The numbers are unrelated.
+
+PowerContext applies extraction and Memory changes before saving the next cursor. If Memory apply fails, advancing the cursor first would skip the failed window.
+
+## Capture does not create Memory
+
+This operation creates a Source only:
+
+```http
+POST /v1/sources/content
+```
+
+Memory follows one of two paths:
+
+1. If you already know what to retain, write Memory explicitly.
+2. Configure a generation pipeline and let the scheduler or `flush_memory` process pending Source windows.
+
+Even when extraction runs successfully, the model may find nothing worth adding or revising. Processing a Source does not guarantee a new Memory Revision.
+
 <Note>
-TODO: Body copy is not written yet. This page is an outline stub.
+`flush_memory` processes pending Sources. It is not another spelling of `remember_memory`.
 </Note>
 
-## This page will cover
+## Idempotency and conflict
 
-- Captured Sources versus referenced Sources
-- Prompt capture creates a Source only
-- Work Contracts and Task Outcomes are exact Source evidence too
+Capturing the same Source identity again in one Scope has two outcomes:
+
+- the serialized payload bytes are identical, so PowerContext returns the original position;
+- the payload bytes differ, so PowerContext reports a conflict and leaves the old Source intact.
+
+This comparison is not semantic canonicalization. Even metadata with the same keys and values may conflict when key order changes the serialized bytes. A retry should reuse the same serialized input.
+
+Do not keep reusing one fixed `source_id` for changing content.
+
+Concurrency has explicit guarantees too:
+
+- distinct concurrent Sources receive a contiguous sequence of positions;
+- concurrent retries of the same Source and payload resolve to one position;
+- when two workers update a cursor, only the write with the expected generation succeeds.
+
+## Sources beyond chat capture
+
+Sources do not come only from agent prompts. Work continuity also records exact Sources, including:
+
+- Work Contracts;
+- Handoff boundaries;
+- Handoff acknowledgement receipts;
+- Task Outcomes.
+
+Handoff Report can therefore project work history from the journal without rewriting Handoff Artifacts.
+
+## Walk through the OpenAPI example
+
+Capture the first piece of evidence:
+
+```json
+{
+  "scope_id": "project:powercontext-101",
+  "source_id": "openapi-task-1",
+  "content": "The OpenAPI contract changed. Regenerate the checked-in client and run contract tests.",
+  "metadata": {
+    "origin": "tutorial"
+  }
+}
+```
+
+Check four things:
+
+1. The response SourceRef is `content/openapi-task-1`.
+2. The position is greater than zero.
+3. Retrying the same request returns the same position.
+4. Reusing the ID with changed content returns a conflict.
+
+Then decide whether the content should remain evidence or become explicit Memory. Most Sources do not need to become long-term knowledge.
+
+## Troubleshooting order
+
+### Capture succeeded, but Memory did not change
+
+Check the generation capability, then verify that the cursor reached the captured position. Even when both are correct, extraction may return no-op.
+
+### Flush returned idle
+
+The scheduler may have processed the window first. Compare `current_cursor` with the capture position instead of treating `idle` as failure.
+
+### A retry became a conflict
+
+The `source_id` was probably reused with different canonical content or metadata.
+
+### Different hosts produce positions in one sequence
+
+That is expected when they use the same Scope and Server. All adapters share the scope-local journal.
+
+## Checklist
+
+- Does Source identity include the ideas of Scope, type, and ID?
+- Are journal position and cursor sequence separate?
+- Are cursor sequence and cursor generation separate?
+- Is the window understood as `(after, through]`?
+- Did capture remain separate from Memory write?
+- Does an idempotent retry keep the original position?
+
+Continue with [Memory](/en/mental-model/memory) to see how Sources can become durable knowledge and why an explicit Memory write does not require a Source first.

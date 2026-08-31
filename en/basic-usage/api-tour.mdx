@@ -1,14 +1,329 @@
 ---
 title: "Common API tour"
-description: "Use the Python Client to connect remember, search, prepare_context, revise, and retire."
+description: "Use the async Python Client to write, search, prepare, revise, retire, and read explicit Memory history."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+This page uses the minimum Server. It needs no generation model or vector search.
 
-## This page will cover
+The goal is concrete: store one project decision, confirm that search and `PreparedContext` can use it, then revise and retire it while preserving history.
 
-- Connect PowerContextClient to the local Server
-- remember_memory to search_memory to prepare_context
-- Send citations back to revise or retire an entry
+## Interface roles
+
+Every remote PowerContext interface connects to the same Server and durable data.
+
+| Interface | Best fit |
+|---|---|
+| HTTP | Cross-language service integration; OpenAPI is the complete contract |
+| Python Client | Typed async calls from Python applications |
+| MCP | A curated agent-facing tool surface, not the complete HTTP API |
+| CLI | Installation, diagnostics, Server management, and human Review |
+
+Discover the HTTP contract from the running Server:
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/redoc
+http://127.0.0.1:8000/openapi.json
+```
+
+When Server authentication is enabled, these discovery routes require a Bearer header too. Do not place a token in the URL.
+
+## Prepare the example project
+
+The previous page installed the client extra. Create `api_tour.py` with this complete script.
+
+```python
+import asyncio
+import os
+from uuid import uuid4
+
+from powercontext.client import PowerContextClient, ServerResponseError
+from powercontext.http import (
+    GetMemoryEntryRequest,
+    ListMemoryEntriesRequest,
+    PrepareContextRequest,
+    RememberMemoryRequest,
+    RetireMemoryEntryRequest,
+    ReviseMemoryEntryRequest,
+    SearchMemoryRequest,
+)
+
+
+SERVER_URL = os.getenv(
+    "POWERCONTEXT_CLIENT_SERVER_URL",
+    "http://127.0.0.1:8000",
+)
+API_TOKEN = os.getenv("POWERCONTEXT_CLIENT_API_TOKEN")
+
+
+async def main() -> None:
+    scope_id = f"project:powercontext-101:{uuid4().hex}"
+
+    async with PowerContextClient(
+        SERVER_URL,
+        token=API_TOKEN,
+        timeout=10.0,
+    ) as client:
+        capabilities = await client.get_capabilities()
+        print("search modes:", [mode.value for mode in capabilities.search_modes])
+        print("scope:", scope_id)
+
+        request = RememberMemoryRequest(
+            scope_id=scope_id,
+            kind="decision",
+            text=(
+                "Regenerate and inspect the checked-in client before "
+                "running contract tests."
+            ),
+            reason="PowerContext 101 API tour",
+        )
+
+        remembered = await client.remember_memory(request)
+        assert remembered.entry is not None
+        original = remembered.entry
+        print("memory:", remembered.memory)
+        print("entry citation:", original.citation)
+        print("source refs:", original.source_refs)
+
+        duplicate = await client.remember_memory(request)
+        assert duplicate.memory == remembered.memory
+        assert duplicate.entry is None
+        print("duplicate write: no-op")
+
+        search = await client.search_memory(
+            SearchMemoryRequest(
+                scope_id=scope_id,
+                query="What should happen before contract tests?",
+                mode="auto",
+                limit=5,
+            )
+        )
+        assert search.hits
+        print("used search mode:", search.mode)
+        for hit in search.hits:
+            print(
+                "hit:",
+                hit.text,
+                hit.score,
+                [item.value for item in hit.matched_by],
+                hit.citation,
+            )
+
+        prepared = await client.prepare_context(
+            PrepareContextRequest(
+                scope_id=scope_id,
+                query="What should happen before contract tests?",
+                max_bytes=8000,
+            )
+        )
+        assert prepared.status == "ready"
+        assert prepared.content is not None
+        assert len(prepared.content.encode("utf-8")) == prepared.content_bytes
+        print("context schema:", prepared.schema_)
+        print("context bytes:", prepared.content_bytes)
+        print(prepared.content)
+
+        exact = await client.get_memory_entry(
+            GetMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=original.citation,
+            )
+        )
+        assert exact == original
+
+        revised = await client.revise_memory_entry(
+            ReviseMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=original.citation,
+                kind="decision",
+                text=(
+                    "Regenerate the checked-in client, inspect the diff, "
+                    "and then run contract tests."
+                ),
+                reason="Add the generated-diff check",
+            )
+        )
+        assert revised.entry is not None
+        current = revised.entry
+        print("revised memory:", revised.memory)
+        print("current citation:", current.citation)
+
+        historical = await client.get_memory_entry(
+            GetMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=original.citation,
+            )
+        )
+        assert historical.text == original.text
+        print("old citation remains readable")
+
+        try:
+            await client.retire_memory_entry(
+                RetireMemoryEntryRequest(
+                    scope_id=scope_id,
+                    citation=original.citation,
+                    reason="Demonstrate stale citation",
+                )
+            )
+        except ServerResponseError as exc:
+            assert exc.status_code == 409
+            assert exc.code == "revision_conflict"
+            print("stale citation rejected:", exc.code, exc.request_id)
+        else:
+            raise AssertionError("the stale citation should have conflicted")
+
+        retired = await client.retire_memory_entry(
+            RetireMemoryEntryRequest(
+                scope_id=scope_id,
+                citation=current.citation,
+                reason="The tutorial lifecycle is complete",
+            )
+        )
+        assert retired.entry is not None
+        assert retired.entry.state == "inactive"
+
+        active = await client.list_memory_entries(
+            ListMemoryEntriesRequest(scope_id=scope_id)
+        )
+        assert active.entries == []
+
+        audit = await client.list_memory_entries(
+            ListMemoryEntriesRequest(
+                scope_id=scope_id,
+                include_inactive=True,
+            )
+        )
+        assert len(audit.entries) == 1
+        assert audit.entries[0].state == "inactive"
+        print("inactive history remains readable")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run it:
+
+```bash
+uv run python api_tour.py
+```
+
+Each run uses a unique Scope so old tutorial data does not break duplicate, entry-count, or Revision assertions. A real project should use a stable project or tenant Scope instead of a random value.
+
+## What the script verifies
+
+### Explicit Memory needs no Source
+
+`remember_memory` writes already-curated durable knowledge. `source_refs` is normally empty in this example.
+
+The first effective write returns:
+
+- an exact Memory Artifact ref;
+- a logical `entry_id`;
+- an exact `entry_version_id`;
+- current entry content and state.
+
+Identical active content is a no-op. The response keeps the current Memory ref, but `entry` is `null`. Do not assume that every `remember_memory` response has `response.entry.citation`.
+
+### Search has two empty cases
+
+The Scope has no Memory lifecycle:
+
+```text
+memory = null
+mode = null
+hits = []
+```
+
+The Scope has Memory but the query has no match:
+
+```text
+memory = current exact ref
+mode = fts/vector/hybrid
+hits = []
+```
+
+Both are normal domain results under HTTP 200.
+
+### PreparedContext is the final envelope
+
+`prepared.content` already contains the trust marker, boundaries, and Citations. A host may inject it into the current model request as untrusted historical evidence. It should not rebuild the value from search hits.
+
+When `status="empty"`:
+
+```text
+content = null
+content_bytes = 0
+```
+
+When `status="ready"`, the actual UTF-8 length equals `content_bytes` and does not exceed request `max_bytes`.
+
+### Exact read and mutation use different version rules
+
+An old Citation remains valid for `get_memory_entry` historical reads.
+
+`revise_memory_entry` and `retire_memory_entry` accept only a current-head Citation. After any Memory mutation advances the Revision, an older Citation returns HTTP 409 `revision_conflict`.
+
+Use the new Citation returned by the mutation response.
+
+### Retire does not delete
+
+After retirement:
+
+- default listing no longer includes the entry;
+- active search and recall stop selecting it;
+- `include_inactive=True` still supports audit;
+- exact historical read still works.
+
+## Handle Client errors
+
+The Python Client keeps the HTTP status, stable error code, Server message, and `X-PowerContext-Request-ID`.
+
+```python
+from powercontext.client import (
+    InvalidResponseError,
+    ServerResponseError,
+    TransportError,
+)
+
+try:
+    ...
+except ServerResponseError as exc:
+    print(exc.status_code, exc.code, exc.server_message, exc.request_id)
+except TransportError as exc:
+    print("HTTP transport failed:", exc)
+except InvalidResponseError as exc:
+    print("Response violated the generated contract:", exc)
+```
+
+Common statuses:
+
+| HTTP | Meaning |
+|---|---|
+| 401 | Bearer token is missing or invalid |
+| 404 | The exact immutable value does not exist |
+| 409 | Current head, Citation, or expected version conflict |
+| 422 | The request or capability violates the contract |
+| 503 | A required Runtime binding or dependency is unavailable |
+
+After a 409, read the current value before deciding whether to retry. Do not guess the Revision.
+
+## MCP and HTTP have different coverage
+
+MCP is a curated tool surface for agents. HTTP is the complete application contract.
+
+`POST /v1/context/prepare` and Python Client `prepare_context` are not MCP tools because a hook or framework adapter normally prepares final context at request time. MCP also does not reproduce every integration's automatic capture and flush lifecycle.
+
+## Completion check
+
+The script should prove that:
+
+- the first remember returns an exact entry Citation;
+- a duplicate is a no-op with `entry=None`;
+- FTS/auto search finds the active entry;
+- PreparedContext is `ready` with a matching byte count;
+- the old Citation remains readable after revise;
+- mutation with the old Citation returns 409;
+- default listing is empty after retire, while audit finds the inactive entry.
+
+Next, compare [explicit Memory with Source extraction](/en/basic-usage/source-and-memory).

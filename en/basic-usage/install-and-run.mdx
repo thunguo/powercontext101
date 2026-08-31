@@ -1,14 +1,244 @@
 ---
 title: "Install and run the Server"
-description: "Install the CLI and Server with uv, then complete a local health check."
+description: "Install the PowerContext CLI and Server, start a model-free local runtime, and inspect its actual capabilities."
 ---
 
+Start with the minimum Server. It has no generation or embedding model, but it can already store explicit Memory, run FTS search, and expose the same durable data through HTTP, the Python Client, and MCP.
+
+## Prerequisites
+
+The documented installation environment is:
+
+- macOS or Linux;
+- Python 3.11 or later;
+- Git;
+- [`uv`](https://docs.astral.sh/uv/).
+
+PowerContext supports Python `<4.0`. This tutorial does not provide an unverified Windows installation path.
+
+## Install the CLI and Server
+
+Install the current `master`:
+
+```bash
+uv tool install --force \
+  "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@master"
+```
+
+`uv tool` uses an isolated environment and leaves no repository checkout in the current directory. `--force` also matters for updates: when the same Git requirement is already installed, it fetches and replaces the selected ref instead of returning already installed.
+
+For team use, replace `master` with a tested tag or commit and use the same ref for the Server and host integrations.
+
 <Note>
-TODO: Body copy is not written yet. This page is an outline stub.
+A `powercontext[client]` extra installed inside the `uv tool` environment is not importable from an unrelated Python project. Install the client extra in the project that runs Client code.
 </Note>
 
-## This page will cover
+## Start the local Server
 
-- Prerequisites: macOS or Linux, Python 3.11+, and uv
-- powercontext server run, the Dashboard, and /mcp
-- powercontext doctor, and explicit Memory without an inference provider
+```bash
+powercontext server run
+```
+
+The default configuration is:
+
+| Item | Default behavior |
+|---|---|
+| Address | `http://127.0.0.1:8000` |
+| Dashboard | `/` |
+| Streamable HTTP MCP | `/mcp` |
+| Database | Persistent SQLite in the user data directory |
+| Bearer auth | Disabled for the default loopback setup |
+| Generation / embedding | Not configured |
+| Search | `auto`, `fts` |
+
+On macOS, the database is usually stored at:
+
+```text
+~/Library/Application Support/powercontext/powercontext.db
+```
+
+On Linux, it is usually:
+
+```text
+~/.local/share/powercontext/powercontext.db
+```
+
+When `POWERCONTEXT_HOME` is set, the default database moves under that directory. Changing home or database URL reveals another data set and is easy to mistake for missing Scope data.
+
+`Ctrl-C` shuts the Server down cleanly. Starting it again reopens the same database.
+
+## Inspect runtime status
+
+Open another terminal:
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+The commands answer different questions.
+
+### `doctor`
+
+Checks the installed package, Server liveness, and Server readiness. It exits with zero only when every check is `ok`.
+
+When liveness fails, readiness is marked skipped. `degraded` also produces a non-zero doctor result because at least one configured inference check failed; it does not necessarily mean the database is unavailable.
+
+### `ready`
+
+Distinguishes:
+
+- `ready`: every configured check passes;
+- `degraded`: an optional inference check failed, with HTTP 200;
+- `not_ready`: the Runtime or database is unavailable and the readiness endpoint returns HTTP 503. The current CLI prints that 503 as a Server error instead of rendering the full `not_ready` response; use `doctor` or inspect `/health/ready` directly for dependency details.
+
+### `capabilities`
+
+A minimum Server should report something like:
+
+```text
+Source types: content
+Artifact families: memory, experience, skill, handoff
+Memory extraction: disabled
+Experience generation: disabled
+Managed Skill generation: disabled
+External Skill Registry: disabled
+Handoff generation: disabled
+Search modes: auto, fts
+Context versions: powercontext.prepared-context.v1
+```
+
+The presence of an Artifact family does not mean model-backed generation for that family is enabled. Check the corresponding capability boolean.
+
+Open the Dashboard at:
+
+```text
+http://127.0.0.1:8000/
+```
+
+With no Dashboard Scopes configured, it shows an empty state. A Dashboard initialization failure logs a warning while HTTP API and MCP continue serving.
+
+## Verify model-free behavior first
+
+The minimum Server supports:
+
+- Source capture;
+- explicit Memory remember, search, revise, and retire;
+- FTS;
+- typed Experience and Skill proposals with Candidate Review;
+- Prepared Handoff finalize, commit, and continue;
+- `PreparedContext` construction when the Scope has recallable content.
+
+It does not support:
+
+- model extraction from Source to Memory;
+- model generation for Experience, Skill, or Handoff;
+- vector or hybrid search;
+- model-backed reranking.
+
+The first tutorial therefore starts with explicit Memory. It verifies persistence, Scope, and Citations before provider configuration becomes another variable.
+
+## Install the Client in a Python project
+
+In the project that runs the examples:
+
+```bash
+uv add \
+  "powercontext[client] @ git+https://github.com/oceanbase/powercontext.git@master"
+```
+
+Confirm that the project uses Python 3.11 or later:
+
+```bash
+uv run python --version
+```
+
+The next page imports the public API through:
+
+```python
+from powercontext.client import PowerContextClient
+from powercontext.http import RememberMemoryRequest
+```
+
+Do not import internal generated modules from `powercontext.http._generated`.
+
+## `.env` is not loaded automatically
+
+The PowerContext CLI does not search the current directory for `.env`. Pass the file explicitly:
+
+```bash
+powercontext server run --env-file .env
+```
+
+A full-capability configuration starts with:
+
+```bash
+powercontext config init --output .env
+powercontext config show --env-file .env
+powercontext config validate --env-file .env
+powercontext server run --env-file .env
+```
+
+Generation and scheduling are independent settings. A generation model enables extraction capability, but it does not enable the periodic scheduler automatically. You may still call `flush_memory` manually.
+
+Embedding configuration requires the model, profile ID, and dimension as a complete set. Missing one should fail validation rather than starting an ambiguous partial vector setup.
+
+## Authentication and remote access
+
+The default Server listens on loopback, so disabled authentication is reasonable for local development.
+
+A non-loopback bind requires authentication or an explicit unsafe opt-in by default. The Python Client also rejects plaintext HTTP to a non-loopback host. Remote and production deployments should use TLS and a bearer token. Never put the token in the URL.
+
+When authentication is enabled, the Client reads a bare token:
+
+```bash
+export POWERCONTEXT_CLIENT_API_TOKEN="replace-with-token"
+```
+
+It constructs:
+
+```http
+Authorization: Bearer replace-with-token
+```
+
+## Common startup problems
+
+### `doctor` cannot reach the Server
+
+Confirm that `powercontext server run` is still running and that port 8000 is free. For a custom address, use the option owned by `doctor`, after the subcommand:
+
+```bash
+powercontext doctor \
+  --server-url http://127.0.0.1:9000
+```
+
+The root `--server-url` applies to Client content commands and does not replace the separate doctor address.
+
+### You created `.env`, but capabilities did not change
+
+Did the Server command include `--env-file .env`? The CLI does not load it implicitly.
+
+### `capabilities` lists only `auto, fts`
+
+The Server is working in FTS-only mode. The vector and hybrid prerequisites are not complete.
+
+### `ready` is degraded
+
+Inspect the failed dependency check. Database operations that do not depend on that inference capability may still work, while operations requiring the failed provider will not.
+
+### Data disappeared after restart
+
+Check `POWERCONTEXT_HOME`, database kind, and database URL, then check `scope_id`. Each changes which data set you see.
+
+## Completion check
+
+Before continuing, confirm that:
+
+- `powercontext doctor` passes for the minimum setup;
+- `powercontext capabilities` lists `auto, fts`;
+- the Dashboard opens or is intentionally disabled;
+- the example Python project can import `PowerContextClient`;
+- the stable Scope for this tutorial is `project:powercontext-101`.
+
+Continue with the [Python Client API tour](/en/basic-usage/api-tour).

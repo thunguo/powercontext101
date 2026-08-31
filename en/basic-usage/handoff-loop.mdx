@@ -1,14 +1,335 @@
 ---
 title: "Handoff loop"
-description: "Turn current work into a Prepared Handoff another session, task, or model can continue."
+description: "Create a Work Contract, transfer current work, acknowledge an exact Handoff, and record the real Task Outcome."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+This page completes a real work transfer. The sender records the delegation boundary and current state, the receiver inspects an exact Handoff, and the final result links back to that transfer.
 
-## This page will cover
+Handoff does not require a generation model here. The caller supplies inspected typed data, so the minimum Server is enough.
 
-- create_work_contract and handoff_current_work
-- continue_handoff, acknowledge_handoff, and record_task_outcome
-- When to commit a durable milestone
+## The loop
+
+```text
+Work Contract
+→ handoff_current_work
+→ Prepared Handoff
+→ optional commit
+→ continue exact
+→ acknowledge exact
+→ Task Outcome
+```
+
+Work Contract, Handoff boundary, acknowledgement receipt, and Task Outcome each produce a Source receipt. A committed Handoff also has an immutable Artifact Revision.
+
+## Complete Python example
+
+Create `handoff_loop.py`:
+
+```python
+import asyncio
+import os
+from uuid import uuid4
+
+from powercontext.client import PowerContextClient
+from powercontext.http import (
+    AcknowledgeHandoffRequest,
+    CommitHandoffRequest,
+    ContinueHandoffRequest,
+    CreateWorkContractRequest,
+    HandoffCurrentWorkRequest,
+    RecordTaskOutcomeRequest,
+)
+
+
+SERVER_URL = os.getenv(
+    "POWERCONTEXT_CLIENT_SERVER_URL",
+    "http://127.0.0.1:8000",
+)
+API_TOKEN = os.getenv("POWERCONTEXT_CLIENT_API_TOKEN")
+
+
+async def main() -> None:
+    run_id = uuid4().hex
+    scope_id = f"project:powercontext-101:{run_id}"
+
+    async with PowerContextClient(
+        SERVER_URL,
+        token=API_TOKEN,
+        timeout=10.0,
+    ) as client:
+        contract = await client.create_work_contract(
+            CreateWorkContractRequest.model_validate({
+                "scope_id": scope_id,
+                "source_id": f"contract-{run_id}",
+                "contract": {
+                    "schema": "powercontext.work-contract.v1",
+                    "trust": "untrusted_input",
+                    "objective": "Complete the OpenAPI client update.",
+                    "facts": [{
+                        "text": "The repository has contract tests.",
+                        "basis": "declared",
+                        "evidence": [],
+                    }],
+                    "in_scope": ["Regenerate the checked-in client."],
+                    "exclusions": ["Do not deploy to production."],
+                    "completion_criteria": ["Contract tests pass."],
+                    "authorization_notes": [
+                        "This contract does not grant deployment authority."
+                    ],
+                    "open_questions": [],
+                },
+            })
+        )
+        print("contract receipt:", contract.source, contract.position)
+
+        prepared_work = await client.handoff_current_work(
+            HandoffCurrentWorkRequest.model_validate({
+                "scope_id": scope_id,
+                "source_id": f"boundary-{run_id}",
+                "handoff": {
+                    "schema": "powercontext.current-work-handoff.v1",
+                    "trust": "untrusted_input",
+                    "objective": "Complete the OpenAPI client update.",
+                    "state": [{
+                        "text": "The checked-in client was regenerated.",
+                        "basis": "declared",
+                        "evidence": [],
+                    }],
+                    "disposition": "continuable",
+                    "next_action": {
+                        "text": "Run contract tests.",
+                        "basis": "declared",
+                        "evidence": [],
+                    },
+                    "omissions": ["Contract tests have not run yet."],
+                },
+            })
+        )
+        print("boundary receipt:", prepared_work.boundary.source)
+        print("prepared base:", prepared_work.handoff.base)
+
+        temporary = await client.continue_handoff(
+            ContinueHandoffRequest(
+                scope_id=scope_id,
+                selection="prepared",
+                prepared=prepared_work.handoff,
+            )
+        )
+        assert temporary.status == "resolved"
+        assert temporary.selection == "prepared"
+        assert temporary.selected_revision is None
+
+        committed = await client.commit_handoff(
+            CommitHandoffRequest(
+                scope_id=scope_id,
+                handoff=prepared_work.handoff,
+            )
+        )
+        print("committed revision:", committed.reference)
+
+        latest = await client.continue_handoff(
+            ContinueHandoffRequest(
+                scope_id=scope_id,
+                selection="latest",
+            )
+        )
+        assert latest.selected_revision == committed.reference
+        assert latest.current_revision == committed.reference
+
+        exact = await client.continue_handoff(
+            ContinueHandoffRequest(
+                scope_id=scope_id,
+                selection="exact",
+                revision=latest.selected_revision,
+            )
+        )
+        assert exact.selection == "exact"
+        assert all(
+            check.status == "available"
+            for check in exact.evidence_checks
+        )
+
+        acknowledgement = await client.acknowledge_handoff(
+            AcknowledgeHandoffRequest.model_validate({
+                "scope_id": scope_id,
+                "source_id": f"receipt-{run_id}",
+                "receiver": "contract-test-agent",
+                "status": "accepted",
+                "selection": "exact",
+                "receiver_checks": {
+                    "live_state": "confirmed",
+                    "capability": "confirmed",
+                    "authorization": "confirmed",
+                },
+                "revision": committed.reference.model_dump(),
+            })
+        )
+        assert acknowledgement.receipt.kind == "handoff-receipt"
+        print("ack receipt:", acknowledgement.receipt.source)
+
+        outcome = await client.record_task_outcome(
+            RecordTaskOutcomeRequest.model_validate({
+                "scope_id": scope_id,
+                "source_id": f"outcome-{run_id}",
+                "outcome": {
+                    "schema": "powercontext.task-outcome.v1",
+                    "trust": "untrusted_observation",
+                    "objective": "Complete the OpenAPI client update.",
+                    "status": "succeeded",
+                    "summary": "Contract tests passed.",
+                    "handoff_receipt_ref": (
+                        acknowledgement.receipt.source.model_dump()
+                    ),
+                    "observations": [{
+                        "text": "The contract tests completed successfully.",
+                        "basis": "declared",
+                        "evidence": [],
+                    }],
+                    "checks": [{
+                        "name": "Contract tests",
+                        "status": "passed",
+                        "details": "The command exited successfully.",
+                        "basis": "declared",
+                        "evidence": [],
+                    }],
+                    "produced_artifacts": [],
+                    "remaining_work": [],
+                },
+            })
+        )
+        assert outcome.kind == "task-outcome"
+        print("outcome receipt:", outcome.source)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run it:
+
+```bash
+uv run python handoff_loop.py
+```
+
+The example uses `model_validate` for nested requests because the JSON contract names the field `schema`, while generated Python models expose an internal alias.
+
+## Boundaries at each step
+
+### Work Contract is a delegation baseline
+
+It records the objective, in-scope work, exclusions, completion criteria, authorization notes, and consequential questions.
+
+The Contract is an `untrusted_input` Source and grants no new authority. A claim with `basis="verified"` needs exact evidence; a `declared` claim carries none.
+
+### `handoff_current_work` writes a boundary Source
+
+It returns:
+
+```text
+PreparedWorkHandoff
+├── boundary: WorkSourceReceipt
+└── handoff: PreparedHandoff
+```
+
+Pass `prepared_work.handoff`, not the whole response, to commit or continue.
+
+This operation creates no Handoff Revision, but it does persist the boundary Source. It is not a read-only preview.
+
+### Temporary transfer needs no commit
+
+The example first uses `continue_handoff(selection="prepared")`. A temporary transfer works and has `selected_revision=None`.
+
+Call `commit_handoff` only when the work needs a durable milestone.
+
+### `latest` discovers; `exact` acknowledges
+
+Latest returns the current head in both `selected_revision` and `current_revision`. After inspection, bind acknowledgement to that exact Revision.
+
+`acknowledge_handoff` does not accept `selection="latest"`.
+
+### Accepted has hard requirements
+
+All three checks must be confirmed, and all evidence must be available:
+
+```text
+live_state
+capability
+authorization
+```
+
+When a check cannot be confirmed, use `needs_clarification` or `declined` with a message.
+
+Acknowledgement records receiver judgment. It grants no permission.
+
+### Outcome links an accepted exact receipt
+
+Use:
+
+```python
+acknowledgement.receipt.source
+```
+
+as `handoff_receipt_ref`.
+
+Only an accepted receipt with exact selection and a selected committed Revision can cover a durable Handoff. A prepared acknowledgement receipt cannot establish that link.
+
+## Outcome and check states
+
+Overall `TaskOutcome.status` accepts:
+
+```text
+succeeded
+partial
+blocked
+failed
+cancelled
+unknown
+```
+
+Individual `TaskCheck.status` accepts:
+
+```text
+passed
+failed
+skipped
+timed_out
+unavailable
+cancelled
+unknown
+```
+
+One passed check does not make the overall result succeeded. A check that never ran should not be reported as passed.
+
+## Negative experiments
+
+### Read latest without commit
+
+Before commit, `continue_handoff(selection="latest")` returns `status="empty"`. The Prepared Handoff still works with `selection="prepared"`.
+
+### Accept with authorization unchecked
+
+Change authorization to `not_checked`. The operation rejects accepted status. Use `needs_clarification` and state what is missing.
+
+### Link a prepared receipt to a committed outcome
+
+Acknowledge prepared, then use that receipt as `handoff_receipt_ref`. The Server rejects it because the receipt is not bound to an exact committed Revision.
+
+### Prepare twice from one base
+
+Prepare two Handoffs, commit the first, then commit the second. The second returns a Revision conflict. Read the new head and prepare again rather than guessing a revision.
+
+### Boundary succeeds and commit fails
+
+The boundary Source remains, but no new Handoff Revision exists. Report both facts. Do not say that nothing was written or that the milestone was saved.
+
+## Completion check
+
+- A Work Contract receipt exists.
+- Prepared Handoff works for temporary continuation.
+- Commit returns an exact Handoff Revision.
+- Latest discovery becomes exact acknowledgement.
+- Accepted checks evidence, live state, capability, and authorization.
+- Task Outcome links the acknowledgement receipt SourceRef.
+- Overall outcome and individual check statuses remain separate.
+
+Continue with [Experience, Skill, and Review](/en/basic-usage/experience-skill-review).

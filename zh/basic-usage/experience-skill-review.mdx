@@ -1,14 +1,433 @@
 ---
 title: "Experience、Skill 与 Review"
-description: "从精确证据生成 Candidate，完成审核，再决定是否导出 Skill。"
+description: "从 exact evidence 创建 Candidate，审核精确版本，再显式导出 approved Skill Revision。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+这一页把已完成工作的证据变成 Experience，再把 approved Experience 写成 managed Skill。重点不在模型写得多漂亮，而在 Review 有没有检查精确 evidence 和 Candidate version。
 
-## 本页将覆盖
+## 两条创建路径
 
-- generate_* 与 propose_* 都只产生 pending Candidate
-- expected_version、批准与拒绝
-- 导出 managed Skill 到宿主，而不是让它自行安装
+| 路径 | 需要 generation model | 结果 |
+|---|---:|---|
+| Python Client `propose_experience` / `propose_skill` | 否 | pending Candidate |
+| CLI `experience generate` / `skill generate` | 是 | pending Candidate 或 `no_op` |
+
+CLI 当前没有 `experience propose` 或 `skill propose` 子命令。无模型 typed proposal 使用 Python Client 或 HTTP API。
+
+本教程先用 typed proposal 建立确定的 Review 闭环，再列出 model generation 命令。
+
+## 1. 准备 exact evidence
+
+先 capture 一条任务结果 Source。新建 `propose_experience.py`：
+
+```python
+import asyncio
+import os
+from uuid import uuid4
+
+from powercontext.client import PowerContextClient
+from powercontext.http import (
+    CaptureContentSourceRequest,
+    ExperienceProposal,
+    ProposeExperienceRequest,
+)
+
+
+SERVER_URL = os.getenv(
+    "POWERCONTEXT_CLIENT_SERVER_URL",
+    "http://127.0.0.1:8000",
+)
+API_TOKEN = os.getenv("POWERCONTEXT_CLIENT_API_TOKEN")
+
+
+async def main() -> None:
+    run_id = uuid4().hex
+    scope_id = f"project:powercontext-101:{run_id}"
+
+    async with PowerContextClient(
+        SERVER_URL,
+        token=API_TOKEN,
+    ) as client:
+        evidence = await client.capture_content_source(
+            CaptureContentSourceRequest(
+                scope_id=scope_id,
+                source_id=f"contract-test-result-{run_id}",
+                content=(
+                    "The OpenAPI client was regenerated and inspected. "
+                    "Contract tests passed."
+                ),
+            )
+        )
+
+        candidate = await client.propose_experience(
+            ProposeExperienceRequest(
+                scope_id=scope_id,
+                proposal=ExperienceProposal(
+                    situation="The OpenAPI contract changed.",
+                    action=(
+                        "Regenerate the client, inspect the diff, and run "
+                        "contract tests."
+                    ),
+                    outcome=(
+                        "The generated transport matched the contract and "
+                        "the tests passed."
+                    ),
+                    lesson=(
+                        "Regenerate and inspect generated clients before "
+                        "contract tests."
+                    ),
+                ),
+                source_refs=[evidence.source],
+                artifact_refs=[],
+                reason="Submit a complete typed Experience proposal.",
+            )
+        )
+
+        print("scope:", scope_id)
+        print("candidate:", candidate.candidate_id)
+        print("version:", candidate.version)
+        print("status:", candidate.status)
+        print("source:", evidence.source)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+运行并保存输出：
+
+```bash
+uv run python propose_experience.py
+```
+
+后面的 CLI 命令把 `SCOPE_ID` 和 `CANDIDATE_ID` 替换成脚本输出。
+
+## 2. 检查 Candidate
+
+默认 Inbox 只列 pending heads：
+
+```bash
+powercontext candidate list \
+  --scope-id SCOPE_ID \
+  --family experience
+```
+
+查看当前版本：
+
+```bash
+powercontext candidate show \
+  --scope-id SCOPE_ID \
+  CANDIDATE_ID
+```
+
+决定前检查：
+
+- `proposal` 四个字段；
+- exact `source_refs` 和 `artifact_refs`；
+- replacement 才有的 `target`；
+- `status`、`family`、`reason`；
+- 当前 `version`。
+
+不要只读模型总结。打开 evidence，确认它真的支持 proposed action、outcome 和 lesson。
+
+## 3. Revise 是完整替换
+
+```bash
+powercontext candidate revise experience \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  --situation "The OpenAPI contract changed." \
+  --action "Regenerate the client, inspect its diff, then run contract tests." \
+  --outcome "The generated transport matched the contract." \
+  --lesson "Inspect generated drift before contract tests." \
+  --source-ref content/SOURCE_ID \
+  CANDIDATE_ID
+```
+
+`SOURCE_ID` 使用 capture response 中的值。
+
+成功后 Candidate 仍是 pending，version 变成 2。再次 show 并检查完整 proposal。
+
+故意用旧版本 approve：
+
+```bash
+powercontext candidate approve \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  CANDIDATE_ID
+```
+
+应返回 HTTP 409 `candidate_conflict`。不要把 expected version 改成 2 就直接重试；先确认当前 v2 正是你要批准的内容。
+
+## 4. Approve 或 reject
+
+批准刚检查的 v2：
+
+```bash
+powercontext candidate approve \
+  --scope-id SCOPE_ID \
+  --expected-version 2 \
+  CANDIDATE_ID
+```
+
+保存 exact `result_artifact`：
+
+```text
+experience/EXPERIENCE_ID@1
+```
+
+Reject 是另一条终局分支，需使用另一个 pending Candidate：
+
+```bash
+powercontext candidate reject \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  --reason "The evidence does not support the proposed lesson." \
+  OTHER_CANDIDATE_ID
+```
+
+approved 和 rejected 都是 terminal，不能再次 revise、approve 或 reject。
+
+## 5. 验证 Experience recall
+
+当前没有 `powercontext context prepare` CLI 命令。用 Python Client：
+
+```python
+import asyncio
+import os
+
+from powercontext.client import PowerContextClient
+from powercontext.http import PrepareContextRequest
+
+
+async def main() -> None:
+    async with PowerContextClient(
+        os.getenv(
+            "POWERCONTEXT_CLIENT_SERVER_URL",
+            "http://127.0.0.1:8000",
+        ),
+        token=os.getenv("POWERCONTEXT_CLIENT_API_TOKEN"),
+    ) as client:
+        prepared = await client.prepare_context(
+            PrepareContextRequest(
+                scope_id="SCOPE_ID",
+                query="When should generated clients be inspected?",
+            )
+        )
+        print(prepared.status)
+        print(prepared.content)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+将脚本里的 `SCOPE_ID` 替换成真实值。
+
+Approve 让 current Experience head 具备 recall 资格，但不保证每个 query 都选中它。Scope、query relevance 和 byte budget 仍然生效。pending、rejected 和 historical Experience Revision 不进入默认 recall。
+
+## 6. 创建 Skill Candidate
+
+最稳妥的新 Skill lineage 是引用刚批准的 Experience。新建 `propose_skill.py`：
+
+```python
+import asyncio
+import os
+
+from powercontext.client import PowerContextClient
+from powercontext.http import (
+    ArtifactReference,
+    ProposeSkillRequest,
+    SkillProposal,
+    SkillValidationItem,
+)
+
+
+async def main() -> None:
+    experience = ArtifactReference(
+        family="experience",
+        artifact_id="EXPERIENCE_ID",
+        revision=1,
+    )
+
+    async with PowerContextClient(
+        os.getenv(
+            "POWERCONTEXT_CLIENT_SERVER_URL",
+            "http://127.0.0.1:8000",
+        ),
+        token=os.getenv("POWERCONTEXT_CLIENT_API_TOKEN"),
+    ) as client:
+        candidate = await client.propose_skill(
+            ProposeSkillRequest(
+                scope_id="SCOPE_ID",
+                proposal=SkillProposal(
+                    name="regenerate-client",
+                    description=(
+                        "Regenerate and verify a generated API client."
+                    ),
+                    instructions=(
+                        "Regenerate the client from the canonical OpenAPI "
+                        "document. Inspect the generated diff, run generation "
+                        "checks, and then run contract tests."
+                    ),
+                    validation=[
+                        SkillValidationItem(
+                            "The generated diff is inspected."
+                        ),
+                        SkillValidationItem(
+                            "The contract tests pass."
+                        ),
+                    ],
+                ),
+                source_refs=[],
+                artifact_refs=[experience],
+                reason=(
+                    "Turn the approved Experience into reusable instructions."
+                ),
+            )
+        )
+        print(candidate.candidate_id, candidate.version)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+替换 `SCOPE_ID` 和 `EXPERIENCE_ID` 后运行。然后用同一组 Candidate 命令 list、show、revise 和 approve。
+
+较长 instructions 建议放进 UTF-8 文件：
+
+```bash
+powercontext candidate revise skill \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  --name regenerate-client \
+  --description "Regenerate and verify a generated API client." \
+  --instructions-file instructions.md \
+  --validation "The generated diff is inspected." \
+  --validation "The contract tests pass." \
+  --artifact-ref experience/EXPERIENCE_ID@1 \
+  SKILL_CANDIDATE_ID
+```
+
+`--instructions` 和 `--instructions-file` 必须二选一。
+
+Approve 后得到：
+
+```text
+skill/SKILL_ID@1
+```
+
+Skill 不会进入 PreparedContext。这是预期行为。
+
+## 7. 读取并导出 exact Skill Revision
+
+先读取：
+
+```bash
+powercontext skill show \
+  --scope-id SCOPE_ID \
+  --revision 1 \
+  SKILL_ID
+```
+
+导出到 Codex：
+
+```bash
+powercontext skill export \
+  --target codex \
+  --scope-id SCOPE_ID \
+  --revision 1 \
+  --destination .agents/skills/regenerate-client \
+  SKILL_ID
+```
+
+导出到 Claude Code：
+
+```bash
+powercontext skill export \
+  --target claude_code \
+  --scope-id SCOPE_ID \
+  --revision 1 \
+  --destination .claude/skills/regenerate-client \
+  SKILL_ID
+```
+
+注意 target 是 `claude_code`，不是 `claude-code`。
+
+输出目录包含：
+
+```text
+SKILL.md
+powercontext.json
+```
+
+检查 `powercontext.json` 是否引用 exact `skill/SKILL_ID@1`。CLI export 是 create-only，destination 已存在时退出，不会覆盖。
+
+当前 managed Skill export 只支持 Codex 和 Claude Code。插件自带 bundled Skill 不等于支持 managed export。
+
+## Model generation 路径
+
+配置 generation model 后，也可以从 exact evidence 生成 Candidate：
+
+```bash
+powercontext experience generate \
+  --scope-id project:example \
+  --source-ref content/SOURCE_ID \
+  --reason "Extract a reusable lesson from the completed task."
+```
+
+从 approved Experience 生成 Skill：
+
+```bash
+powercontext skill generate \
+  --scope-id project:example \
+  --origin experience \
+  --artifact-ref experience/EXPERIENCE_ID@1 \
+  --reason "Turn the reviewed lesson into reusable instructions."
+```
+
+返回结果可能是：
+
+```text
+status: pending, candidate: {...}
+```
+
+也可能是：
+
+```text
+status: no_op, candidate: null
+```
+
+`no_op` 不进入 Inbox，也没有 Candidate 可以 approve。没配置 generation model 时，generate 返回 503 `generation_unavailable`。
+
+其他 Skill origin：
+
+- `source`：只能提供 one or more exact Source refs，不能带 Artifact refs 或 target；
+- `usage`：提供 exact target Skill 和至少一条 bounded Source。Server 只校验引用形状，reviewer 仍要判断 Source 是否真的记录了使用效果。
+
+## Conflict 处理
+
+| 情况 | 结果 | 处理 |
+|---|---|---|
+| `expected_version` 过期 | 409 `candidate_conflict` | 重新 show，审阅 current version |
+| Candidate 已 terminal | 409 `candidate_terminal` | 不再修改该 Candidate |
+| replacement target head 已推进 | 409 `artifact_conflict` | Candidate 保持 pending，重新评估 target |
+| evidence/lineage 不合法 | 422 `invalid_request` | 修正 evidence，不是 CAS 重试 |
+| export destination 已存在 | CLI exit 2 | 检查 foreign/current/drifted 状态，不覆盖 |
+
+同一个 replacement Candidate 的 target 不能在 revise 时换成另一个 Revision。
+
+## 完成检查
+
+- typed propose 无模型也能创建 pending Candidate；
+- generate 可能 pending，也可能 no-op；
+- Review 始终先 show，再使用 inspected `expected_version`；
+- stale version 会 409；
+- approve 返回 exact `result_artifact`；
+- approved current Experience 可以参与相关 recall；
+- Skill approval 不 export，也不执行；
+- export package 包含 `SKILL.md` 和 `powercontext.json`；
+- 现有 destination 和 local drift 不会被静默覆盖。
+
+Basic Usage 到这里完成。下一步按你的运行环境进入[框架集成](/zh/frameworks/overview)、[通用 Agent](/zh/common-agents/overview)或[编程 Agent](/zh/coding-agents/overview)。

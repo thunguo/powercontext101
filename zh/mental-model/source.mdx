@@ -1,14 +1,201 @@
 ---
 title: "Source"
-description: "Source 保存原始工作证据。采集 prompt 不会自动变成 Memory。"
+description: "Source 保存可定位的工作证据。journal position、处理 cursor 和 Memory 是后续的不同层。"
 ---
 
+Source 记录“发生过什么”。一条用户 prompt、一次任务结果，或者宿主捕获的回合，都可以成为 Source。
+
+它不负责判断内容是否值得长期保留。这个判断属于 Memory、Experience、Skill 或 Handoff 的后续流程。
+
+## 稳定身份
+
+PowerContext 用两个字段引用 Source：
+
+```text
+SourceRef
+├── source_type
+└── source_id
+```
+
+完整身份还包括 `scope_id`。同一个 `source_type` 和 `source_id` 可以出现在不同 Scope 中，互不影响。
+
+对于内置 content Source，一次 capture 会返回 SourceRef 和 scope-local journal position：
+
+```json
+{
+  "status": "accepted",
+  "source": {
+    "source_type": "content",
+    "source_id": "openapi-task-1"
+  },
+  "position": 1
+}
+```
+
+`source_id` 应稳定且可重现。宿主通常根据 scope、session、turn 或内容生成它，以便重试时保持幂等。
+
+## Captured 与 referenced
+
+Source adapter 有两种 materialization。
+
+| 类型 | 保存什么 | 读取方式 |
+|---|---|---|
+| `captured` | PowerContext 保存内容快照和 metadata | 直接从持久层读取 |
+| `referenced` | PowerContext 保存外部材料的引用 | 读取时由 adapter 解析 |
+
+Captured Source 适合 prompt、任务结果和事件文本。Referenced Source 适合由其他系统管理的材料。
+
+两者的差别很实际：captured content 是当时的快照；referenced material 以后再次解析时，外部内容可能已经变化。
+
+## 一条 Scope 内共用一条 journal
+
+Source 被持久化后会得到单调递增的 position。position：
+
+- 从 1 开始；
+- 只在当前 Scope 内有意义；
+- 不同 Source adapter 共用同一序列；
+- 幂等重试不会占用新 position。
+
+假设先后捕获两条内容：
+
+```text
+content/openapi-task-1 → position 1
+content/openapi-task-2 → position 2
+```
+
+Source journal 解决顺序问题。它不表示哪条 Source 已经被处理，也不表示已经生成 Memory。
+
+## Trigger 决定处理窗口
+
+`SourceWindowTrigger` 是纯策略。它比较 high watermark 和当前 cursor，然后返回下一段固定窗口：
+
+```text
+state.sequence = 0
+high_watermark = 2
+limit = 1
+
+ProcessSourceWindow(after=0, through=1)
+```
+
+下一次 activation 得到：
+
+```text
+ProcessSourceWindow(after=1, through=2)
+```
+
+cursor 已到 2 时，不再返回 action。
+
+窗口写作 `(after, through]`：不含 `after`，包含 `through`。`source_window_limit` 只限制一次处理多少条，不限制 journal 总长度。
+
+Trigger 不读取模型，也不执行 extraction。它只返回新状态和待执行 action。
+
+## Cursor 记录消费进度
+
+这里有两个容易混淆的数字：
+
+- cursor `sequence`：业务上处理到哪个 Source position；
+- stored cursor `generation`：保存 cursor 时的并发控制版本。
+
+例如，cursor 可能表示已经处理到 position 12，同时数据库 row 的 generation 是 4。它们没有数值对应关系。
+
+PowerContext 处理 Source window 时，会先完成 extraction 和 Memory apply，再保存新的 cursor。Memory apply 失败时不能提前推进 cursor，否则失败窗口会被跳过。
+
+## Capture 不会自动产生 Memory
+
+下面的调用只创建 Source：
+
+```http
+POST /v1/sources/content
+```
+
+要得到 Memory，还有两种路径：
+
+1. 你已经知道要保存什么，直接调用显式 Memory 写入；
+2. 配置 generation pipeline，由 scheduler 或 `flush_memory` 处理未消费的 Source window。
+
+即使 extraction 正常运行，模型也可能认为当前窗口没有值得新增或修订的内容。Source 被处理不保证 Memory Revision 一定变化。
+
 <Note>
-TODO: 正文待写。本页只建立大纲。
+`flush_memory` 处理待消费 Source。它不是 `remember_memory` 的另一种写法。
 </Note>
 
-## 本页将覆盖
+## 幂等和冲突
 
-- Captured Source 与 referenced Source 的区别
-- 采集用户提示词只生成 Source
-- Work Contract 和 Task Outcome 也是精确 Source 证据
+同一 Scope 中，重复 capture 相同 Source identity 时：
+
+- 持久层序列化后的 payload bytes 完全相同：返回原来的 position；
+- payload bytes 不同：返回 conflict，不覆盖旧 Source。
+
+这个比较不是语义 canonicalization。即使 metadata 表达同一组键值，键顺序导致序列化 bytes 变化时也可能 conflict。重试应复用同一序列化输入。
+
+所以不要长期复用固定 `source_id`，却每次写入不同内容。
+
+并发行为同样有明确约束：
+
+- 多条不同 Source 并发写入，position 保持连续，无缺口；
+- 同一 Source 的相同 payload 并发重试，最终都指向同一个 position；
+- 两个 worker 同时更新 cursor 时，只有符合 expected generation 的写入成功。
+
+## Source 可以引用什么
+
+Source 不只来自聊天宿主。Work continuity 也把事件保存为精确 Source，例如：
+
+- Work Contract；
+- Handoff boundary；
+- Handoff acknowledgement receipt；
+- Task Outcome。
+
+这使 Handoff Report 可以从 journal 投影工作历史，而不必改写底层 Handoff Artifact。
+
+## 用 OpenAPI 案例推演
+
+捕获第一条证据：
+
+```json
+{
+  "scope_id": "project:powercontext-101",
+  "source_id": "openapi-task-1",
+  "content": "The OpenAPI contract changed. Regenerate the checked-in client and run contract tests.",
+  "metadata": {
+    "origin": "tutorial"
+  }
+}
+```
+
+检查四件事：
+
+1. response 中的 SourceRef 是否为 `content/openapi-task-1`；
+2. position 是否大于 0；
+3. 相同请求重试是否返回同一 position；
+4. 修改 content 后复用同一 ID 是否返回 conflict。
+
+然后再决定：这是只需要保留的证据，还是应该显式写成 Memory。别急着把所有 Source 都变成长期知识。
+
+## 排查顺序
+
+### Capture 成功，但 Memory 没变化
+
+先看 generation capability，再看 cursor 是否到达 capture position。两者都正常时，extraction 仍可能得到 no-op。
+
+### Flush 返回 idle
+
+scheduler 可能已经先处理了窗口。比较 `current_cursor` 与 capture position，不要只看 `idle` 字样。
+
+### 重试变成 conflict
+
+检查是否复用了 `source_id`，但 canonical content 或 metadata 已变化。
+
+### 不同宿主出现相同 position
+
+只要它们使用同一 Scope 和 Server，这很正常。所有 adapter 共用 scope-local journal。
+
+## 检查清单
+
+- Source identity 是否包含 Scope、type 和 ID 的概念？
+- journal position 与 cursor sequence 是否分开？
+- cursor sequence 与 cursor generation 是否分开？
+- window 是否按 `(after, through]` 理解？
+- capture 是否被误写成 Memory write？
+- 幂等重试是否保持原 position？
+
+下一页是 [Memory](/zh/mental-model/memory)。它会接着解释 Source 怎样被选成长期知识，以及显式写入为什么不需要先创建 Source。

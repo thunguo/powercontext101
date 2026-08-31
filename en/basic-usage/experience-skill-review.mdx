@@ -1,14 +1,433 @@
 ---
 title: "Experience, Skill, and Review"
-description: "Generate a Candidate from exact evidence, finish review, then decide whether to export a Skill."
+description: "Create a Candidate from exact evidence, review the exact version, and export an approved Skill Revision explicitly."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+This page turns completed-work evidence into Experience, then turns the approved Experience into a managed Skill. The important part is not how polished the model output sounds. Review must inspect exact evidence and the exact Candidate version.
 
-## This page will cover
+## Two creation paths
 
-- Both generate_* and propose_* create a pending Candidate
-- expected_version, approve, and reject
-- Export a managed Skill to a host; never let it install itself
+| Path | Generation model required | Result |
+|---|---:|---|
+| Python Client `propose_experience` / `propose_skill` | No | Pending Candidate |
+| CLI `experience generate` / `skill generate` | Yes | Pending Candidate or `no_op` |
+
+The CLI currently has no `experience propose` or `skill propose` subcommand. Use the Python Client or HTTP API for model-free typed proposals.
+
+This tutorial establishes a deterministic Review loop with typed proposals first, then shows model-generation commands.
+
+## 1. Prepare exact evidence
+
+Capture one task-result Source. Create `propose_experience.py`:
+
+```python
+import asyncio
+import os
+from uuid import uuid4
+
+from powercontext.client import PowerContextClient
+from powercontext.http import (
+    CaptureContentSourceRequest,
+    ExperienceProposal,
+    ProposeExperienceRequest,
+)
+
+
+SERVER_URL = os.getenv(
+    "POWERCONTEXT_CLIENT_SERVER_URL",
+    "http://127.0.0.1:8000",
+)
+API_TOKEN = os.getenv("POWERCONTEXT_CLIENT_API_TOKEN")
+
+
+async def main() -> None:
+    run_id = uuid4().hex
+    scope_id = f"project:powercontext-101:{run_id}"
+
+    async with PowerContextClient(
+        SERVER_URL,
+        token=API_TOKEN,
+    ) as client:
+        evidence = await client.capture_content_source(
+            CaptureContentSourceRequest(
+                scope_id=scope_id,
+                source_id=f"contract-test-result-{run_id}",
+                content=(
+                    "The OpenAPI client was regenerated and inspected. "
+                    "Contract tests passed."
+                ),
+            )
+        )
+
+        candidate = await client.propose_experience(
+            ProposeExperienceRequest(
+                scope_id=scope_id,
+                proposal=ExperienceProposal(
+                    situation="The OpenAPI contract changed.",
+                    action=(
+                        "Regenerate the client, inspect the diff, and run "
+                        "contract tests."
+                    ),
+                    outcome=(
+                        "The generated transport matched the contract and "
+                        "the tests passed."
+                    ),
+                    lesson=(
+                        "Regenerate and inspect generated clients before "
+                        "contract tests."
+                    ),
+                ),
+                source_refs=[evidence.source],
+                artifact_refs=[],
+                reason="Submit a complete typed Experience proposal.",
+            )
+        )
+
+        print("scope:", scope_id)
+        print("candidate:", candidate.candidate_id)
+        print("version:", candidate.version)
+        print("status:", candidate.status)
+        print("source:", evidence.source)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run it and keep the output:
+
+```bash
+uv run python propose_experience.py
+```
+
+Replace `SCOPE_ID` and `CANDIDATE_ID` in later CLI commands with the values printed by the script.
+
+## 2. Inspect the Candidate
+
+The default Inbox lists pending heads only:
+
+```bash
+powercontext candidate list \
+  --scope-id SCOPE_ID \
+  --family experience
+```
+
+Show the current version:
+
+```bash
+powercontext candidate show \
+  --scope-id SCOPE_ID \
+  CANDIDATE_ID
+```
+
+Before deciding, inspect:
+
+- all four proposal fields;
+- exact `source_refs` and `artifact_refs`;
+- `target`, which appears only for replacement;
+- `status`, `family`, and `reason`;
+- current `version`.
+
+Do not rely on the model's summary. Open the evidence and verify that it supports the proposed action, outcome, and lesson.
+
+## 3. Revise replaces the whole proposal
+
+```bash
+powercontext candidate revise experience \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  --situation "The OpenAPI contract changed." \
+  --action "Regenerate the client, inspect its diff, then run contract tests." \
+  --outcome "The generated transport matched the contract." \
+  --lesson "Inspect generated drift before contract tests." \
+  --source-ref content/SOURCE_ID \
+  CANDIDATE_ID
+```
+
+Use the Source ID returned by capture.
+
+The Candidate remains pending and advances to version 2. Show it again and inspect the complete replacement.
+
+Intentionally approve with the stale version:
+
+```bash
+powercontext candidate approve \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  CANDIDATE_ID
+```
+
+It should return HTTP 409 `candidate_conflict`. Do not change the value to 2 and retry without confirming that current v2 is the proposal you intend to approve.
+
+## 4. Approve or reject
+
+Approve the inspected v2:
+
+```bash
+powercontext candidate approve \
+  --scope-id SCOPE_ID \
+  --expected-version 2 \
+  CANDIDATE_ID
+```
+
+Keep the exact `result_artifact`:
+
+```text
+experience/EXPERIENCE_ID@1
+```
+
+Reject is an alternative terminal branch and needs another pending Candidate:
+
+```bash
+powercontext candidate reject \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  --reason "The evidence does not support the proposed lesson." \
+  OTHER_CANDIDATE_ID
+```
+
+Approved and rejected Candidates are terminal. Neither may be revised, approved, or rejected again.
+
+## 5. Verify Experience recall
+
+There is no `powercontext context prepare` CLI command. Use the Python Client:
+
+```python
+import asyncio
+import os
+
+from powercontext.client import PowerContextClient
+from powercontext.http import PrepareContextRequest
+
+
+async def main() -> None:
+    async with PowerContextClient(
+        os.getenv(
+            "POWERCONTEXT_CLIENT_SERVER_URL",
+            "http://127.0.0.1:8000",
+        ),
+        token=os.getenv("POWERCONTEXT_CLIENT_API_TOKEN"),
+    ) as client:
+        prepared = await client.prepare_context(
+            PrepareContextRequest(
+                scope_id="SCOPE_ID",
+                query="When should generated clients be inspected?",
+            )
+        )
+        print(prepared.status)
+        print(prepared.content)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Replace `SCOPE_ID` with the actual value.
+
+Approval makes the current Experience head eligible for recall, but it does not guarantee selection for every query. Scope, query relevance, and byte budget still apply. Pending, rejected, and historical Experience Revisions stay outside default recall.
+
+## 6. Create a Skill Candidate
+
+The clearest lineage for a new Skill is the approved Experience. Create `propose_skill.py`:
+
+```python
+import asyncio
+import os
+
+from powercontext.client import PowerContextClient
+from powercontext.http import (
+    ArtifactReference,
+    ProposeSkillRequest,
+    SkillProposal,
+    SkillValidationItem,
+)
+
+
+async def main() -> None:
+    experience = ArtifactReference(
+        family="experience",
+        artifact_id="EXPERIENCE_ID",
+        revision=1,
+    )
+
+    async with PowerContextClient(
+        os.getenv(
+            "POWERCONTEXT_CLIENT_SERVER_URL",
+            "http://127.0.0.1:8000",
+        ),
+        token=os.getenv("POWERCONTEXT_CLIENT_API_TOKEN"),
+    ) as client:
+        candidate = await client.propose_skill(
+            ProposeSkillRequest(
+                scope_id="SCOPE_ID",
+                proposal=SkillProposal(
+                    name="regenerate-client",
+                    description=(
+                        "Regenerate and verify a generated API client."
+                    ),
+                    instructions=(
+                        "Regenerate the client from the canonical OpenAPI "
+                        "document. Inspect the generated diff, run generation "
+                        "checks, and then run contract tests."
+                    ),
+                    validation=[
+                        SkillValidationItem(
+                            "The generated diff is inspected."
+                        ),
+                        SkillValidationItem(
+                            "The contract tests pass."
+                        ),
+                    ],
+                ),
+                source_refs=[],
+                artifact_refs=[experience],
+                reason=(
+                    "Turn the approved Experience into reusable instructions."
+                ),
+            )
+        )
+        print(candidate.candidate_id, candidate.version)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Replace `SCOPE_ID` and `EXPERIENCE_ID`, then run the script. Use the same Candidate list, show, revise, and approve commands.
+
+For longer instructions, use a UTF-8 file:
+
+```bash
+powercontext candidate revise skill \
+  --scope-id SCOPE_ID \
+  --expected-version 1 \
+  --name regenerate-client \
+  --description "Regenerate and verify a generated API client." \
+  --instructions-file instructions.md \
+  --validation "The generated diff is inspected." \
+  --validation "The contract tests pass." \
+  --artifact-ref experience/EXPERIENCE_ID@1 \
+  SKILL_CANDIDATE_ID
+```
+
+Choose exactly one of `--instructions` and `--instructions-file`.
+
+Approval produces:
+
+```text
+skill/SKILL_ID@1
+```
+
+The Skill still does not enter PreparedContext. That is expected.
+
+## 7. Read and export an exact Skill Revision
+
+Read it first:
+
+```bash
+powercontext skill show \
+  --scope-id SCOPE_ID \
+  --revision 1 \
+  SKILL_ID
+```
+
+Export to Codex:
+
+```bash
+powercontext skill export \
+  --target codex \
+  --scope-id SCOPE_ID \
+  --revision 1 \
+  --destination .agents/skills/regenerate-client \
+  SKILL_ID
+```
+
+Export to Claude Code:
+
+```bash
+powercontext skill export \
+  --target claude_code \
+  --scope-id SCOPE_ID \
+  --revision 1 \
+  --destination .claude/skills/regenerate-client \
+  SKILL_ID
+```
+
+The target is `claude_code`, not `claude-code`.
+
+The output directory contains:
+
+```text
+SKILL.md
+powercontext.json
+```
+
+Confirm that `powercontext.json` cites exact `skill/SKILL_ID@1`. CLI export is create-only and refuses an existing destination.
+
+Managed Skill export currently supports Codex and Claude Code only. A bundled Skill shipped with a plugin does not imply managed export support.
+
+## Model-generation path
+
+With a generation model configured, a Candidate may also be generated from exact evidence:
+
+```bash
+powercontext experience generate \
+  --scope-id project:example \
+  --source-ref content/SOURCE_ID \
+  --reason "Extract a reusable lesson from the completed task."
+```
+
+Generate Skill from approved Experience:
+
+```bash
+powercontext skill generate \
+  --scope-id project:example \
+  --origin experience \
+  --artifact-ref experience/EXPERIENCE_ID@1 \
+  --reason "Turn the reviewed lesson into reusable instructions."
+```
+
+The response may be:
+
+```text
+status: pending, candidate: {...}
+```
+
+or:
+
+```text
+status: no_op, candidate: null
+```
+
+A no-op does not enter the Inbox and has no Candidate to approve. Without a generation model, generate returns 503 `generation_unavailable`.
+
+Other Skill origins:
+
+- `source`: one or more exact Source refs only, with no Artifact refs or target;
+- `usage`: an exact target Skill and at least one bounded Source. The Server validates reference shape; the reviewer decides whether the Source truly records useful observed behavior.
+
+## Conflict handling
+
+| Situation | Result | Action |
+|---|---|---|
+| stale `expected_version` | 409 `candidate_conflict` | Show and review the current version |
+| Candidate is terminal | 409 `candidate_terminal` | Do not modify it again |
+| replacement target head advanced | 409 `artifact_conflict` | Candidate remains pending; reassess the target |
+| invalid evidence or lineage | 422 `invalid_request` | Correct evidence rather than retrying CAS |
+| export destination exists | CLI exit 2 | Inspect foreign/current/drifted state; do not overwrite |
+
+A replacement Candidate cannot switch its target to another Revision during revise.
+
+## Completion check
+
+- Typed propose creates a pending Candidate without a model.
+- Generate may return pending or no-op.
+- Review always shows the Candidate before using inspected `expected_version`.
+- A stale version returns 409.
+- Approval returns an exact `result_artifact`.
+- The approved current Experience may participate in relevant recall.
+- Skill approval neither exports nor executes it.
+- The export package contains `SKILL.md` and `powercontext.json`.
+- An existing destination or local drift is never overwritten silently.
+
+Basic Usage is complete. Continue with [Framework integration](/en/frameworks/overview), [Common agents](/en/common-agents/overview), or [Coding agents](/en/coding-agents/overview) for your runtime.

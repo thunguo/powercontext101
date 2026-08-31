@@ -1,14 +1,244 @@
 ---
 title: "安装并运行 Server"
-description: "用 uv 安装 CLI 与 Server，完成本地健康检查。"
+description: "安装 PowerContext CLI 和 Server，启动无模型的本地运行时，并检查实际能力。"
 ---
 
+这一页先启动最小 Server。它没有 generation 或 embedding 模型，但已经能保存显式 Memory、执行 FTS search，并通过 HTTP、Python Client 和 MCP 提供同一套持久数据。
+
+## 前置条件
+
+当前文档化的安装环境是：
+
+- macOS 或 Linux；
+- Python 3.11 及以上；
+- Git；
+- [`uv`](https://docs.astral.sh/uv/)。
+
+PowerContext 支持 Python `<4.0`。本教程不提供未经验证的 Windows 安装路径。
+
+## 安装 CLI 和 Server
+
+从当前 `master` 安装：
+
+```bash
+uv tool install --force \
+  "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@master"
+```
+
+`uv tool` 使用隔离环境，不会在当前目录留下仓库 checkout。`--force` 也用于更新：如果同一个 Git requirement 已安装，它会重新获取所选 ref，而不是直接报告 already installed。
+
+团队项目最好把 `master` 换成经过验证的 tag 或 commit，并让 Server 与宿主 integration 使用同一个 ref。
+
 <Note>
-TODO: 正文待写。本页只建立大纲。
+`uv tool` 里的 `powercontext[client]` 不能被另一个 Python 项目直接 import。需要写 Client 代码时，稍后还要把 client extra 安装到那个项目自己的环境中。
 </Note>
 
-## 本页将覆盖
+## 启动本地 Server
 
-- macOS / Linux、Python 3.11+、uv 前置条件
-- powercontext server run、Dashboard 与 /mcp
-- powercontext doctor 与显式 Memory 无需 inference provider
+```bash
+powercontext server run
+```
+
+默认配置如下：
+
+| 项目 | 默认行为 |
+|---|---|
+| 地址 | `http://127.0.0.1:8000` |
+| Dashboard | `/` |
+| Streamable HTTP MCP | `/mcp` |
+| 数据库 | 用户数据目录中的持久 SQLite |
+| Bearer auth | 关闭，仅适合默认 loopback 使用 |
+| Generation / embedding | 未配置 |
+| Search | `auto`、`fts` |
+
+macOS 上，数据库通常位于：
+
+```text
+~/Library/Application Support/powercontext/powercontext.db
+```
+
+Linux 通常位于：
+
+```text
+~/.local/share/powercontext/powercontext.db
+```
+
+设置 `POWERCONTEXT_HOME` 后，默认数据库会放到该目录。切换 home 或 database URL 会看到另一套数据，这很容易被误判成 Scope 丢失。
+
+`Ctrl-C` 会正常关闭 Server。再次运行命令会打开同一个数据库。
+
+## 检查运行状态
+
+另开一个终端：
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+三个命令回答不同问题。
+
+### `doctor`
+
+检查当前 package、Server liveness 和 readiness。全部为 `ok` 时退出码才是 0。
+
+如果 liveness 失败，readiness 会标为 skipped。`degraded` 也会让 doctor 返回非零，因为至少一个已配置 inference check 没通过；这不等于数据库必然不可用。
+
+### `ready`
+
+区分：
+
+- `ready`：所有已配置检查通过；
+- `degraded`：可选 inference check 失败，HTTP 仍为 200；
+- `not_ready`：Runtime 或数据库不可用，readiness endpoint 返回 HTTP 503。当前 CLI 会把这个 503 打印成 Server error，而不是完整展开 `not_ready` response；用 `doctor` 或直接检查 `/health/ready` 诊断依赖项。
+
+### `capabilities`
+
+最小 Server 应显示类似：
+
+```text
+Source types: content
+Artifact families: memory, experience, skill, handoff
+Memory extraction: disabled
+Experience generation: disabled
+Managed Skill generation: disabled
+External Skill Registry: disabled
+Handoff generation: disabled
+Search modes: auto, fts
+Context versions: powercontext.prepared-context.v1
+```
+
+Artifact family 存在不代表该 family 的 model-backed generation 已开启。以对应 capability boolean 为准。
+
+打开 Dashboard：
+
+```text
+http://127.0.0.1:8000/
+```
+
+没有配置 Dashboard Scope 时，页面显示空状态。Dashboard 初始化失败只会记录 warning；HTTP API 和 MCP 仍可继续服务。
+
+## 先验证无模型能力
+
+最小 Server 可以完成：
+
+- capture Source；
+- explicit Memory remember、search、revise 和 retire；
+- FTS；
+- typed Experience / Skill proposal 与 Candidate Review；
+- Prepared Handoff finalize、commit 和 continue；
+- `PreparedContext` 构造，只要当前 Scope 有可召回内容。
+
+它不能完成：
+
+- Source 到 Memory 的模型抽取；
+- Experience / Skill / Handoff 的模型生成；
+- vector / hybrid search；
+- model-backed reranking。
+
+所以第一条教程从 explicit Memory 开始。这样可以先验证持久化、Scope 和 Citation，不必把 provider 配置也塞进第一次排错。
+
+## 为 Python 项目安装 Client
+
+在要运行示例的 Python 项目中：
+
+```bash
+uv add \
+  "powercontext[client] @ git+https://github.com/oceanbase/powercontext.git@master"
+```
+
+确认该项目使用 Python 3.11 或以上：
+
+```bash
+uv run python --version
+```
+
+下一页的示例通过：
+
+```python
+from powercontext.client import PowerContextClient
+from powercontext.http import RememberMemoryRequest
+```
+
+导入公共 API。不要从 `powercontext.http._generated` 导入内部生成模块。
+
+## `.env` 不会自动加载
+
+PowerContext CLI 不会搜索当前目录的 `.env`。需要显式传入：
+
+```bash
+powercontext server run --env-file .env
+```
+
+完整能力可以从配置生成器开始：
+
+```bash
+powercontext config init --output .env
+powercontext config show --env-file .env
+powercontext config validate --env-file .env
+powercontext server run --env-file .env
+```
+
+Generation 和 scheduler 是独立配置。配置 generation model 会让 extraction capability 可用，但不会自动打开定时 scheduler；你仍可手动调用 `flush_memory`。
+
+Embedding 必须成组配置 model、profile ID 和 dimension。缺少任意一项时，配置校验应失败，而不是启动一套含糊的半向量模式。
+
+## Auth 与远程访问
+
+默认配置只监听 loopback，所以关闭 auth 是可接受的本地开发设置。
+
+绑定非 loopback 地址时，Server 默认要求认证或显式 unsafe opt-in。Python Client 也拒绝访问非 loopback 的明文 HTTP。生产和远程部署应使用 TLS 和 Bearer token，不要把 token 放进 URL。
+
+开启 auth 后，Client 从环境读取裸 token：
+
+```bash
+export POWERCONTEXT_CLIENT_API_TOKEN="replace-with-token"
+```
+
+它会构造：
+
+```http
+Authorization: Bearer replace-with-token
+```
+
+## 常见启动问题
+
+### `doctor` 显示 Server 不可达
+
+确认 `powercontext server run` 仍在运行，并检查 8000 端口是否被占用。若使用自定义地址，`doctor` 使用自己的 option，放在子命令后：
+
+```bash
+powercontext doctor \
+  --server-url http://127.0.0.1:9000
+```
+
+根命令的 `--server-url` 用于 Client content commands，不会替代 `doctor` 的独立地址参数。
+
+### 创建了 `.env`，能力仍没变化
+
+启动命令是否带了 `--env-file .env`？CLI 不会隐式加载它。
+
+### `capabilities` 只有 `auto, fts`
+
+Server 正常运行在 FTS-only 模式。它尚不满足 vector/hybrid 的前提。
+
+### `ready` 是 degraded
+
+查看具体 dependency check。数据库操作如果不依赖故障 inference capability，可能仍可用；需要该 provider 的操作仍会失败。
+
+### 重启后看不到旧数据
+
+检查 `POWERCONTEXT_HOME`、database kind 和 database URL 是否变化，再检查 `scope_id`。这三处都会改变你看到的数据集。
+
+## 完成检查
+
+继续前确认：
+
+- `powercontext doctor` 在最小配置下通过；
+- `powercontext capabilities` 显示 `auto, fts`；
+- Dashboard 能打开，或已明确禁用；
+- Python 示例项目能 import `PowerContextClient`；
+- 你知道本次教程使用的稳定 Scope 是 `project:powercontext-101`。
+
+下一页用 [Python Client 串通常用 API](/zh/basic-usage/api-tour)。
