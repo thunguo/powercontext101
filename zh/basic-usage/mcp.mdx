@@ -1,0 +1,73 @@
+---
+title: "用 MCP 连接 Server"
+description: "把 MCP 客户端接到同一套持久数据，并分清它和 HTTP / Python Client 的覆盖面。"
+---
+
+MCP 是给 Agent 的精选工具面。它连的是同一个 Server、同一套持久数据，**不是**完整 HTTP API。
+
+自动 recall、capture 和 flush 仍由宿主 Hook 或 framework adapter 负责。MCP 只暴露需要你明确调用的那些 operation。
+
+## 默认地址
+
+```text
+http://127.0.0.1:8000/mcp
+```
+
+这是 Streamable HTTP。默认只听 loopback，未开 Bearer。Server 没启动时，客户端应看到连接失败，而不是一套空工具。
+
+## 最小客户端配置
+
+把下面这段合并进宿主的 MCP 配置。不要写本机绝对路径，也不要把 token 放进 URL。
+
+```json
+{
+  "mcpServers": {
+    "powercontext": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+有的宿主把类型写成 `streamable-http`。指向同一个 `/mcp` 即可。Codex、Claude Code、WorkBuddy 的字段名和 header helper 不同，那些细节在对应宿主页。
+
+## 能做 / 不能做
+
+| 能做 | 不能做 |
+|---|---|
+| `remember_memory`、`search_memory`、exact get / list / revise / retire | `prepare_context`。最终 `PreparedContext` 通常由 Hook 或 adapter 在请求时准备 |
+| `capture_content_source` | `flush_memory` |
+| Work Contract、Handoff、Task Outcome | Skill generate / export |
+| Candidate list / get / approve / reject / revise | Experience operation |
+| 与 HTTP、Python Client 读写同一套数据 | 复现每个 integration 的自动 recall / capture / flush 生命周期 |
+
+当前测试里的默认 MCP 工具名就是上表这些 operation id。Handoff report 相关只读工具只在该 feature 打开时出现，不要当成默认面。
+
+MCP 上的 `readOnlyHint` / `destructiveHint` 只给宿主做确认提示。它**不是**授权边界。提案 Agent 仍可能同时拿到 approve 工具，除非宿主自己撤权。
+
+<Warning>
+`handoff_current_work` 会写 boundary Source。讨论设计，或说 “preview and make no writes”，不要调用它。
+</Warning>
+
+## 开启 Bearer 之后
+
+默认 loopback 可以关 auth。一旦 `POWERCONTEXT_SERVER_AUTH_ENABLED=true`：
+
+- `/mcp` 本身要带 `Authorization: Bearer <token>`，discovery 和 tool call 都算；
+- `/openapi.json` 同样要 header；
+- `/docs` 仍可公开打开，那不代表 MCP 或 API 已经授权。
+
+不要把 token 放进 URL。宿主应使用它自己的 header helper 或环境变量，例如 Codex 的 `POWERCONTEXT_CODEX_AUTHORIZATION`。
+
+401/403 不是 `empty`。工具失败必须可见，不能假装写入成功。
+
+## 完成检查
+
+- 客户端连上 `http://127.0.0.1:8000/mcp`，能列出 `remember_memory` 和 `search_memory`。
+- 你用 MCP 写入的 Memory，能被 [API 串讲](/zh/basic-usage/api-tour) 的 Python Client 搜到。
+- 工具列表里没有 `prepare_context`。
+- 停掉 Server 后再调用 `remember_memory`，失败可见。
+- 开了 Bearer 后，不带 header 的 `/mcp` 不能当已连接。
+
+编程宿主怎么注册 MCP，看 [Codex](/zh/coding-agents/codex) 或 [Claude Code](/zh/coding-agents/claude-code)。通用 Agent 里没有 setup 的路径，看 [Agent Plugin](/zh/common-agents/agent-plugin)。

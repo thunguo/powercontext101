@@ -1,0 +1,73 @@
+---
+title: "Connect with MCP"
+description: "Point an MCP client at the same durable data, and keep its coverage distinct from HTTP and the Python Client."
+---
+
+MCP is a curated tool surface for agents. It talks to the same Server and the same durable data. It is **not** the full HTTP API.
+
+Automatic recall, capture, and flush still belong to a host hook or framework adapter. MCP only exposes operations you call explicitly.
+
+## Default URL
+
+```text
+http://127.0.0.1:8000/mcp
+```
+
+This is Streamable HTTP. The default Server listens on loopback with Bearer auth off. If the Server is down, the client should fail to connect rather than show an empty tool set that looks healthy.
+
+## Minimum client config
+
+Merge this into the host MCP config. Do not write a machine-local filesystem path, and do not put a token in the URL.
+
+```json
+{
+  "mcpServers": {
+    "powercontext": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+Some hosts spell the type as `streamable-http`. Point them at the same `/mcp`. Codex, Claude Code, and WorkBuddy use different field names and header helpers; those details stay on the host pages.
+
+## What it can and cannot do
+
+| Can | Cannot |
+|---|---|
+| `remember_memory`, `search_memory`, exact get / list / revise / retire | `prepare_context`. A hook or adapter normally prepares the final `PreparedContext` |
+| `capture_content_source` | `flush_memory` |
+| Work Contract, Handoff, Task Outcome | Skill generate / export |
+| Candidate list / get / approve / reject / revise | Experience operations |
+| Read and write the same data as HTTP and the Python Client | Reproduce each integration's automatic recall / capture / flush lifecycle |
+
+The default MCP tool names in current tests are those operation ids. Read-only Handoff report tools appear only when that feature is on. Do not treat them as the default surface.
+
+`readOnlyHint` and `destructiveHint` on MCP tools are confirmation hints for the host. They are **not** an authorization boundary. A proposing agent can still receive approve tools unless the host withholds them.
+
+<Warning>
+`handoff_current_work` writes a boundary Source. Discussing a design, or saying “preview and make no writes,” must not call it.
+</Warning>
+
+## After you enable Bearer
+
+Loopback can leave auth off. Once `POWERCONTEXT_SERVER_AUTH_ENABLED=true`:
+
+- `/mcp` itself needs `Authorization: Bearer <token>` for discovery and for tool calls;
+- `/openapi.json` needs the same header;
+- `/docs` can still open without a token. That does not mean MCP or the API is authorized.
+
+Do not put the token in the URL. Use the host header helper or environment variable, such as `POWERCONTEXT_CODEX_AUTHORIZATION` on Codex.
+
+401/403 is not `empty`. A tool failure must stay visible. Do not pretend a write succeeded.
+
+## Completion check
+
+- The client connects to `http://127.0.0.1:8000/mcp` and lists `remember_memory` and `search_memory`.
+- A Memory written through MCP is visible to the Python Client on the [API tour](/en/basic-usage/api-tour).
+- The tool list does not include `prepare_context`.
+- `remember_memory` fails visibly after you stop the Server.
+- With Bearer enabled, `/mcp` without a header is not a connected client.
+
+For host-specific MCP registration, see [Codex](/en/coding-agents/codex) or [Claude Code](/en/coding-agents/claude-code). For a setup-free common-agent path, see [Agent Plugin](/en/common-agents/agent-plugin).

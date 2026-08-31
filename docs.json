@@ -117,6 +117,7 @@
                 "pages": [
                   "zh/basic-usage/install-and-run",
                   "zh/basic-usage/api-tour",
+                  "zh/basic-usage/mcp",
                   "zh/basic-usage/source-and-memory",
                   "zh/basic-usage/handoff-loop",
                   "zh/basic-usage/experience-skill-review"
@@ -239,6 +240,7 @@
                 "pages": [
                   "en/basic-usage/install-and-run",
                   "en/basic-usage/api-tour",
+                  "en/basic-usage/mcp",
                   "en/basic-usage/source-and-memory",
                   "en/basic-usage/handoff-loop",
                   "en/basic-usage/experience-skill-review"
