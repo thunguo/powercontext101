@@ -1,13 +1,13 @@
 ---
 title: "Common agents overview"
-description: "Choose between Hermes and OpenClaw, then keep installation, activation, Server startup, and diagnostics separate."
+description: "Choose among Hermes, OpenClaw, WorkBuddy, and Agent Plugin, then keep installation, activation, Server startup, and diagnostics separate."
 ---
 
 <Warning>
 `powercontext setup <host>` installs and configures a host integration. It does not start the PowerContext Server. A completed setup is not proof that recall or writes can reach the Server.
 </Warning>
 
-This section covers two general-purpose hosts with first-class setup commands: Hermes and OpenClaw. They connect to the same Server, but their host contracts are different. Pick the host first; do not copy settings from one into the other.
+This section starts with two general-purpose hosts that have first-class setup commands: Hermes and OpenClaw. The other two pages are [WorkBuddy](/en/common-agents/workbuddy) and [Agent Plugin](/en/common-agents/agent-plugin). They connect to the same Server, but their host contracts are different. Pick the host first; do not copy settings from one into the other.
 
 ## The four layers
 
@@ -119,9 +119,25 @@ Automatic recall and capture are auxiliary paths and normally fail open. Explici
 - Switch Scope and search for data from the old Scope. No entry should cross the boundary.
 - Put a secret in captured text. Neither integration provides complete DLP; privacy policy must prevent the capture rather than relying on heuristic filtering.
 
-## Other names you may encounter
+## WorkBuddy and Agent Plugin
 
-WorkBuddy has dedicated `setup` and doctor commands, but it is not in the first-class bulk catalog used by `setup select` and `doctor integrations`. Do not infer catalog membership from the existence of a setup command. The 101 verification contract is on [WorkBuddy](/en/coding-agents/workbuddy). The portable Skill + MCP package is on [Agent Plugin](/en/coding-agents/agent-plugin).
+These two pages belong in this chapter, but they are not in the first-class catalog used by `setup select` and `doctor integrations`.
+
+| Capability | WorkBuddy | Agent Plugin |
+|---|---|---|
+| Automatic event | `UserPromptSubmit` | None |
+| Injection | `additionalContext` | None; MCP only |
+| Prompt capture | Yes | No |
+| Explicit interface | MCP | MCP |
+| Handoff | MCP + Skill | MCP + Skill |
+| Permission | Host-gated | Host-gated |
+| Managed Skill export | Unsupported | Unsupported |
+| Real-host E2E | Not validated (service-chain only) | Not validated (package contract only) |
+| Catalog | Dedicated `setup` / `doctor`; not first-class | No setup / doctor |
+
+Do not describe WorkBuddy as a `setup select` member. Do not describe Agent Plugin as a host that prepares context automatically. The verification contracts are on [WorkBuddy](/en/common-agents/workbuddy) and [Agent Plugin](/en/common-agents/agent-plugin).
+
+## Other names you may encounter
 
 Bub is narrower still in this checkout: it appears as a package/README integration path, not as a first-class host setup and diagnostics entry. LangChain, LangGraph, and Pydantic AI are framework integrations, not hosts in this catalog.
 
@@ -145,4 +161,4 @@ Bub is narrower still in this checkout: it appears as a package/README integrati
 - Server outage leaves automatic paths fail-open and explicit writes visible.
 - Capture policy is acceptable before `autoCapture` or `capture_turns` remains enabled.
 
-Continue with [Hermes](/en/common-agents/hermes) for the full provider surface, or [OpenClaw](/en/common-agents/openclaw) for the narrower Memory-only path.
+Continue with [Hermes](/en/common-agents/hermes) for the full provider surface, or [OpenClaw](/en/common-agents/openclaw) for the narrower Memory-only path. Use the matching page for WorkBuddy or the portable Agent Plugin.

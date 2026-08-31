@@ -1,13 +1,13 @@
 ---
 title: "通用 Agent 总览"
-description: "在 Hermes 与 OpenClaw 之间选路，并把安装、激活、Server 启动和诊断分开处理。"
+description: "在 Hermes、OpenClaw、WorkBuddy 与 Agent Plugin 之间选路，并把安装、激活、Server 启动和诊断分开处理。"
 ---
 
 <Warning>
 `powercontext setup <host>` 只安装并配置宿主 integration，不会启动 PowerContext Server。Setup 成功，也不能证明召回或写入已经能访问 Server。
 </Warning>
 
-本章讲两个有 first-class setup 命令的通用宿主：Hermes 和 OpenClaw。它们连接同一个 Server，但宿主合同不同。先选宿主，不要把一边的配置照搬到另一边。
+本章先讲两个有 first-class setup 命令的通用宿主：Hermes 和 OpenClaw。另外两页是 [WorkBuddy](/zh/common-agents/workbuddy) 和 [Agent Plugin](/zh/common-agents/agent-plugin)。它们连接同一个 Server，但宿主合同不同。先选宿主，不要把一边的配置照搬到另一边。
 
 ## 四层边界
 
@@ -119,9 +119,25 @@ flowchart LR
 - 切换 Scope 后搜索旧 Scope 的数据。不应有 entry 越界出现。
 - 在待采集文本中放入 secret。两个 integration 都不提供完整 DLP；隐私策略应阻止采集，而不是依赖启发式过滤。
 
-## 还会遇到的几个名字
+## WorkBuddy 与 Agent Plugin
 
-WorkBuddy 有单独的 `setup` 和 doctor 命令，但不在 `setup select` 与 `doctor integrations` 使用的 first-class bulk catalog 里。存在 setup 命令，不代表它属于这个 catalog。101 的验证合同见 [WorkBuddy](/zh/coding-agents/workbuddy)。便携 Skill + MCP 包见 [Agent Plugin](/zh/coding-agents/agent-plugin)。
+这两页属于本章，但不在 `setup select` / `doctor integrations` 的 first-class catalog 里。
+
+| 能力 | WorkBuddy | Agent Plugin |
+|---|---|---|
+| 自动事件 | `UserPromptSubmit` | 无 |
+| 注入 | `additionalContext` | 无；只靠 MCP |
+| Prompt capture | 有 | 无 |
+| 显式接口 | MCP | MCP |
+| Handoff | MCP + Skill | MCP + Skill |
+| Permission | Host-gated | Host-gated |
+| Managed Skill export | Unsupported | Unsupported |
+| Real-host E2E | Not validated（仅 service-chain） | Not validated（仅 package contract） |
+| Catalog | 独立 `setup` / `doctor`；不在 first-class | 无 setup / doctor |
+
+不要把 WorkBuddy 写成 `setup select` 成员，也不要把 Agent Plugin 写成会自动 prepare 的宿主。验证合同见 [WorkBuddy](/zh/common-agents/workbuddy) 和 [Agent Plugin](/zh/common-agents/agent-plugin)。
+
+## 还会遇到的几个名字
 
 Bub 在当前 checkout 里更窄：它只是 package/README integration 路径，不是 first-class 宿主 setup/diagnostics entry。LangChain、LangGraph 与 Pydantic AI 是 framework integration，也不在这个宿主 catalog 中。
 
@@ -145,4 +161,4 @@ Bub 在当前 checkout 里更窄：它只是 package/README integration 路径�
 - Server outage 时，自动路径 fail-open，显式写入错误可见。
 - 保留 `autoCapture` 或 `capture_turns` 前，已确认 capture policy。
 
-要用完整 provider surface，继续看 [Hermes](/zh/common-agents/hermes)；只需要较窄的 Memory 路径，就看 [OpenClaw](/zh/common-agents/openclaw)。
+要用完整 provider surface，继续看 [Hermes](/zh/common-agents/hermes)；只需要较窄的 Memory 路径，就看 [OpenClaw](/zh/common-agents/openclaw)。WorkBuddy 或便携 Agent Plugin 分别看对应页。

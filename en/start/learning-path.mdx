@@ -55,18 +55,18 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     If you only need automatic recall, you can skip Handoff and Skill for now.
   </Tab>
   <Tab title="I use Hermes / OpenClaw">
-    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
+    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Common agents overview](/en/common-agents/overview) → [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
 
     You are done when the plugin is installed and active, `powercontext doctor <host>` passes, and a new session can recall a Memory you stored explicitly.
 
-    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. Installation, credentials, and durable writes still require your authorization.
+    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. WorkBuddy and the portable Agent Plugin also live in this chapter: run `setup workbuddy` separately for WorkBuddy; Agent Plugin has no setup command, so verify explicit MCP only. Installation, credentials, and durable writes still require your authorization.
   </Tab>
   <Tab title="I use a coding agent">
     Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Coding agents overview](/en/coding-agents/overview) → the selected host page.
 
-    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ. WorkBuddy has dedicated `setup` / `doctor` commands but is not in the first-class catalog. Agent Plugin has no setup command; it only ships a portable Skill and MCP configuration.
+    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ.
 
-    You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you. Agent Plugin has no automatic recall; verify that an explicit MCP failure stays visible.
+    You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you.
   </Tab>
   <Tab title="I am building an integration">
     Complete [Hooks and plugins](/en/coding-agents/hooks-and-plugins), compare at least two existing hosts, then read [Extend hooks](/en/coding-agents/extend-hooks).

@@ -1,11 +1,11 @@
 ---
 title: "编程 Agent 总览"
-description: "比较 first-class 编程宿主，以及 WorkBuddy 与 Agent Plugin 的接入边界。"
+description: "比较 Codex、Claude Code、DSH、OpenCode 与 Pi 的事件、注入、采集、权限和验证等级。"
 ---
 
-first-class catalog 里的五个编程宿主连接同一个 PowerContext Server，但没有共用一套 Hook API。共同点是领域合同：解析 Scope、prepare 临时上下文、独立 capture Source，并让显式持久写入经过宿主权限。
+五个编程宿主连接同一个 PowerContext Server，但没有共用一套 Hook API。共同点是领域合同：解析 Scope、prepare 临时上下文、独立 capture Source，并让显式持久写入经过宿主权限。
 
-官方 configure how-to 另外还有 [WorkBuddy](/zh/coding-agents/workbuddy) 和 [Agent Plugin](/zh/coding-agents/agent-plugin)。前者有独立 `setup` / `doctor`，但不在 `setup select` 里；后者没有 setup 命令，只提供便携 Skill 与 MCP 配置。
+WorkBuddy 和便携 Agent Plugin 不在这一章。它们的验证合同在[通用 Agent](/zh/common-agents/overview)。
 
 ## 共同执行流
 
@@ -35,22 +35,6 @@ host event
 
 Bundled `project-context` Skill 只是 integration 自带说明，不代表 managed Skill export。
 
-## WorkBuddy 与 Agent Plugin
-
-| 能力 | WorkBuddy | Agent Plugin |
-|---|---|---|
-| 自动事件 | `UserPromptSubmit` | 无 |
-| 注入 | `additionalContext` | 无；只靠 MCP |
-| Prompt capture | 有 | 无 |
-| 显式接口 | MCP | MCP |
-| Handoff | MCP + Skill | MCP + Skill |
-| Permission | Host-gated | Host-gated |
-| Managed Skill export | Unsupported | Unsupported |
-| Real-host E2E | Not validated（仅 service-chain） | Not validated（仅 package contract） |
-| Catalog | 独立 `setup` / `doctor`；不在 first-class | 无 setup / doctor |
-
-不要把 WorkBuddy 写成 `setup select` 成员，也不要把 Agent Plugin 写成会自动 prepare 的宿主。
-
 ## Setup 与 doctor
 
 ```bash
@@ -75,7 +59,6 @@ Automatic recall/capture 属于辅助路径，Server failure 时通常 fail-open
 - 需要 pre-step 与可裁剪 HTTP tools：DSH。
 - 需要 exact-turn transient cache 与真实 host E2E：OpenCode。
 - 需要 boundary flush 和 no-UI fail-closed：Pi。
-- 需要 Codex 同类 Hook + MCP，但宿主是 WorkBuddy：WorkBuddy。单独运行 `setup workbuddy`。
-- 需要便携 Skill + MCP、不要宿主专用集成：Agent Plugin。
+- 需要 WorkBuddy 或便携 Agent Plugin：去[通用 Agent](/zh/common-agents/overview)。
 
 先读 [Hooks 与插件](/zh/coding-agents/hooks-and-plugins)，再进入对应宿主页。
