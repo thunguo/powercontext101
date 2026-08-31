@@ -1,8 +1,19 @@
 # PowerContext 101
 
-PowerContext 101 is a bilingual Chinese and English tutorial site for PowerContext. It teaches the mental model, runnable API workflows, framework integration, and agent-host behavior. Complete contracts and deployment reference remain in the [official PowerContext docs](https://powercontext.oceanbase.io/).
+PowerContext 101 is a bilingual Chinese and English tutorial site for PowerContext. It teaches the mental model, runnable API workflows, framework integration, and agent-host behavior. Complete contracts and deployment reference remain in the [official PowerContext docs](https://oceanbase.github.io/powercontext/).
 
-The site is being written in stages. Start pages and selected Mental Model pages have full copy; remaining pages may still show an explicit `TODO` note. Navigation presence does not imply that a page is finished.
+Published MDX pages have full copy. There are no `TODO` stubs. Navigation matches written pages.
+
+| Section | Status |
+|---|---|
+| Start | Entry and learning path are written |
+| Mental model | Full concept pages |
+| Basic usage | Full runnable tutorials |
+| Frameworks | Full integration guides. First install path is LangGraph or LangChain; the Pydantic AI Agent adapter is Preview |
+| Common agents | Full Hermes, OpenClaw, WorkBuddy, Agent Plugin, and self-extension pages |
+| Coding agents | Contract, capability matrix, and followable host pages exist. They are 101 verification contracts, not copies of official how-tos. Most real-host E2E is **Not validated**. `setup` and `doctor` do not prove recall or a live host session. |
+
+Do not treat a coding-agent host page as a finished, proven host walkthrough. Use the official docs for install parameters.
 
 ## Local preview
 
