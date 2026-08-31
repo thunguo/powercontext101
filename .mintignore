@@ -2,6 +2,9 @@
 # .git, .github, .claude, .agents, .idea, node_modules,
 # README.md, LICENSE.md, CHANGELOG.md, CONTRIBUTING.md
 
+# Root bilingual README. Mintlify already ignores README.md.
+README.zh-CN.md
+
 # Draft content
 drafts/
 *.draft.mdx
