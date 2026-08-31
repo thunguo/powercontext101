@@ -5,6 +5,8 @@ description: "Map host events onto Scope, ephemeral injection, Source capture, p
 
 A reliable adapter is more than one API call before a prompt. It must fit host events, prevent stale context, protect credentials, and separate automatic helpers from explicit mutations.
 
+## Adapter contract
+
 ```text
 PromptEvent
 → ScopeResolver
@@ -17,19 +19,34 @@ PromptEvent
 → content-free Diagnostics
 ```
 
-## Host event models
+## Five event models
 
-| Host | Preparation event | Injection channel |
+| Host | Preparation timing | Injection channel |
 |---|---|---|
-| Codex | Short-process `UserPromptSubmit` | Hook stdout additional context |
+| Codex | short-process `UserPromptSubmit` | hook stdout additional context |
 | Claude Code | `UserPromptSubmit` | JSON `additionalContext` |
-| DSH | `agent/pre-step` | Plugin message after downstream decision |
-| OpenCode | Prepare on `chat.message`, inject on transform | `(sessionID,messageID)` cache |
-| Pi | `before_agent_start` | Returned `systemPrompt` |
+| DSH | `agent/pre-step` middleware | plugin message after downstream decision |
+| OpenCode | prepare on `chat.message`, inject on message transform | `(sessionID,messageID)` exact-turn cache |
+| Pi | `before_agent_start` | returned `systemPrompt` augmentation |
 
-Automatic tests should cover Server down, 401/403 vs empty, unknown schema, size/deadline, capture/recall independence, stale-turn rejection, and content-free diagnostics. Redirect refusal may be promised only where the implementation explicitly enforces it.
+Do not copy one host's Stop, transcript, or permission assumptions onto another.
 
-Capture remains Source evidence until scheduler or flush processes it. Each host page states capture content, secret filtering, size bounds, and whether boundary flush exists.
+## Security contract
+
+Automatic path tests must cover:
+
+- Server down: the original task continues;
+- 401/403 vs empty are distinguishable;
+- unknown schema is not injected;
+- oversized response / timeout are bounded;
+- redirect does not leak Authorization (promise this only where the implementation explicitly refuses);
+- capture failure does not delete valid recall;
+- stale turn context does not enter a new turn;
+- diagnostics contain no prompt, Scope, content, or token.
+
+Explicit mutation must fail visibly and go through host permission. Candidate approval must not be silently opened as a normal model tool.
+
+## Capture is not Memory
 
 ```text
 prompt capture
@@ -39,10 +56,31 @@ prompt capture
 → Memory commit or no-op
 ```
 
-## Setup contract
+Adapter docs must state the capture scope: user prompt only, full visible turn, or no capture at all. They must also state the secret and size policy.
 
-A host installer should gate versions, preserve foreign config, record ownership, reject foreign-file overwrite, expose partial failure or rollback, distinguish installed from active, and provide doctor plus a real-host activation probe.
+## Setup and doctor contract
 
-The repository has shared policies and test vectors, but no single HostAdapter SDK. Reuse transport rules, prepared-context parsing, Scope behavior, Pi flusher, DSH operation generation, projections, and setup/doctor tests without pretending one abstraction already exists.
+A new host installer must at least:
+
+- gate versions;
+- install idempotently and preserve non-owned config;
+- mark ownership and reject overwriting foreign files;
+- support rollback or an explicit partial-failure state;
+- distinguish plugin installed, host activated, and Server running;
+- provide bounded doctor and a real host activation probe.
+
+## No unified HostAdapter SDK
+
+The repository already has reusable helpers, but it has no unified `HostAdapter` abstraction:
+
+- `powercontext.transport` and loopback vectors;
+- Codex/Claude prepared-context parser;
+- host-specific Scope normalization;
+- Pi pending Source flusher;
+- DSH generated operation table;
+- Codex/Claude Skill projection;
+- `hosts.py` setup/doctor catalog.
+
+Reuse the contracts and tests. Do not pretend a unified SDK already exists.
 
 Continue with [Codex](/en/coding-agents/codex), [Claude Code](/en/coding-agents/claude-code), [DSH](/en/coding-agents/dsh), [OpenCode](/en/coding-agents/opencode), or [Pi](/en/coding-agents/pi).
