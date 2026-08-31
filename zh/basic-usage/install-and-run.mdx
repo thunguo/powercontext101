@@ -27,7 +27,9 @@ uv tool install --force \
 
 `uv tool` 使用隔离环境，不会在当前目录留下仓库 checkout。`--force` 也用于更新：如果同一个 Git requirement 已安装，它会重新获取所选 ref，而不是直接报告 already installed。
 
-团队项目最好把 `master` 换成经过验证的 tag 或 commit，并让 Server 与宿主 integration 使用同一个 ref。
+本地学习可以跟着你正在读的那一页里的 ref 走。本页和通用 / 编程 Agent setup 用 `@master`，方便跟上当前教程。
+
+可复现部署不要跟 `master`。先选定一个经过验证的 commit，再让 CLI、Server 和宿主 plugin 使用同一个 ref。需要 pin 时写成完整 commit hash，不要在同一组命令里混用短 hash 和长 hash。
 
 <Note>
 `uv tool` 里的 `powercontext[client]` 不能被另一个 Python 项目直接 import。需要写 Client 代码时，稍后还要把 client extra 安装到那个项目自己的环境中。

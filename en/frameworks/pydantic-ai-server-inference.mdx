@@ -24,11 +24,11 @@ Generation does not enable the Scheduler. You may call `flush_memory` manually, 
 
 ## Configure the Server
 
-Install one of the supported roles:
+Install one of the supported roles. This pin is the same commit as the [LangGraph](/en/frameworks/langgraph) and [LangChain](/en/frameworks/langchain) pages, written as a full hash:
 
 ```bash
-uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@4213d32"
-uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@4213d32"
+uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
+uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
 ```
 
 The Server settings use Pydantic AI model strings. Provider-specific environment variables, such as credentials and base URLs, are read by the selected provider.

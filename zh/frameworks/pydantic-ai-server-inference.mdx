@@ -24,11 +24,11 @@ Generation 不会自动启用 Scheduler。可以手动调用 `flush_memory`，�
 
 ## 配置 Server
 
-按运行方式安装其中一个 role：
+按运行方式安装其中一个 role。此处 pin 与 [LangGraph](/zh/frameworks/langgraph) / [LangChain](/zh/frameworks/langchain) 页相同，写成完整 commit hash：
 
 ```bash
-uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@4213d32"
-uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@4213d32"
+uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
+uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
 ```
 
 Server settings 使用 Pydantic AI model string。Credential、base URL 等 provider 专用环境变量由所选 provider 读取。

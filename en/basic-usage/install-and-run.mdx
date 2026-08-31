@@ -27,7 +27,9 @@ uv tool install --force \
 
 `uv tool` uses an isolated environment and leaves no repository checkout in the current directory. `--force` also matters for updates: when the same Git requirement is already installed, it fetches and replaces the selected ref instead of returning already installed.
 
-For team use, replace `master` with a tested tag or commit and use the same ref for the Server and host integrations.
+For local learning, follow the ref on the page you are reading. This page and the common / coding-agent setup pages use `@master` so the tutorial can track current docs.
+
+For a reproducible deploy, do not follow `master`. Pin one reviewed commit, then use that same ref for the CLI, Server, and host plugin. Write the full commit hash when you pin. Do not mix a short hash and a long hash in the same command set.
 
 <Note>
 A `powercontext[client]` extra installed inside the `uv tool` environment is not importable from an unrelated Python project. Install the client extra in the project that runs Client code.
