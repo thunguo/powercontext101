@@ -1,14 +1,42 @@
 ---
 title: "Codex"
-description: "Install the Codex plugin, complete a cross-session Memory loop, and check fail-open."
+description: "Use a UserPromptSubmit hook, HTTP MCP, and project-context Skill for automatic recall and explicit Handoff."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+The Codex integration has three paths: a short-process hook prepares and captures automatically, MCP performs explicit operations, and a bundled Skill tells Codex when to use them.
 
-## This page will cover
+## Install
 
-- Paste-ready setup: setup codex, doctor codex, and hook approval
-- The project-context skill guides explicit writes
-- Shared Workstream and Git scopes with Claude Code
+```bash
+powercontext setup codex --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor codex
+```
+
+Open a new session and inspect `/hooks` and `/mcp`. No formal minimum Codex version is declared; a real host-process E2E is **Not validated**.
+
+## Automatic path
+
+`UserPromptSubmit` launches an isolated Python hook. It derives API base from plugin `.mcp.json`, resolves Workstream/Git/path Scope, prepares and captures the prompt independently, and may flush through the capture position.
+
+Recall and capture fail open independently. Redirect, unknown schema, oversized response, and deadline paths are bounded. Automatic capture stores the prompt only, not final response or Task Outcome.
+
+## MCP and Skill
+
+MCP exposes explicit Memory, Work Contract, Handoff, acknowledgement, Outcome, and Review operations. The `project-context` Skill guides a one-turn durable Handoff, but commit still requires explicit user intent.
+
+“Preview and make no writes” cannot call `handoff_current_work`, which writes a boundary Source. A temporary Handoff can skip commit but is not zero-write.
+
+Codex and Claude Code can share Scope through one Workstream binding or normalized repository identity.
+
+## Negative checks
+
+- Server down: normal prompt continues; explicit write reports error.
+- Redirect: Authorization is not forwarded.
+- Flush never catches up: bounded retries end and turn continues without claiming Memory exists.
+- Handoff preparation succeeds but commit fails: boundary Source exists, durable milestone does not.
+- Mutation with old Citation returns conflict.
+
+Managed Skill export supports Codex. The bundled Skill and an exported managed Skill are different objects.
+
+Continue with [Claude Code](/en/coding-agents/claude-code).

@@ -1,14 +1,86 @@
 ---
 title: "Hooks 与插件"
-description: "先讲合同：Hook 做 recall + capture，插件做显式 Memory / Handoff，Skill 指导何时写。"
+description: "把宿主事件映射到 Scope、临时注入、Source capture、权限和有界诊断。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+一个可靠 adapter 不等于“在 prompt 前调一次 API”。它要适配宿主事件、避免 stale context、保护凭证，并把 automatic helper 与 explicit mutation 分开。
 
-## 本页将覆盖
+## Adapter contract
 
-- UserPromptSubmit / pre-step 一类 Hook 的职责
-- 采集 Source 不等于 remember Memory
-- fail-open、schema 校验与 MCP 工具面
+```text
+PromptEvent
+→ ScopeResolver
+→ PreparedContextProvider
+→ schema / size validation
+→ TransientInjector
+→ SourceCapture
+→ optional FlushCoordinator
+→ ToolSurface + PermissionGate
+→ content-free Diagnostics
+```
+
+## 五种事件模型
+
+| Host | 准备时机 | 注入通道 |
+|---|---|---|
+| Codex | short-process `UserPromptSubmit` | hook stdout additional context |
+| Claude Code | `UserPromptSubmit` | JSON `additionalContext` |
+| DSH | `agent/pre-step` middleware | downstream decision 后 plugin message |
+| OpenCode | `chat.message` 准备，message transform 注入 | `(sessionID,messageID)` exact-turn cache |
+| Pi | `before_agent_start` | returned `systemPrompt` augmentation |
+
+不能把一种宿主的 Stop、transcript 或 permission 假设复制到另一种。
+
+## 安全合同
+
+Automatic path 应测试：
+
+- Server down 时原任务继续；
+- 401/403 与 empty 可区分；
+- unknown schema 不注入；
+- oversized response / timeout 有界；
+- redirect 不泄漏 Authorization（只在实现明确拒绝的宿主这样承诺）；
+- capture failure 不删除 valid recall；
+- stale turn context 不进入新 turn；
+- diagnostics 不含 prompt、Scope、content 或 token。
+
+显式 mutation 则要求失败可见，并经过宿主 permission。Candidate approval 不应作为普通 model tool 静默开放。
+
+## Capture 不等于 Memory
+
+```text
+prompt capture
+→ Source position
+→ optional flush / scheduler
+→ extraction candidate
+→ Memory commit or no-op
+```
+
+Adapter 文档必须写明捕获范围：只 user prompt、完整 visible turn，还是根本不 capture。也要写 secret 与 size policy。
+
+## Setup 与 doctor contract
+
+新宿主安装器至少应：
+
+- 检查版本；
+- 幂等安装，并保留非 owned 配置；
+- 标记 ownership，拒绝覆盖 foreign files；
+- 支持 rollback 或明确 partial-failure 状态；
+- 区分 plugin installed、host activated、Server running；
+- 提供 bounded doctor 和真实 host activation probe。
+
+## 当前没有统一 HostAdapter SDK
+
+仓库已有可复用 helper，但尚无一个统一 `HostAdapter` abstraction：
+
+- transport policy 与 loopback vectors；
+- Codex/Claude prepared-context parser；
+- Scope normalization 的各宿主实现；
+- Pi pending Source flusher；
+- DSH generated operation table；
+- Codex/Claude Skill projection；
+- `hosts.py` setup/doctor catalog。
+
+扩展时复用合同和测试，不要假装已有统一 SDK。
+
+下一步按宿主阅读：[Codex](/zh/coding-agents/codex)、[Claude Code](/zh/coding-agents/claude-code)、[DSH](/zh/coding-agents/dsh)、[OpenCode](/zh/coding-agents/opencode)或 [Pi](/zh/coding-agents/pi)。

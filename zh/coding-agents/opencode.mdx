@@ -1,14 +1,52 @@
 ---
 title: "OpenCode"
-description: "通过原生 OpenCode 插件召回并维护项目上下文。"
+description: "用二阶段 exact-turn cache 注入临时上下文，并通过 context.ask 控制持久写入。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+<Warning>
+Version-gated：OpenCode `>=1.18.21,<2`。当前五个宿主中，OpenCode 有真实 host-process E2E 覆盖。
+</Warning>
 
-## 本页将覆盖
+## 安装
 
-- 可贴配置：setup opencode 与 doctor opencode
-- plugin 与 skill 是两项独立检查
-- 召回、采集和显式 Memory 操作怎么分工
+```bash
+powercontext setup opencode --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor opencode
+```
+
+Setup 安装 owned plugin 与 owned global `project-context` Skill，并写 ownership manifest。Foreign 同名文件不会被覆盖。Doctor 启动短生命周期 `opencode serve`，用 nonce 验证 plugin activation；不创建 session 或调用模型。
+
+## 二阶段 lifecycle
+
+```text
+chat.message
+→ resolve session directory / Scope
+→ prepare + capture
+→ cache by (sessionID,messageID)
+
+experimental.chat.messages.transform
+→ match exact latest user turn
+→ inject synthetic untrusted part
+```
+
+`experimental.chat.system.transform` 只追加使用指导。Session created/updated 维护 directory cache，deleted 清理 stale turn/context。
+
+## Tools 与 permission
+
+Curated HTTP tools 覆盖 Memory、Handoff、Experience/Skill generation 与 read-only Candidate operations。Mutation 调宿主 `context.ask()`，属于 **Host-gated**。
+
+Secret-looking prompt 不自动 capture。Prepared context 只进入 exact turn，不落 transcript。
+
+Bundled `project-context` Skill 与 managed Skill export 无关；OpenCode 不是当前 managed export target。
+
+## 负向检查
+
+- 旧 OpenCode version：setup 拒绝。
+- Foreign owned path：拒绝覆盖。
+- `(session,message)` 不匹配：不注入 stale context。
+- Session deleted：cache 清理。
+- Permission denied：mutation 不执行。
+- Server down：普通 host flow 继续。
+
+下一页是 [Pi](/zh/coding-agents/pi)。

@@ -1,14 +1,63 @@
 ---
 title: "Claude Code"
-description: "安装 Claude Code 插件，理解 UserPromptSubmit 召回与提示词采集。"
+description: "安装 UserPromptSubmit + MCP + Skill 插件，并明确 v1 不读取 transcript 或 final response。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+Claude Code v1 integration 只在 `UserPromptSubmit` 自动运行。它 prepare context、capture 当前 user prompt，再通过 `additionalContext` 返回临时内容。
 
-## 本页将覆盖
+## 安装
 
-- 可贴配置：setup claude-code、/hooks、/mcp
-- v1 没有 Stop Hook，也不会自动采集最终回复
-- scope 解析顺序与 POWERCONTEXT_CLAUDE_SCOPE_ID
+```bash
+powercontext setup claude-code \
+  --source oceanbase/powercontext \
+  --ref master \
+  --server-url http://127.0.0.1:8000
+
+powercontext server run
+powercontext doctor claude-code
+```
+
+Setup 修改 user-scope marketplace/plugin settings，并在失败时恢复 snapshot。Claude Code 2.1.133 是已知兼容背景，不是正式最低版本。
+
+## v1 自动边界
+
+```text
+UserPromptSubmit
+→ prompt (compatibility fallback: user_prompt)
+→ resolve shared project Scope
+→ recall and capture independently
+→ optional flush
+→ additionalContext
+```
+
+当前明确没有：
+
+- Stop Hook；
+- transcript 读取；
+- assistant final response 自动 capture；
+- 自动 Task Outcome。
+
+不要因为 Claude Code 提供其他事件，就把它们写进当前 plugin contract。
+
+## MCP 与鉴权
+
+`.mcp.json` 连接 Server。`headersHelper` 从环境读取完整 Authorization value，避免把 token 写进配置或 prompt。远程 endpoint 使用 HTTPS。
+
+MCP 执行 exact Memory maintenance、Prepared/committed Handoff、acknowledgement 和 Outcome。Final result 需要持久化时必须显式调用。
+
+## Fail-open 与安全
+
+Recall failure 不阻止 capture；capture failure 不删除 valid `additionalContext`。Hook 拒绝 redirect、限制 response size 与 wall-clock deadline，并输出不含 prompt/Scope/content/token 的诊断。
+
+无 UI 时 durable mutation 是否被宿主明确拒绝，目前 **Not validated**；不要照搬 Pi 的保证。
+
+## 验证
+
+- `/hooks` 能看到 `UserPromptSubmit`；
+- `/mcp` 显示 Server connected；
+- prompt Source 存在，assistant final response 不存在；
+- Server down 时普通任务继续；
+- explicit MCP write failure 可见；
+- 与 Codex 在同一 repository/Workstream 下共享 Memory。
+
+下一页是 [DeepSeek Harness](/zh/coding-agents/dsh)。

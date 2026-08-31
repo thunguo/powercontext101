@@ -1,14 +1,63 @@
 ---
 title: "Extend with hooks"
-description: "Extend the existing recall, capture, and fail-open contract. Do not invent a second protocol."
+description: "Write a verifiable adapter contract first, then reuse existing transport, Scope, capture, flush, and doctor rules."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+Before adding a sixth host, discover what the host can actually provide. Without a stable prompt event, pre-dispatch injection point, or permission API, copying another adapter will not preserve its guarantees.
 
-## This page will cover
+## Capability discovery
 
-- Safe extension points: diagnostics, scope binding, and extra capture boundaries
-- A hook failure must not fail the user task
-- Acceptance checks a new host should match
+Record prompt event, turn/session identity, workspace, transient injection channel, tool registration, permission/UI, package and Skill installation, headless lifecycle, and version probe.
+
+## Adapter contract
+
+```text
+PromptEvent
+ScopeResolver
+PreparedContextProvider
+TransientInjector
+SourceCapture
+FlushCoordinator
+ToolSurface
+PermissionGate
+Diagnostics
+Installer / Doctor
+```
+
+Define input, output, failure policy, and observable assertions for each. Automatic helpers may fail open; explicit mutation may not.
+
+## Reuse current implementation
+
+- `powercontext.transport` and loopback vectors;
+- Codex/Claude prepared-context schema validation;
+- host-specific Scope normalization tests;
+- Pi pending flusher;
+- DSH OpenAPI-derived operation table;
+- Codex/Claude Skill projections;
+- setup/doctor catalog in `cli/hosts.py`.
+
+There is no unified HostAdapter SDK today. Do not invent one for cleaner documentation.
+
+## Acceptance tiers
+
+1. Unit contract: schema, Scope, size, secret, permission.
+2. Service chain: real Server, Source/Memory lineage, fail-open.
+3. Setup/doctor: idempotency, ownership, rollback, activation.
+4. Real-host E2E: launch host, send prompt, observe injection/capture/permission.
+5. Negative/security: Server down, wrong auth, redirect, unknown schema, oversize, stale turn, no UI, flush timeout.
+
+Managed Skill export currently supports Codex and Claude Code only. Adding export for a new host requires a projection contract and drift tests; a bundled Skill is not enough.
+
+## Delivery checklist
+
+- Host version gate and activation probe exist.
+- Scope comes from stable authorized identity.
+- PreparedContext is transient and untrusted.
+- Capture states content, size, and secret policy.
+- Explicit writes define permission and no-UI behavior.
+- Diagnostics leak no content or credentials.
+- Setup preserves foreign config and reports rollback or partial failure.
+- Real-host E2E exists; an HTTP-only chain is insufficient.
+- Unsupported and Not validated remain separate.
+
+Only then add the host to the first-class catalog.

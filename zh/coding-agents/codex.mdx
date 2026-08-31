@@ -1,14 +1,42 @@
 ---
 title: "Codex"
-description: "安装 Codex 插件，完成跨会话 Memory 闭环，并检查 fail-open。"
+description: "用 UserPromptSubmit Hook、HTTP MCP 与 project-context Skill 完成自动 recall 和显式 Handoff。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+Codex integration 有三条路径：短进程 Hook 自动 prepare/capture，MCP 执行显式操作，bundled Skill 告诉 Codex 何时使用它们。
 
-## 本页将覆盖
+## 安装
 
-- 可贴配置：setup codex、doctor codex、批准 Hook
-- project-context skill 指导显式写
-- 与 Claude Code 共享 Workstream / Git scope
+```bash
+powercontext setup codex --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor codex
+```
+
+新 session 检查 `/hooks` 与 `/mcp`。当前没有正式最低 Codex version；真实 host-process E2E 为 **Not validated**。
+
+## 自动路径
+
+`UserPromptSubmit` 启动隔离 Python hook。它从 plugin `.mcp.json` 推导 API base，解析 Workstream/Git/path Scope，分别 prepare 和 capture prompt，并可 flush 到 capture position。
+
+Recall 与 capture 独立 fail-open；redirect、unknown schema、oversize 与 deadline 都有安全处理。自动 capture 只记录 prompt，不记录 final response 或 Task Outcome。
+
+## MCP 与 Skill
+
+MCP 提供 explicit Memory、Work Contract、Handoff、acknowledgement、Outcome 与 Review operations。`project-context` Skill 指导 one-turn durable Handoff，但 commit 仍需用户明确要求。
+
+“Preview and make no writes”不能通过 `handoff_current_work` 实现，因为后者会写 boundary Source。Temporary Handoff 可不 commit，但也不是零写。
+
+Codex 与 Claude Code 可通过同一 Workstream binding 或 normalized repository identity 共享 Scope。
+
+## 负向检查
+
+- Server down：普通 prompt 继续，显式 write 报错。
+- Redirect：Authorization 不得转发。
+- Flush 未追上：bounded retries 后继续 turn，不谎报 Memory 已生成。
+- Handoff preparation 成功但 commit 失败：boundary Source 存在，无 durable milestone。
+- 旧 Citation mutation：返回 conflict。
+
+Managed Skill export 支持 Codex；bundled Skill 与 exported managed Skill 是不同对象。
+
+下一页是 [Claude Code](/zh/coding-agents/claude-code)。

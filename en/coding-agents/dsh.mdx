@@ -1,14 +1,53 @@
 ---
 title: "DeepSeek Harness"
-description: "Use the DeepSeek Harness pre-step hook and pc_* tools to keep project context."
+description: "Use agent/pre-step middleware and native pc_* HTTP tools to connect PowerContext."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+The DSH integration is not an MCP plugin. It recalls and captures in `agent/pre-step`, then registers curated `pc_*` HTTP tools and human `/pc` commands.
 
-## This page will cover
+## Install
 
-- Paste-ready setup: setup dsh and doctor dsh
-- agent/pre-step recall and capture are independent and fail open
-- Named pc_* tools and the /pc command
+```bash
+powercontext setup dsh --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor dsh
+```
+
+Setup requires built `lib/index.js` and installs with `dsh plugin --profile web add`. Doctor uses `--dump-config` to find the exact plugin ID. A formal minimum DSH version and real host E2E are **Not validated**.
+
+## Pre-step flow
+
+```text
+agent/pre-step
+→ all text blocks form recall query
+→ user-originated blocks form capture content
+→ resolve workspace Scope
+→ prepare and capture independently
+→ await next() exactly once
+→ only when downstream enters model, append plugin message
+```
+
+The full batch improves recall while Source capture remains user-only.
+
+## Tools and permission
+
+DSH exposes Memory, Handoff, Experience/Skill generation, and read-only Candidate operations. Dangerous and admin operations are not registered.
+
+Named mutation returns `ask` from `tools/pre-execute`, leaving the decision to host permission UI. Candidate approve/reject/revise is not an ordinary model tool; use human `/pc review` or another controlled surface.
+
+## Failure behavior
+
+Missing cwd skips automatic work or returns stable unscoped status. Server, validation, or wrapping failure does not replace downstream result. Permission denial remains visible for mutations.
+
+## Verify
+
+- `next()` runs exactly once.
+- A non-enter downstream decision receives no injection.
+- Recall query uses the batch while capture contains user-originated text only.
+- Mutation triggers ask.
+- Approval tools are absent from the model surface.
+- Agent continues with Server down.
+
+`test_dsh_http_chain.py` verifies HTTP contract, not a full real DSH host E2E.
+
+Continue with [OpenCode](/en/coding-agents/opencode).

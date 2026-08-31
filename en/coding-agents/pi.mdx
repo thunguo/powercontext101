@@ -1,14 +1,55 @@
 ---
 title: "Pi"
-description: "Use the native Pi package for recall, Memory and Handoff tools, and /pc diagnostics."
+description: "Inject context at before_agent_start, flush pending Sources at boundaries, and refuse durable writes without UI."
 ---
 
 <Note>
-TODO: Body copy is not written yet. This page is an outline stub.
+Package runtime requires Node `>=22.19`. Pi 0.82.x is development compatibility, not a declared minimum host version. Package-load E2E exists; the full recall host chain is **Not validated**.
 </Note>
 
-## This page will cover
+## Install
 
-- Paste-ready setup: setup pi and doctor pi
-- Bounded PreparedContext and prompt capture before a normal start
-- Explicit durable writes need interactive confirmation; boundary flush fails open
+```bash
+powercontext setup pi --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor pi
+```
+
+Setup installs a native package containing an extension and bundled Skill. Doctor uses `pi list` and verifies the actual package path and manifest.
+
+## Turn and boundary flush
+
+```text
+before_agent_start
+→ resolve Scope
+→ prepare
+→ capture prompt Source
+→ immediate flush or record pending position
+→ augment systemPrompt
+
+agent_end / session_before_compact / session_before_switch / session_shutdown
+→ retry pending flush within bounded budget
+```
+
+The flusher keeps the maximum pending position per Scope and clears only when `current_cursor >= position`. Boundary failure fails open.
+
+Prompt Source identity derives from branch and turn identity. Secret-looking or over-byte-limit prompts are not captured.
+
+## Tools and confirmation
+
+Pi supplies Memory/Handoff tools and `/pc` diagnostics. Durable mutation requires interactive confirmation. Without UI it returns stable `confirmation_required` and performs no silent write.
+
+`agent_end` triggers flush only; it does not record Task Outcome. `session_shutdown` is not a Claude Code Stop hook.
+
+Pi does not support managed Skill export. A bundled Skill does not change that fact.
+
+## Negative checks
+
+- Server down: recall, capture, and flush do not block the agent.
+- Secret or oversized prompt: recall may run, capture does not.
+- Immediate flush fails: boundary event retries.
+- Cursor never catches up: bounded budget ends without claiming Memory exists.
+- Mutation without UI: explicit denial.
+- Redirect and remote transport: verify Pi's transport tests rather than copying another host's behavior.
+
+Continue with [Extend hooks](/en/coding-agents/extend-hooks).

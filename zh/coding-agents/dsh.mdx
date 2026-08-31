@@ -1,14 +1,53 @@
 ---
 title: "DeepSeek Harness"
-description: "在 DeepSeek Harness 里用 pre-step Hook 和 pc_* 工具维护项目上下文。"
+description: "用 agent/pre-step middleware 与原生 pc_* HTTP tools 接入 PowerContext。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+DSH integration 不是 MCP plugin。它在 `agent/pre-step` 做 recall/capture，并注册 curated `pc_*` HTTP tools 与 `/pc` 人工命令。
 
-## 本页将覆盖
+## 安装
 
-- 可贴配置：setup dsh 与 doctor dsh
-- agent/pre-step 召回和采集相互独立且 fail-open
-- 具名 pc_* 工具与 /pc 命令
+```bash
+powercontext setup dsh --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor dsh
+```
+
+Setup 要求 built plugin 中有 `lib/index.js`，通过 `dsh plugin --profile web add` 安装。Doctor 用 `--dump-config` 检查 exact plugin ID。正式最低 DSH version 与真实 host E2E 均 **Not validated**。
+
+## Pre-step flow
+
+```text
+agent/pre-step
+→ all text blocks form recall query
+→ user-originated blocks form capture content
+→ resolve workspace Scope
+→ prepare and capture independently
+→ await next() exactly once
+→ only when downstream enters model, append plugin message
+```
+
+这允许 full batch 帮助 recall，同时只把 user content 作为 Source。
+
+## Tools 与 permission
+
+DSH 暴露 Memory、Handoff、Experience/Skill generation 和 read-only Candidate operations。Dangerous/admin operations 不注册。
+
+Named mutation 在 `tools/pre-execute` 返回 `ask`，由宿主 permission UI 决定。Candidate approve/reject/revise 不作为普通 model tools；留给人工 `/pc review` 或其他受控 surface。
+
+## Failure behavior
+
+Missing cwd 时 automatic path 跳过或返回稳定 unscoped 状态。Server/validation/wrapping failure 不替换 downstream result。Permission denial 必须对 mutation 可见。
+
+## 验证
+
+- `next()` 只调用一次；
+- downstream 非 enter 时不注入；
+- recall query 包含 batch，capture 只有 user-originated text；
+- mutation 触发 ask；
+- approval tool 未出现在 model surface；
+- Server down 时 Agent 继续。
+
+`test_dsh_http_chain.py` 验证 HTTP contract，不是完整真实 DSH host E2E。
+
+下一页是 [OpenCode](/zh/coding-agents/opencode)。

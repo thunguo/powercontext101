@@ -1,14 +1,61 @@
 ---
 title: "编程 Agent 总览"
-description: "Codex、Claude Code、DeepSeek Harness、OpenCode 和 Pi 共用 Hook + Plugin + Skill 合同。"
+description: "比较 Codex、Claude Code、DSH、OpenCode 与 Pi 的事件、注入、采集、权限和验证等级。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+五个宿主连接同一个 PowerContext Server，但没有共用一套 Hook API。共同点是领域合同：解析 Scope、prepare 临时上下文、独立 capture Source，并让显式持久写入经过宿主权限。
 
-## 本页将覆盖
+## 共同执行流
 
-- 官方支持的编程宿主名单
-- Hook 负责召回和采集，Plugin / MCP 负责显式写
-- 跨宿主共享同一个 Server 与 scope
+```text
+host event
+→ resolve Scope
+→ prepare bounded untrusted context
+→ inject through host-specific channel
+→ run model
+→ optionally capture Source / flush
+→ explicit tools under host permission
+```
+
+## 能力矩阵
+
+| 能力 | Codex | Claude Code | DSH | OpenCode | Pi |
+|---|---|---|---|---|---|
+| 自动事件 | `UserPromptSubmit` | `UserPromptSubmit` | `agent/pre-step` | `chat.message` + transform | `before_agent_start` |
+| 注入 | additional context | `additionalContext` | plugin message | exact-turn message transform | system prompt |
+| Prompt capture | 有 | 有 | user-originated batch | 有，过滤 secret-like prompt | 有，过滤 secret/size |
+| Final response capture | 无 | 无 | 无 | 无 | 无 |
+| 显式接口 | MCP | MCP | native HTTP tools | native HTTP tools | native tools + `/pc` |
+| Handoff | MCP + Skill | MCP + Skill | curated HTTP tools | curated HTTP tools | native tools |
+| Permission | Host-gated | Host-gated | pre-execute `ask` | `context.ask` | interactive confirm；无 UI 拒绝 |
+| Managed Skill export | Supported | Supported | Unsupported | Unsupported | Unsupported |
+| Real-host E2E | Not validated | Not validated | Not validated | Supported | package load only；full chain Not validated |
+
+Bundled `project-context` Skill 只是 integration 自带说明，不代表 managed Skill export。
+
+## Setup 与 doctor
+
+```bash
+powercontext setup <host> \
+  --source oceanbase/powercontext \
+  --ref master
+
+powercontext doctor <host>
+```
+
+Setup 不启动 Server。Doctor 检查安装/激活的有限边界，不证明真实 recall、permission UI 或跨会话行为。每个宿主页会写明它具体检查什么。
+
+## 自动与显式路径
+
+Automatic recall/capture 属于辅助路径，Server failure 时通常 fail-open。显式 Memory、Handoff、Review 或 export 不能假装成功。
+
+不同宿主的 permission 也不能互相类推：Pi 明确在无 UI 时拒绝 durable write；DSH 和 OpenCode 交给宿主 permission API；Codex/Claude Code 的无 UI 拒绝行为当前 **Not validated**。
+
+## 选择路径
+
+- 需要 Hook + MCP + project Skill：Codex 或 Claude Code。
+- 需要 pre-step 与可裁剪 HTTP tools：DSH。
+- 需要 exact-turn transient cache 与真实 host E2E：OpenCode。
+- 需要 boundary flush 和 no-UI fail-closed：Pi。
+
+先读 [Hooks 与插件](/zh/coding-agents/hooks-and-plugins)，再进入对应宿主页。

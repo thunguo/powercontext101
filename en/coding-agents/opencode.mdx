@@ -1,14 +1,52 @@
 ---
 title: "OpenCode"
-description: "Recall and maintain project context with the native OpenCode plugin."
+description: "Inject temporary context through a two-stage exact-turn cache and gate durable writes with context.ask."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+<Warning>
+Version-gated: OpenCode `>=1.18.21,<2`. Among the five hosts, OpenCode has real host-process E2E coverage.
+</Warning>
 
-## This page will cover
+## Install
 
-- Paste-ready setup: setup opencode and doctor opencode
-- Plugin and skill are separate doctor checks
-- How recall, capture, and explicit Memory writes are split
+```bash
+powercontext setup opencode --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor opencode
+```
+
+Setup installs an owned plugin and owned global `project-context` Skill with ownership manifests. Foreign same-name files are not overwritten. Doctor starts short-lived `opencode serve` and verifies plugin activation with a nonce; it creates no session and calls no model.
+
+## Two-stage lifecycle
+
+```text
+chat.message
+→ resolve session directory / Scope
+→ prepare + capture
+→ cache by (sessionID,messageID)
+
+experimental.chat.messages.transform
+→ match exact latest user turn
+→ inject synthetic untrusted part
+```
+
+`experimental.chat.system.transform` adds usage guidance only. Session created/updated maintains directory cache, while deleted clears stale turn context.
+
+## Tools and permission
+
+Curated HTTP tools cover Memory, Handoff, Experience/Skill generation, and read-only Candidate operations. Mutation calls host `context.ask()` and is **Host-gated**.
+
+Secret-looking prompts are not captured automatically. Prepared context enters the exact turn and not the transcript.
+
+The bundled `project-context` Skill is unrelated to managed Skill export; OpenCode is not a current managed export target.
+
+## Negative checks
+
+- Old OpenCode version: setup refuses.
+- Foreign owned path: no overwrite.
+- `(session,message)` mismatch: no stale injection.
+- Session deleted: cache clears.
+- Permission denied: mutation does not run.
+- Server down: normal host flow continues.
+
+Continue with [Pi](/en/coding-agents/pi).

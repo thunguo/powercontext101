@@ -1,14 +1,55 @@
 ---
 title: "Pi"
-description: "用原生 Pi package 做召回、Memory / Handoff 工具和 /pc 诊断。"
+description: "在 before_agent_start 注入上下文，用 pending Source flusher 处理边界，并在无 UI 时拒绝持久写。"
 ---
 
 <Note>
-TODO: 正文待写。本页只建立大纲。
+Package runtime 要求 Node `>=22.19`。Pi 0.82.x 是 development compatibility，不是正式最低 host version。Package-load E2E 有覆盖，完整 recall host chain 为 **Not validated**。
 </Note>
 
-## 本页将覆盖
+## 安装
 
-- 可贴配置：setup pi 与 doctor pi
-- 启动前的有界 PreparedContext 与提示词采集
-- 显式持久化写入需要交互确认，边界 flush fail-open
+```bash
+powercontext setup pi --source oceanbase/powercontext --ref master
+powercontext server run
+powercontext doctor pi
+```
+
+Setup 安装 native package，包含 extension 与 bundled Skill。Doctor 用 `pi list` 检查实际 package path/manifest。
+
+## Turn 与 boundary flush
+
+```text
+before_agent_start
+→ resolve Scope
+→ prepare
+→ capture prompt Source
+→ immediate flush or record pending position
+→ augment systemPrompt
+
+agent_end / session_before_compact / session_before_switch / session_shutdown
+→ retry pending flush within bounded budget
+```
+
+Flusher 按 Scope 保留最大 pending position，只有 `current_cursor >= position` 才清除。Boundary failure fail-open。
+
+Prompt Source ID 由 branch/turn identity 派生。Secret-looking 或超过 UTF-8 byte limit 的 prompt 不 capture。
+
+## Tools 与确认
+
+Pi 提供 Memory/Handoff tools 和 `/pc` diagnostics。Durable mutation 需要 interactive confirmation；没有 UI 时返回稳定 `confirmation_required`，不会静默写入。
+
+`agent_end` 只触发 flush，不自动记录 Task Outcome。`session_shutdown` 也不是 Claude Code Stop Hook。
+
+Pi 不支持 managed Skill export；bundled Skill 不改变这个事实。
+
+## 负向检查
+
+- Server down：recall/capture/flush 不阻止 Agent。
+- Secret/oversized prompt：可 recall，但不 capture。
+- Immediate flush 失败：boundary event 重试。
+- Cursor 永远追不上：bounded budget 后停止，不谎报 Memory 已生成。
+- 无 UI mutation：明确拒绝。
+- Redirect/remote transport：按 Pi transport tests 验证，不跨宿主类推。
+
+下一页是[扩展 Hook](/zh/coding-agents/extend-hooks)。

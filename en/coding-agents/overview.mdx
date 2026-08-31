@@ -1,14 +1,52 @@
 ---
 title: "Coding agents overview"
-description: "Codex, Claude Code, DeepSeek Harness, OpenCode, and Pi share a Hook plus Plugin plus Skill contract."
+description: "Compare events, injection, capture, permissions, and validation levels across Codex, Claude Code, DSH, OpenCode, and Pi."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+The five hosts connect to one Server but do not share one Hook API. Their common layer is the domain contract: resolve Scope, prepare temporary context, capture Source independently, and put explicit writes behind host permissions.
 
-## This page will cover
+```text
+host event
+→ resolve Scope
+→ prepare bounded untrusted context
+→ inject through host-specific channel
+→ run model
+→ optionally capture Source / flush
+→ explicit tools under host permission
+```
 
-- The official coding-host list
-- Hooks recall and capture; plugins and MCP perform explicit writes
-- Hosts share one Server and one scope model
+## Capability matrix
+
+| Capability | Codex | Claude Code | DSH | OpenCode | Pi |
+|---|---|---|---|---|---|
+| Event | `UserPromptSubmit` | `UserPromptSubmit` | `agent/pre-step` | `chat.message` + transform | `before_agent_start` |
+| Injection | Additional context | `additionalContext` | Plugin message | Exact-turn transform | System prompt |
+| Prompt capture | Yes | Yes | User-originated batch | Yes, secret-like filter | Yes, secret/size filters |
+| Final response capture | No | No | No | No | No |
+| Explicit interface | MCP | MCP | Native HTTP tools | Native HTTP tools | Native tools + `/pc` |
+| Permission | Host-gated | Host-gated | Pre-execute `ask` | `context.ask` | Interactive; deny without UI |
+| Managed Skill export | Supported | Supported | Unsupported | Unsupported | Unsupported |
+| Real-host E2E | Not validated | Not validated | Not validated | Supported | Package load only; full chain Not validated |
+
+A bundled `project-context` Skill is guidance shipped by an integration. It does not prove managed Skill export support.
+
+## Setup and verification
+
+```bash
+powercontext setup <host> \
+  --source oceanbase/powercontext \
+  --ref master
+
+powercontext doctor <host>
+```
+
+Setup never starts the Server. Doctor is a bounded installation check, not proof of live recall or permission UI. Automatic helper failures normally fail open; explicit Memory, Handoff, Review, and export failures remain visible.
+
+## Choose a host
+
+- Hook + MCP + project Skill: Codex or Claude Code.
+- Pre-step and curated HTTP tools: DSH.
+- Exact-turn cache and real-host E2E: OpenCode.
+- Boundary flush and no-UI fail-closed writes: Pi.
+
+Read [Hooks and plugins](/en/coding-agents/hooks-and-plugins), then choose a host page.

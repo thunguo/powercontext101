@@ -1,14 +1,63 @@
 ---
 title: "用 Hooks 扩展"
-description: "在现有召回、采集和 fail-open 合同上扩展，而不是另起一套协议。"
+description: "先写可验证 adapter contract，再复用现有 transport、Scope、capture、flush 和 doctor 规则。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+接第六个宿主前，先确认宿主能提供什么。没有稳定 prompt event、pre-dispatch injection point 或 permission API，就不能照抄现有 adapter。
 
-## 本页将覆盖
+## Capability discovery
 
-- 可以扩展的点：诊断、scope 绑定、额外采集边界
-- 不要把 Hook 失败变成任务失败
-- 新宿主接入时应对齐的验收项
+记录：prompt event、turn/session identity、workspace、transient injection channel、tool registration、permission/UI、package/Skill install、headless lifecycle 和 version probe。
+
+## Adapter contract
+
+```text
+PromptEvent
+ScopeResolver
+PreparedContextProvider
+TransientInjector
+SourceCapture
+FlushCoordinator
+ToolSurface
+PermissionGate
+Diagnostics
+Installer / Doctor
+```
+
+每项写明 input/output、失败策略和可观察 assertion。Automatic helper 可 fail-open；explicit mutation 不可。
+
+## 复用现有实现
+
+- `powercontext.transport` 与 loopback vectors；
+- Codex/Claude prepared-context schema validation；
+- 各宿主 Scope normalization tests；
+- Pi pending flusher；
+- DSH OpenAPI-derived operation table；
+- Codex/Claude Skill projections；
+- `cli/hosts.py` setup/doctor catalog。
+
+当前没有统一 HostAdapter SDK。不要为了文档整齐虚构一个。
+
+## Acceptance tiers
+
+1. Unit contract：schema、Scope、size、secret、permission。
+2. Service-chain：真实 Server、Source/Memory lineage、fail-open。
+3. Setup/doctor：幂等、ownership、rollback、activation。
+4. Real-host E2E：启动宿主，发送 prompt，观察 injection/capture/permission。
+5. Negative/security：Server down、wrong auth、redirect、unknown schema、oversize、stale turn、no UI、flush timeout。
+
+Managed Skill export 只有 Codex/Claude Code。新宿主要增加 export，必须单独实现 projection contract 与 drift tests，不能因为有 bundled Skill 就标 Supported。
+
+## 交付 checklist
+
+- Host version gate 和 activation probe 已实现。
+- Scope 来自稳定、授权后的 identity。
+- PreparedContext 临时注入且标 untrusted。
+- Capture 明确内容、size、secret policy。
+- Explicit writes 有 permission/no-UI 行为。
+- Diagnostics 不泄密。
+- Setup 不覆盖 foreign config，并有 rollback/partial-failure 报告。
+- Real-host E2E 存在；仅 HTTP-chain 不算。
+- Unsupported 与 Not validated 分开。
+
+完成这些，才把宿主加入 first-class catalog。

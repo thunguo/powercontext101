@@ -1,14 +1,40 @@
 ---
 title: "Hooks and plugins"
-description: "The contract: hooks recall and capture, plugins write Memory or Handoff, and Skills say when to write."
+description: "Map host events onto Scope, ephemeral injection, Source capture, permissions, and bounded diagnostics."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+A reliable adapter is more than one API call before a prompt. It must fit host events, prevent stale context, protect credentials, and separate automatic helpers from explicit mutations.
 
-## This page will cover
+```text
+PromptEvent
+→ ScopeResolver
+→ PreparedContextProvider
+→ schema / size validation
+→ TransientInjector
+→ SourceCapture
+→ optional FlushCoordinator
+→ ToolSurface + PermissionGate
+→ content-free Diagnostics
+```
 
-- What UserPromptSubmit and pre-step hooks are responsible for
-- Capturing a Source is not the same as remembering Memory
-- fail-open, schema validation, and the MCP tool surface
+## Host event models
+
+| Host | Preparation event | Injection channel |
+|---|---|---|
+| Codex | Short-process `UserPromptSubmit` | Hook stdout additional context |
+| Claude Code | `UserPromptSubmit` | JSON `additionalContext` |
+| DSH | `agent/pre-step` | Plugin message after downstream decision |
+| OpenCode | Prepare on `chat.message`, inject on transform | `(sessionID,messageID)` cache |
+| Pi | `before_agent_start` | Returned `systemPrompt` |
+
+Automatic tests should cover Server down, 401/403 vs empty, unknown schema, size/deadline, capture/recall independence, stale-turn rejection, and content-free diagnostics. Redirect refusal may be promised only where the implementation explicitly enforces it.
+
+Capture remains Source evidence until scheduler or flush processes it. Each host page states capture content, secret filtering, size bounds, and whether boundary flush exists.
+
+## Setup contract
+
+A host installer should gate versions, preserve foreign config, record ownership, reject foreign-file overwrite, expose partial failure or rollback, distinguish installed from active, and provide doctor plus a real-host activation probe.
+
+The repository has shared policies and test vectors, but no single HostAdapter SDK. Reuse transport rules, prepared-context parsing, Scope behavior, Pi flusher, DSH operation generation, projections, and setup/doctor tests without pretending one abstraction already exists.
+
+Continue with [Codex](/en/coding-agents/codex), [Claude Code](/en/coding-agents/claude-code), [DSH](/en/coding-agents/dsh), [OpenCode](/en/coding-agents/opencode), or [Pi](/en/coding-agents/pi).

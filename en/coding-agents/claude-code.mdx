@@ -1,14 +1,63 @@
 ---
 title: "Claude Code"
-description: "Install the Claude Code plugin and understand UserPromptSubmit recall plus prompt capture."
+description: "Install the UserPromptSubmit + MCP + Skill plugin and keep the v1 transcript/final-response limits explicit."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+The Claude Code v1 integration runs automatically only on `UserPromptSubmit`. It prepares context, captures the current user prompt, and returns temporary `additionalContext`.
 
-## This page will cover
+## Install
 
-- Paste-ready setup: setup claude-code, /hooks, and /mcp
-- v1 has no Stop hook and does not capture the final reply
-- Scope resolution order and POWERCONTEXT_CLAUDE_SCOPE_ID
+```bash
+powercontext setup claude-code \
+  --source oceanbase/powercontext \
+  --ref master \
+  --server-url http://127.0.0.1:8000
+
+powercontext server run
+powercontext doctor claude-code
+```
+
+Setup changes user-scope marketplace and plugin settings and restores its snapshot on failure. Claude Code 2.1.133 is known compatibility context, not a declared minimum version.
+
+## v1 automatic boundary
+
+```text
+UserPromptSubmit
+→ prompt (compatibility fallback: user_prompt)
+→ resolve shared project Scope
+→ recall and capture independently
+→ optional flush
+→ additionalContext
+```
+
+Current plugin explicitly has no:
+
+- Stop hook;
+- transcript reading;
+- automatic assistant final-response capture;
+- automatic Task Outcome.
+
+Do not infer these from other Claude Code events.
+
+## MCP and authentication
+
+`.mcp.json` connects to the Server. `headersHelper` reads a complete Authorization value from environment so the token stays out of config and prompts. Use HTTPS remotely.
+
+MCP performs exact Memory maintenance, Prepared/committed Handoff, acknowledgement, and Outcome. Persisting a final result requires an explicit operation.
+
+## Fail-open and security
+
+Recall failure does not block capture; capture failure does not erase valid `additionalContext`. The hook rejects redirects, bounds response size and wall-clock time, and emits diagnostics without prompt, Scope, content, or token.
+
+Explicit denial of durable mutation without UI is currently **Not validated**; do not copy Pi's guarantee.
+
+## Verify
+
+- `/hooks` shows `UserPromptSubmit`.
+- `/mcp` shows the Server connected.
+- Prompt Source exists; assistant final response does not.
+- Normal work continues with Server down.
+- Explicit MCP write failure remains visible.
+- Memory is shared with Codex under the same repository or Workstream Scope.
+
+Continue with [DeepSeek Harness](/en/coding-agents/dsh).
