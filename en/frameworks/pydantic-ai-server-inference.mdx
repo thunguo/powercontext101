@@ -1,17 +1,143 @@
 ---
 title: "Pydantic AI Server inference"
-description: "Understand how the PowerContext Server uses Pydantic AI for generation and embedding models."
+description: "Configure Server generation and embedding, then understand validation before model output reaches the domain layer."
 ---
 
 <Note>
-TODO: The Framework Integration wave will complete this page. This stub separates Server inference from the Pydantic AI agent adapter.
+Supported: this integration ships with PowerContext builtin and Server. It is unrelated to the Pydantic AI agent adapter.
 </Note>
 
-Here, Pydantic AI runs inside the PowerContext Server for structured generation, embeddings, and optional reranking. It is not the agent adapter and does not add tools to a Pydantic AI agent.
+PowerContext uses Pydantic AI at the provider boundary. Server composition wraps generation and embedding models behind PowerContext inference protocols; domain rules for Memory, Review, and Handoff do not depend on an agent framework.
 
-## This page will cover
+## Model-free baseline
 
-- A model-free Server still supports explicit Memory and FTS
-- Generation and embedding are independent capabilities
-- Source extraction, Experience / Skill / Handoff generation, and reranking
-- Embedding profiles, vector / hybrid search, and failure behavior
+Without inference, the Server still supports explicit Memory, FTS, Source capture, typed Experience / Skill proposal, Candidate Review, and Handoff finalize / commit / continue when the caller supplies complete typed data.
+
+| Capability | Generation | Embedding |
+|---|---:|---:|
+| Source → Memory extraction | Yes | No |
+| Experience / Skill generation | Yes | No |
+| Model-backed Handoff generation | Yes | No |
+| Optional reranking | Yes | No |
+| Vector / hybrid search | No | Yes |
+
+Generation and embedding can be configured independently.
+
+## Configure generation
+
+```bash
+export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL="provider:model-name"
+powercontext server run --env-file .env
+```
+
+Provider credentials remain in environment variables understood by that Pydantic AI provider; they are not PowerContext domain fields.
+
+One generation model supplies Memory extraction, Experience incubation/generation, managed Skill generation, Handoff generation, and optional reranking. Configuring the model does not enable the scheduler; periodic extraction uses a separate runtime schedule setting.
+
+## Configure embedding
+
+```bash
+export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_MODEL="provider:embedding-model"
+export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_PROFILE_ID="project-embedding-v1"
+export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_DIMENSION="1536"
+```
+
+Model, profile ID, and dimension are required together. `EmbeddingProfile` is a compatibility contract for projections and queries and also includes normalization. After changing model, dimension, or normalization, rebuild projections from authoritative Memory Revisions instead of silently reusing old vectors.
+
+Settings accept `unit` or `none` normalization, but current vector search admission requires a compatible unit-normalized L2 profile. Accepted configuration alone does not guarantee vector/hybrid support.
+
+## Structured output is not approval
+
+```text
+Pydantic AI structured output
+→ schema validation
+→ PowerContext evidence / lineage / domain validation
+→ Memory plan or pending Candidate
+→ atomic commit or Review
+```
+
+Schema-valid means only that fields have the right shape. A Memory candidate must cite this operation's bounded evidence and pass intent, deduplication, and current-head checks. Experience, Skill, and Handoff apply their own lineage rules.
+
+A model cannot directly create approved Experience or Skill or grant execution authority.
+
+## Validate embedding output
+
+The adapter checks:
+
+- output count matches input count;
+- input order is preserved;
+- dimension is correct;
+- values are finite;
+- normalization matches the profile.
+
+Temporary embedding unavailability or timeout during a Memory write may still commit the authoritative Memory Revision and FTS projection while leaving vector projection absent. Configuration errors and invalid output do not use this fallback and may abort the operation.
+
+## Search fallback
+
+`mode="auto"` selects hybrid only when backend, profile, and current projections qualify. If query embedding then becomes temporarily unavailable or times out, search may retry as FTS when FTS exists.
+
+Explicit `vector` and `hybrid` never silently become FTS; missing capability returns HTTP 422.
+
+## Readiness
+
+Inference probes make real minimal provider requests:
+
+- all pass: `ready`;
+- generation or embedding probe fails: `degraded`, HTTP 200;
+- Runtime or database fails: `not_ready`, HTTP 503.
+
+Readiness and capabilities answer different questions. Capabilities are published from startup composition and do not disappear dynamically after one degraded probe.
+
+Provider timeout and HTTP 408/504 map to timeout; 409/425/429, 5xx, and transient provider faults map to unavailable; other provider 4xx responses normally become configuration errors. Public errors exclude raw provider bodies.
+
+## Direct composition
+
+An application that owns Pydantic AI `Model` lifecycle may compose directly:
+
+```python
+from powercontext.builtin.artifacts.memory import (
+    MEMORY_EXTRACTION_INSTRUCTIONS,
+    LLMMemoryCandidatePipeline,
+    MemoryExtractionInput,
+    MemoryExtractionOutput,
+)
+from powercontext.builtin.inference.pydantic_ai import (
+    InferenceLimits,
+    PydanticAIStructuredGenerator,
+)
+
+
+generator = PydanticAIStructuredGenerator(
+    model=generation_model,
+    instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
+    input_type=MemoryExtractionInput,
+    output_type=MemoryExtractionOutput,
+    limits=InferenceLimits(timeout_seconds=30, max_requests=2),
+)
+candidate_pipeline = LLMMemoryCandidatePipeline(generator)
+```
+
+`generation_model` must be an initialized Pydantic AI `Model`, not a provider string. The application that creates it also closes it.
+
+## Verify
+
+Generation round trip: capture a unique Source → flush → cursor reaches position → entry `source_refs` contains that Source. No linked entry may be a valid no-op.
+
+Vector verification also asserts:
+
+```text
+response mode == vector
+hit citation == source-linked entry
+matched_by contains vector
+```
+
+An embedding request in stats does not replace lineage assertions.
+
+## Current boundaries
+
+- No cross-provider automatic fallback exists.
+- Embedding profiles do not hot-migrate silently.
+- Reranking falls back to coarse order only when generation succeeds but every rank is invalid; provider failure propagates.
+- Older RFC phase-one text excluding Handoff generation and reranking no longer describes current behavior.
+
+Continue with the [Pydantic AI agent adapter (Preview)](/en/frameworks/pydantic-ai).

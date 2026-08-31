@@ -1,17 +1,143 @@
 ---
 title: "Pydantic AI Server inference"
-description: "了解 PowerContext Server 如何通过 Pydantic AI 使用 generation 和 embedding 模型。"
+description: "配置 Server 的 generation 与 embedding，并理解模型输出进入领域层前的校验。"
 ---
 
 <Note>
-TODO: 正文将在 Framework Integration 批次完成。本页先把 Server inference 与 Pydantic AI Agent adapter 分开。
+Supported：这部分随 PowerContext builtin / Server 提供。它与 Pydantic AI Agent adapter 无关。
 </Note>
 
-这里的 Pydantic AI 运行在 PowerContext Server 内部，用于结构化生成、embedding 和可选 reranking。它不是 Agent adapter，也不会给你的 Pydantic AI Agent 自动增加工具。
+PowerContext 在 provider 边界使用 Pydantic AI。Server composition 把 generation 和 embedding model 包装成 PowerContext inference protocol；Memory、Review 和 Handoff 的领域规则不依赖 Agent framework。
 
-## 本页将覆盖
+## 无模型基线
 
-- 无模型 Server 仍可提供 explicit Memory 和 FTS
-- generation 与 embedding 是独立能力
-- Source extraction、Experience / Skill / Handoff generation 和 reranking
-- embedding profile、vector / hybrid search 与失败降级
+不配置 inference 时，Server 仍支持 explicit Memory、FTS、Source capture、typed Experience / Skill proposal、Candidate Review，以及 caller 已提供完整 typed data 的 Handoff finalize / commit / continue。
+
+| 能力 | generation | embedding |
+|---|---:|---:|
+| Source → Memory extraction | 是 | 否 |
+| Experience / Skill generation | 是 | 否 |
+| model-backed Handoff generation | 是 | 否 |
+| optional reranking | 是 | 否 |
+| vector / hybrid search | 否 | 是 |
+
+Generation 和 embedding 可独立配置。
+
+## 配置 generation
+
+```bash
+export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL="provider:model-name"
+powercontext server run --env-file .env
+```
+
+Provider credential 使用对应 Pydantic AI provider 的环境变量，不是 PowerContext domain 字段。
+
+Generation model 同时服务 Memory extraction、Experience incubation/generation、managed Skill generation、Handoff generation 和可选 reranking。配置 model 不会自动打开 scheduler；定时 extraction 由独立的 runtime schedule 设置控制。
+
+## 配置 embedding
+
+```bash
+export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_MODEL="provider:embedding-model"
+export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_PROFILE_ID="project-embedding-v1"
+export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_DIMENSION="1536"
+```
+
+model、profile ID、dimension 必须成组配置。`EmbeddingProfile` 是 projection 与 query 的兼容合同，还包含 normalization。更换 model、dimension 或 normalization 后，应从权威 Memory Revisions 重建 projection，不能静默复用旧 vector。
+
+当前设置允许 normalization `unit` 或 `none`，但 vector search admission 需要兼容的 unit-normalized L2 profile。不要因为配置被接受，就假设任何 profile 都支持 vector/hybrid。
+
+## Structured output 不是批准
+
+```text
+Pydantic AI structured output
+→ schema validation
+→ PowerContext evidence / lineage / domain validation
+→ Memory plan or pending Candidate
+→ atomic commit or Review
+```
+
+Schema-valid 只说明字段形状正确。Memory candidate 仍必须引用本次 bounded evidence，并通过 intent、dedupe 和 current-head 检查。Experience、Skill、Handoff 各有自己的 lineage 规则。
+
+模型不能直接创建 approved Experience / Skill，也不能授予执行权限。
+
+## Embedding output 检查
+
+Adapter 验证：
+
+- output count 与 input 一致；
+- input 顺序未改变；
+- dimension 正确；
+- 数值有限；
+- normalization 符合 profile。
+
+Temporary embedding unavailable/timeout 在 Memory write 时可让权威 Memory Revision 与 FTS projection 继续提交，而 vector projection 缺失。Configuration error 或 invalid output 不走这条 fallback，可能中止 operation。
+
+## Search fallback
+
+`mode="auto"` 只有在 backend、profile 和 current projection 都满足条件时才选择 hybrid。若 query embedding 随后 temporary unavailable/timeout，且 FTS 可用，可重试为 FTS。
+
+显式 `vector` / `hybrid` 永不静默改成 FTS；缺能力时返回 422 capability error。
+
+## Readiness
+
+Inference probe 是真实最小 provider request。结果：
+
+- 全部通过：`ready`；
+- generation/embedding probe 失败：`degraded`，HTTP 200；
+- Runtime/database failure：`not_ready`，HTTP 503。
+
+Readiness 与 capabilities 回答不同问题。Capability 在 startup composition 时发布，不会因为一次 degraded probe 就动态消失。
+
+Provider timeout、408/504 映射 timeout；409/425/429、5xx 和 transient provider error 映射 unavailable；其他 provider 4xx 通常是 configuration error。公共错误不包含 raw provider body。
+
+## 直接 composition
+
+应用自己管理 Pydantic AI `Model` 生命周期时，可以直接组合：
+
+```python
+from powercontext.builtin.artifacts.memory import (
+    MEMORY_EXTRACTION_INSTRUCTIONS,
+    LLMMemoryCandidatePipeline,
+    MemoryExtractionInput,
+    MemoryExtractionOutput,
+)
+from powercontext.builtin.inference.pydantic_ai import (
+    InferenceLimits,
+    PydanticAIStructuredGenerator,
+)
+
+
+generator = PydanticAIStructuredGenerator(
+    model=generation_model,
+    instructions=MEMORY_EXTRACTION_INSTRUCTIONS,
+    input_type=MemoryExtractionInput,
+    output_type=MemoryExtractionOutput,
+    limits=InferenceLimits(timeout_seconds=30, max_requests=2),
+)
+candidate_pipeline = LLMMemoryCandidatePipeline(generator)
+```
+
+`generation_model` 必须是 initialized Pydantic AI `Model`，不是 provider string。创建它的应用负责关闭。
+
+## 验证
+
+Generation round trip：capture unique Source → flush → cursor 到达 position → entry `source_refs` 包含该 Source。没有 linked entry 可能是合法 no-op。
+
+Vector round trip 还应断言：
+
+```text
+response mode == vector
+hit citation == source-linked entry
+matched_by contains vector
+```
+
+Stats 中有 embedding request 不能代替 lineage assertion。
+
+## 当前边界
+
+- 没有跨 provider automatic fallback；
+- 没有 embedding profile 静默热迁移；
+- reranker 只在 generation 成功但所有 rank 无效时退回 coarse order；provider failure 会传播；
+- 旧 RFC 中“不支持 Handoff generation / reranking”的 phase-one 描述已落后于当前实现。
+
+下一页是 [Pydantic AI Agent adapter（Preview）](/zh/frameworks/pydantic-ai)。

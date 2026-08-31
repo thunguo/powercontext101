@@ -1,14 +1,181 @@
 ---
 title: "LangGraph"
-description: "用工具、召回 hook 和 PowerContextScope 把图接到运行中的 Server。"
+description: "用三个 Memory tools、PowerContextRecall 和 PowerContextScope 接入运行中的 Server。当前 adapter 仅支持 async。"
 ---
 
 <Note>
-TODO: 正文待写。本页只建立大纲。
+Source install only：`powercontext-langgraph==0.0.1` 尚未发布到 PyPI，要求 Python 3.11+ 和 LangGraph 1.2+。它不安装或启动 Server。
 </Note>
 
-## 本页将覆盖
+LangGraph adapter 有三个组件：
 
-- 入门：create_react_agent + PowerContextRecall + powercontext_tools
-- 必须使用 ainvoke / astream
-- 进阶：自定义图、llm_input_messages、上下文不进 checkpointer
+- `powercontext_tools()`：search、remember、context 三个 `BaseTool`；
+- `PowerContextRecall`：node 或 `pre_model_hook`；
+- `PowerContextScope`：每个 run 的 Scope 和 connection override。
+
+## 安装
+
+Server 与 adapter 分开安装：
+
+```bash
+uv tool install --force \
+  "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@master"
+
+uv pip install \
+  "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@master#subdirectory=integrations/langgraph"
+
+powercontext server run
+```
+
+可复现部署应把 `master` 换成验证过的 commit。仓库内开发可运行 `uv sync --locked`；只安装 adapter 不包含示例所需的 in-process Server dependencies。
+
+## 最小 Agent
+
+```python
+from langgraph.prebuilt import create_react_agent
+from powercontext_langgraph import (
+    PowerContextRecall,
+    PowerContextScope,
+    powercontext_tools,
+)
+
+
+agent = create_react_agent(
+    model,
+    tools=powercontext_tools(),
+    pre_model_hook=PowerContextRecall(),
+    context_schema=PowerContextScope,
+    checkpointer=my_checkpointer,
+)
+
+result = await agent.ainvoke(
+    {
+        "messages": [{
+            "role": "user",
+            "content": "What should happen before contract tests?",
+        }]
+    },
+    context=PowerContextScope(
+        scope_id="project:powercontext-101",
+    ),
+)
+```
+
+<Warning>
+Recall 和 tools 都是 async。使用 `ainvoke` / `astream`；同步 `invoke` / `stream` 无法驱动它们。
+</Warning>
+
+## Tools 的真实范围
+
+```text
+powercontext_search(query, limit=5)
+powercontext_remember(text, kind="agent-note", reason=None)
+powercontext_context(query)
+```
+
+Search tool 的 `limit` 是 1–20，比 HTTP API 的 1–50 更窄。Tool validation 发生在函数体之前；缺失参数或越界值可能触发 framework validation，而不是 adapter 的 friendly failure string。
+
+Server Client error 返回短 unavailable string，不会让模型把失败理解成空 Memory。Search hit 是精简 JSON，仅保留 `matched_by`、`score`、`text`，不等同 Pydantic AI Toolset 的完整 response。
+
+## Recall 走临时 channel
+
+`PowerContextRecall` 读取最新 human text，query clamp 到 8192 characters，调用 `prepare_context`，然后写：
+
+```text
+llm_input_messages
+├── PowerContext untrusted system message
+└── original messages
+```
+
+Persisted `messages` 不变。Empty、无 human message 或 failure 时，adapter 仍覆盖 `llm_input_messages` 为原始 messages，避免上一次 step 的 stale recall 留在 last-value channel。
+
+## Custom StateGraph
+
+```python
+from typing import Annotated
+
+from langchain_core.messages import BaseMessage
+from langgraph.graph import START, StateGraph
+from langgraph.graph.message import add_messages
+from powercontext_langgraph import PowerContextRecall, PowerContextScope
+from typing_extensions import TypedDict
+
+
+class AgentState(TypedDict):
+    messages: Annotated[list[BaseMessage], add_messages]
+    llm_input_messages: list[BaseMessage]
+
+
+def call_model(state: AgentState):
+    model_input = state.get("llm_input_messages") or state["messages"]
+    return {"messages": [model.invoke(model_input)]}
+
+
+builder = StateGraph(AgentState, context_schema=PowerContextScope)
+builder.add_node("recall", PowerContextRecall())
+builder.add_node("model", call_model)
+builder.add_edge(START, "recall")
+builder.add_edge("recall", "model")
+
+graph = builder.compile(checkpointer=my_checkpointer)
+```
+
+只读 `state["messages"]` 会让 Recall 成功但模型看不到 context。
+
+## Scope 与 cache
+
+```text
+PowerContextScope.scope_id / POWERCONTEXT_LANGGRAPH_SCOPE_ID
+→ normalized network Git remote
+→ MissingScopeError
+```
+
+没有 local path fallback。`TOKEN` 是 bare token。`PowerContextScope` 可 override base URL、token、timeout，但不能 override settings 中的 `max_bytes`。
+
+Recall cache 最多 64 项，key 是 Scope 加 human message ID；没有 ID 时退回 query text。标准 `add_messages` 路径通常提供 ID。自定义 state 如果连续创建相同文本且 `id=None`，可能跨两个逻辑 turn 复用旧 cache；为每个 turn 提供 unique message ID。
+
+## 无模型检查
+
+上游 `inspect_recall.py` 会启动临时 Server、seed explicit Memory、运行 Recall node 并打印 exact system message：
+
+```bash
+uv run python integrations/langgraph/examples/inspect_recall.py
+```
+
+它需要完整仓库/Server development environment，不需要外部模型 key。真实 model round trip 再运行 `agent_memory_roundtrip.py`。
+
+## 为什么没有 `BaseStore`
+
+`BaseStore` 要支持 `GetOp`、caller-keyed `PutOp` upsert/delete 和 `SearchOp`。PowerContext Memory 只有 Search 自然对应；identity 和 version 由 Server 分配。
+
+Search-only 假实现会通过组装，随后在其他 node 的 Get/Put 上运行时失败。Adapter 因此只接 node/tool，不占 `compile(store=...)`。
+
+## Failure behavior
+
+- Server unavailable：Recall 返回原 messages 给临时 channel，graph 继续；
+- empty：不加 recall prefix；
+- 401/403：每个 Recall instance 一次不含 token 的 error log；
+- missing Scope/config：automatic recall fail-open，tool 返回 unavailable；
+- remote plaintext HTTP：Client 在发送前拒绝；
+- 同一 text 无 ID：可能命中 fallback cache，见上文。
+
+## 当前不支持
+
+- sync graph API；
+- automatic Source / trajectory capture；
+- PowerContext checkpointing implementation；
+- `BaseStore`；
+- Handoff、Review、Experience / Skill direct operations；
+- PyPI install。
+
+## 完成检查
+
+- 使用 `await ...ainvoke`；
+- 显式传 per-run Scope；
+- custom model node 读取 `llm_input_messages`；
+- unique turn 有稳定且不同的 message ID；
+- checkpointer 不含 recalled block；
+- Server down 时 graph 仍到 END；
+- tool failure 与 empty Memory 可区分。
+
+下一页是 [LangChain](/zh/frameworks/langchain)。

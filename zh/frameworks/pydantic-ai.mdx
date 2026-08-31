@@ -1,16 +1,140 @@
 ---
 title: "Pydantic AI Agent adapter（Preview）"
-description: "用 Capability 或 Toolset 把 Pydantic AI Agent 接到 PowerContext。当前普通安装路径不可用。"
+description: "阅读 Capability 与 Toolset API；当前 PyPI 和 Git subdirectory 都无法独立安装。"
 ---
 
 <Warning>
-Preview：该 adapter 尚未发布到 PyPI。当前 Git subdirectory 安装也会因为依赖版本约束失败，不要把本页当成可直接安装的用户教程。
+Preview：`powercontext-pydantic-ai` 尚未发布到 PyPI。它要求 final `powercontext[client]>=0.0.3`，当前 public package 与 `master` development version 都不满足。旧 PyPI 命令和 Git subdirectory install 都会依赖解析失败。
 </Warning>
 
-## 本页将覆盖
+这是一份 API review，不是生产安装教程。
 
-- `PowerContext` Capability：三个工具、每 run 自动 recall，以及可选 capture / flush
-- `PowerContextToolset`：只提供三个显式工具
-- per-run Scope callback、history replacement 与隐私边界
-- 自动路径 fail-open 与显式工具 `ModelRetry` 的区别
-- 当前不支持的 Handoff、Review、Experience / Skill 操作
+## Capability 与 Toolset
+
+### Capability
+
+```python
+from pydantic_ai import Agent
+from powercontext_pydantic_ai import PowerContext
+
+
+agent = Agent(
+    "openai:gpt-5.2",
+    capabilities=[PowerContext(scope_id="project:example")],
+)
+```
+
+`PowerContext` 增加三个工具、automatic recall，以及可选 capture/flush lifecycle。
+
+### Toolset-only
+
+```python
+from pydantic_ai import Agent
+from powercontext_pydantic_ai import PowerContextToolset
+
+
+agent = Agent(
+    "openai:gpt-5.2",
+    toolsets=[PowerContextToolset(scope_id="project:example")],
+)
+```
+
+Toolset 只有工具，不 automatic prepare、capture 或 flush。
+
+| 能力 | Capability | Toolset |
+|---|---:|---:|
+| `powercontext_search` | 是 | 是 |
+| `powercontext_remember` | 是 | 是 |
+| `powercontext_context` | 是 | 是 |
+| automatic recall | 成功注入一次后本 run 停止；empty/failure 时后续 model request 可能重试 | 否 |
+| trajectory capture | 可选，默认关 | 否 |
+| checkpoint / final flush | capture 开启时 | 否 |
+
+显式工具返回完整 public response JSON。Client failure 转成 `ModelRetry`，不是空 search。
+
+## Recall 与 history
+
+Capability 读取最新 textual user prompt，解析 Scope，调用 `prepare_context`，移除旧 marker block，再 prepend 当前 context。
+
+复用旧 `message_history` 开新 run 时，adapter 会替换可识别的旧 block。应用仍可能持久化完整 messages；adapter 只控制下一次 dispatch 前的输入整理。
+
+## Scope callback
+
+```python
+from pydantic_ai import RunContext
+from powercontext_pydantic_ai import PowerContext
+
+
+def tenant_scope(ctx: RunContext[dict[str, str]]) -> str:
+    return f"tenant:{ctx.deps['tenant_id']}"
+
+
+capability = PowerContext(scope_id=tenant_scope)
+```
+
+Scope precedence：
+
+```text
+constructor string/callback
+→ POWERCONTEXT_PYDANTIC_AI_SCOPE_ID
+→ normalized Git origin
+→ local path hash
+```
+
+Callback 在 run binding 时执行。如果 deps 缺失、callback 抛异常或返回空值，错误发生在 automatic HTTP recall 的 fail-open 边界之前，run 可能无法开始。部署前要单独测试 callback configuration。
+
+## 配置
+
+```bash
+export POWERCONTEXT_PYDANTIC_AI_BASE_URL=http://127.0.0.1:8000
+export POWERCONTEXT_PYDANTIC_AI_TOKEN=opaque-server-token
+export POWERCONTEXT_PYDANTIC_AI_SCOPE_ID=project:example
+```
+
+`TOKEN` 是裸 token，不包含 `Bearer `。
+
+| Setting | 默认 |
+|---|---:|
+| `TIMEOUT` | `10` seconds |
+| `MAX_BYTES` | `8000` |
+| `CAPTURE_EVENTS` | `false` |
+| `CAPTURE_CHECKPOINT_EVERY` | `5` |
+| `CAPTURE_MAX_BYTES` | `8192` |
+
+## Capture 与隐私
+
+开启 capture 会发送 initial user text、visible model text/tool calls、completed tool arguments/results。Thinking/reasoning parts 被排除。
+
+Credential-like keys 和已知 credential env values 会 redaction；普通代码、prompt 和业务数据仍可能敏感。Redaction 不是 DLP。
+
+Event schema：
+
+```text
+powercontext.pydantic-ai-capture-event/v1
+```
+
+成功 captures 在 run-local lock 下排序；到 checkpoint count 后 flush，`after_run` 处理剩余 Source。
+
+## Failure behavior
+
+| 路径 | 结果 |
+|---|---|
+| prepare/capture/flush 的 Client failure | fail-open，run 继续 |
+| Scope callback/config binding failure | 在 HTTP helper 边界前传播，需预先验证 |
+| explicit tool Client failure | `ModelRetry` |
+| first 401/403 | 一次 credential-free warning |
+
+## MCP fallback
+
+MCP 无需 adapter package，提供显式工具，但没有 automatic prepare、trajectory capture、checkpoint/final flush。
+
+## 当前边界
+
+- 普通用户无 supported standalone install；
+- Handoff、Candidate Review、Experience、Skill direct operations 不在 adapter 内；
+- Temporal、DBOS、Prefect 等 durable execution **Not validated**；
+- capture 不批准任何长期知识。
+
+Compatible package 发布前，生产接入使用 Python Client、MCP、LangGraph 或 LangChain。
+
+下一页进入 [LangGraph](/zh/frameworks/langgraph)。
