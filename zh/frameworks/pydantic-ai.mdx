@@ -174,14 +174,14 @@ PowerContext MCP 不需要 Pydantic AI 专用 package。它可以向 Agent 暴�
 
 | 项目 | 状态 |
 |---|---|
-| Public PyPI installation | 当前不支持 |
-| 从当前仓库执行 Git subdirectory installation | 当前不支持，原因是 final `>=0.0.3` dependency |
-| Handoff operation | 此 adapter 不支持 |
-| Candidate Review operation | 此 adapter 不支持 |
-| Direct Experience 或 Skill operation | 此 adapter 不支持 |
-| Temporal、DBOS、Prefect 等 durable execution | 尚未验证 |
-| 在受支持 consumer install 上运行真实 provider call | 尚未验证，因为当前不存在该 install path |
-| 把 recalled evidence 持久化为 trusted Agent history | 不支持；它是不可信内容，每个 run 都会替换 |
+| Public PyPI installation | **Unsupported**；当前没有可用安装 |
+| 从当前仓库执行 Git subdirectory installation | **Unsupported**；final `>=0.0.3` dependency 会解析失败 |
+| Handoff operation | **Unsupported**；此 adapter 不提供 |
+| Candidate Review operation | **Unsupported**；此 adapter 不提供 |
+| Direct Experience 或 Skill operation | **Unsupported**；此 adapter 不提供 |
+| Temporal、DBOS、Prefect 等 durable execution | **Not validated** |
+| 在受支持 consumer install 上运行真实 provider call | **Not validated**；当前不存在该 install path |
+| 把 recalled evidence 持久化为 trusted Agent history | **Unsupported**；它是不可信内容，每个 run 都会替换 |
 
 ## 完成检查
 
