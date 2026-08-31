@@ -5,6 +5,8 @@ description: "Compare events, injection, capture, permissions, and validation le
 
 The five hosts connect to one Server but do not share one Hook API. Their common layer is the domain contract: resolve Scope, prepare temporary context, capture Source independently, and put explicit writes behind host permissions.
 
+## Common execution flow
+
 ```text
 host event
 → resolve Scope
@@ -19,18 +21,19 @@ host event
 
 | Capability | Codex | Claude Code | DSH | OpenCode | Pi |
 |---|---|---|---|---|---|
-| Event | `UserPromptSubmit` | `UserPromptSubmit` | `agent/pre-step` | `chat.message` + transform | `before_agent_start` |
-| Injection | Additional context | `additionalContext` | Plugin message | Exact-turn transform | System prompt |
-| Prompt capture | Yes | Yes | User-originated batch | Yes, secret-like filter | Yes, secret/size filters |
+| Automatic event | `UserPromptSubmit` | `UserPromptSubmit` | `agent/pre-step` | `chat.message` + transform | `before_agent_start` |
+| Injection | additional context | `additionalContext` | plugin message | exact-turn message transform | system prompt |
+| Prompt capture | Yes | Yes | user-originated batch | Yes, filter secret-like prompt | Yes, filter secret/size |
 | Final response capture | No | No | No | No | No |
-| Explicit interface | MCP | MCP | Native HTTP tools | Native HTTP tools | Native tools + `/pc` |
-| Permission | Host-gated | Host-gated | Pre-execute `ask` | `context.ask` | Interactive; deny without UI |
+| Explicit interface | MCP | MCP | native HTTP tools | native HTTP tools | native tools + `/pc` |
+| Handoff | MCP + Skill | MCP + Skill | curated HTTP tools | curated HTTP tools | native tools |
+| Permission | Host-gated | Host-gated | pre-execute `ask` | `context.ask` | interactive confirm; deny without UI |
 | Managed Skill export | Supported | Supported | Unsupported | Unsupported | Unsupported |
-| Real-host E2E | Not validated | Not validated | Not validated | Supported | Package load only; full chain Not validated |
+| Real-host E2E | Not validated | Not validated | Not validated | Supported | package load only; full chain Not validated |
 
 A bundled `project-context` Skill is guidance shipped by an integration. It does not prove managed Skill export support.
 
-## Setup and verification
+## Setup and doctor
 
 ```bash
 powercontext setup <host> \
@@ -40,13 +43,19 @@ powercontext setup <host> \
 powercontext doctor <host>
 ```
 
-Setup never starts the Server. Doctor is a bounded installation check, not proof of live recall or permission UI. Automatic helper failures normally fail open; explicit Memory, Handoff, Review, and export failures remain visible.
+Setup never starts the Server. Doctor is a bounded install/activation check. It is not E2E, and it does not prove live recall, permission UI, or cross-session behavior. Each host page states what that host actually checks.
 
-## Choose a host
+## Automatic and explicit paths
 
-- Hook + MCP + project Skill: Codex or Claude Code.
-- Pre-step and curated HTTP tools: DSH.
-- Exact-turn cache and real-host E2E: OpenCode.
-- Boundary flush and no-UI fail-closed writes: Pi.
+Automatic recall/capture is a helper path. Server failure usually fail-open. Explicit Memory, Handoff, Review, or export must not pretend success.
 
-Read [Hooks and plugins](/en/coding-agents/hooks-and-plugins), then choose a host page.
+Do not copy one host's permission model onto another. Pi refuses durable write without UI. DSH and OpenCode go through the host permission API. Codex/Claude Code no-UI refuse behavior is **Not validated**.
+
+## Choose a path
+
+- Need Hook + MCP + project Skill: Codex or Claude Code.
+- Need pre-step and curated HTTP tools: DSH.
+- Need exact-turn transient cache and real-host E2E: OpenCode.
+- Need boundary flush and no-UI fail-closed: Pi.
+
+Read [Hooks and plugins](/en/coding-agents/hooks-and-plugins), then open the matching host page.
