@@ -46,6 +46,10 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     You are done when you finish the first loop: write one Memory, find it with `search_memory`, and use `prepare_context` to obtain a cited `PreparedContext`.
 
     Skip framework pages, host pages, and the later Source / Handoff tutorials for now.
+
+    **Longer path (optional, not a completion check)**
+
+    If the objects still blur, read [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill). After the first loop, continue only if you need [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), or [Experience / Skill Review](/en/basic-usage/experience-skill-review).
   </Tab>
   <Tab title="I write Python agents">
     Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [API tour](/en/basic-usage/api-tour) → [Framework integration](/en/frameworks/overview).
@@ -53,6 +57,10 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     First run `remember_memory`, `search_memory`, and `prepare_context` with the Python Client. Then open the [framework integration overview](/en/frameworks/overview). The next step from that page is LangGraph or LangChain, not Server inference and not the Preview adapter. The Pydantic AI agent adapter is a Preview and has no working standalone installation path, so it is not a good first integration.
 
     If you only need automatic recall, you can skip Handoff and Skill for now.
+
+    **Longer path (optional, not a completion check)**
+
+    After LangGraph or LangChain works, read [framework tricks](/en/frameworks/tricks). Add [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review) only when you need extraction, Handoff, or Skill. Read Server inference and the Preview adapter later, not first.
   </Tab>
   <Tab title="I use Hermes / OpenClaw">
     Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Common agents overview](/en/common-agents/overview) → [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
@@ -60,6 +68,10 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     You are done when the plugin is installed and active, `powercontext doctor <host>` passes, and a new session can recall a Memory you stored explicitly.
 
     After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. WorkBuddy and the portable Agent Plugin also live in this chapter: run `setup workbuddy` separately for WorkBuddy; Agent Plugin has no setup command, so verify explicit MCP only. Installation, credentials, and durable writes still require your authorization.
+
+    **Longer path (optional, not a completion check)**
+
+    After recall works, read [Handoff](/en/mental-model/handoff), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review). [Agent self-extension](/en/common-agents/agent-self-extension) covers managed Skill export only. Hermes and OpenClaw cannot export; switch to Codex or Claude Code for that step.
   </Tab>
   <Tab title="I use a coding agent">
     Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Coding agents overview](/en/coding-agents/overview) → the selected host page.
@@ -67,6 +79,10 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ.
 
     You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you.
+
+    **Longer path (optional, not a completion check)**
+
+    After the host page works, read [Hooks and plugins](/en/coding-agents/hooks-and-plugins) and [Extend hooks](/en/coding-agents/extend-hooks). Use [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill) for object detail. The runnable extras are [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review).
   </Tab>
   <Tab title="I am building an integration">
     Complete [Hooks and plugins](/en/coding-agents/hooks-and-plugins), compare at least two existing hosts, then read [Extend hooks](/en/coding-agents/extend-hooks).
@@ -74,6 +90,10 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     The deliverable is not merely code that calls `/v1/context/prepare`. Write a verifiable adapter contract covering Scope, transient injection, Source capture, permissions, diagnostics, installation, and real-host end-to-end tests.
 
     You can postpone the Basic Usage Handoff and Skill tutorials until the adapter's recall and capture path is stable.
+
+    **Longer path (optional, not a completion check)**
+
+    After the main chain is stable, add [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), [Experience / Skill Review](/en/basic-usage/experience-skill-review), and [framework tricks](/en/frameworks/tricks). The object pages [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill) help you check the contract. They are not a gate for starting the integration.
   </Tab>
 </Tabs>
 
