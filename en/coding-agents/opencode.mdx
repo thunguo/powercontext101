@@ -95,7 +95,14 @@ Exit, open a new session, and ask the learning-path question:
 What should happen after the OpenAPI contract changes?
 ```
 
-When automatic recall succeeds, the current user turn receives a synthetic part that starts with `PowerContext host-supplied context`, includes a Citation, and is labeled untrusted historical evidence. That text enters the exact turn and is not stored in the OpenCode transcript.
+Check exact-turn in this order. Do not stop at the diagram:
+
+1. In the current session, send one user message: the learning-path question.
+2. Inspect the latest user turn. `experimental.chat.messages.transform` should insert a synthetic part that starts with `PowerContext host-supplied context`, includes a Citation, and is labeled untrusted historical evidence. That text enters the exact turn and is not stored in the OpenCode transcript.
+3. Delete the session. `session.deleted` must clear the stale turn cache and the Scope cache.
+4. Open a new session and send an unrelated coding question. The old synthetic part must not appear.
+
+A `(sessionID, messageID)` pair that is not the current user turn must not inject the previous cache either.
 
 ## Scope resolution
 

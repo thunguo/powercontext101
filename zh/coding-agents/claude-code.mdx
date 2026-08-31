@@ -81,6 +81,25 @@ claude
 
 `POWERCONTEXT_CLAUDE_*` 优先于 `CLAUDE_PLUGIN_OPTION_*` 和 plugin options。不要把 token 写进 Server URL、plugin options、`.mcp.json` 或日志。`headersHelper` 只从环境读取完整 Authorization。远程 endpoint 使用 HTTPS。
 
+Setup 写入的 `.mcp.json` 字段是：
+
+```json
+{
+  "powercontext": {
+    "type": "http",
+    "url": "http://127.0.0.1:8000/mcp"
+  }
+}
+```
+
+真实文件还会带 `headersHelper`，从 `POWERCONTEXT_CLAUDE_AUTHORIZATION` 组装 header；URL 也可以来自 `user_config.server_url`。对照时只看这三项：`type`、`url` 指向 `/mcp`、文件里没有 token。
+
+新 session 里对照：
+
+1. `/hooks` 有 `UserPromptSubmit`。
+2. `/mcp` 显示 `powercontext` Server connected。
+3. 工具列表有 `remember_memory`，没有 `prepare_context`。
+
 ```bash
 export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
 claude

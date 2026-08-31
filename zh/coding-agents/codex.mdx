@@ -57,6 +57,29 @@ Hook 从 plugin `.mcp.json` 推导 API base，默认连到 `http://127.0.0.1:800
 | Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
 | Hook timeout | `10` | Codex 外层 hook timeout，单位秒 |
 
+Plugin `.mcp.json` 至少要有这些字段。token 只写环境变量名，不写值：
+
+```json
+{
+  "mcpServers": {
+    "powercontext": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp",
+      "required": false,
+      "env_http_headers": {
+        "Authorization": "POWERCONTEXT_CODEX_AUTHORIZATION"
+      }
+    }
+  }
+}
+```
+
+新 session 里对照：
+
+1. `/hooks` 列出 PowerContext `UserPromptSubmit`。提示信任时再信任。
+2. `/mcp` 看到名为 `powercontext` 的 Server。Server 已启动时应是 connected。
+3. `/mcp` 工具列表里有 `remember_memory`，没有 `prepare_context`。
+
 `POWERCONTEXT_CODEX_SERVER_URL` 会被忽略。`server_url` 只来自 plugin `.mcp.json`。不要把 token 写进 `.mcp.json`、Server URL 或静态 MCP header。当前工作不能落成 Source 时：
 
 ```bash

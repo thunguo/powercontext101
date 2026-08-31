@@ -72,7 +72,31 @@ after changing the OpenAPI contract, regenerate the client and inspect the diff.
 Return the Memory Citation. Do not store secrets.
 ```
 
-`pc_remember` first triggers host permission `ask`. After approval it should return a Memory Citation. You can use `/pc` commands for read-only checks.
+Follow this minimum sequence. Do not stop at a bullet list:
+
+1. Ask the model to call `pc_remember`. For a named mutation, `tools/pre-execute` always returns:
+
+```json
+{
+  "kind": "ask",
+  "reason": "PowerContext tool \"pc_remember\" changes durable project context."
+}
+```
+
+2. Approve once in the host permission UI. You should get a Memory Citation. A denial must write nothing.
+3. Review is not a model tool. List pending Candidates with:
+
+```text
+/pc review
+```
+
+Approval is a human command:
+
+```text
+/pc review approve <candidate_id> <expected_version>
+```
+
+`/pc remember` and `/pc review` do not go through `tools/pre-execute`. They are slash commands the human already started.
 
 Ask a new request or open a new session:
 

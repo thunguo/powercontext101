@@ -57,6 +57,29 @@ The hook derives its API base from plugin `.mcp.json`, which defaults to `http:/
 | Recall budget | `8000` | `max_bytes` the hook sends to `prepare_context`; no matching env |
 | Hook timeout | `10` | Outer Codex hook timeout in seconds |
 
+Plugin `.mcp.json` needs at least these fields. Put the environment variable name in the file, not the token:
+
+```json
+{
+  "mcpServers": {
+    "powercontext": {
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp",
+      "required": false,
+      "env_http_headers": {
+        "Authorization": "POWERCONTEXT_CODEX_AUTHORIZATION"
+      }
+    }
+  }
+}
+```
+
+In a new session, check:
+
+1. `/hooks` lists the PowerContext `UserPromptSubmit` hook. Trust it only when prompted.
+2. `/mcp` shows a Server named `powercontext`. It should be connected when the Server is running.
+3. The `/mcp` tool list includes `remember_memory` and does not include `prepare_context`.
+
 `POWERCONTEXT_CODEX_SERVER_URL` is ignored. `server_url` comes only from plugin `.mcp.json`. Do not put the token in `.mcp.json`, the Server URL, or a static MCP header. Disable capture when the current work must not become Source evidence:
 
 ```bash

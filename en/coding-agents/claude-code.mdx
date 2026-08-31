@@ -81,6 +81,25 @@ Non-secret options can be set during setup or overridden for one launch:
 
 `POWERCONTEXT_CLAUDE_*` takes precedence over `CLAUDE_PLUGIN_OPTION_*` and plugin options. Do not put the token in the Server URL, plugin options, `.mcp.json`, or logs. `headersHelper` reads the complete Authorization value from the environment only. Use HTTPS for a remote endpoint.
 
+Setup writes a `.mcp.json` with these fields:
+
+```json
+{
+  "powercontext": {
+    "type": "http",
+    "url": "http://127.0.0.1:8000/mcp"
+  }
+}
+```
+
+The installed file also has a `headersHelper` that builds the header from `POWERCONTEXT_CLAUDE_AUTHORIZATION`. The URL may come from `user_config.server_url`. When you inspect the file, check three things: `type`, a `/mcp` URL, and no token in the file.
+
+In a new session, check:
+
+1. `/hooks` shows `UserPromptSubmit`.
+2. `/mcp` shows the `powercontext` Server connected.
+3. The tool list includes `remember_memory` and does not include `prepare_context`.
+
 ```bash
 export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
 claude

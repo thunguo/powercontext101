@@ -95,7 +95,14 @@ Return the Memory Citation. Do not store secrets.
 What should happen after the OpenAPI contract changes?
 ```
 
-自动召回成功时，当前 user turn 会出现以 `PowerContext host-supplied context` 开头的 synthetic part，内容带 Citation，并标成 untrusted historical evidence。这段文字进入 exact turn，不写进 OpenCode transcript。
+按这个顺序对照 exact-turn，不要只看图：
+
+1. 在当前 session 发一条用户消息，问学习路径那道题。
+2. 看这一轮最新 user turn：`experimental.chat.messages.transform` 应插入以 `PowerContext host-supplied context` 开头的 synthetic part，带 Citation，标成 untrusted historical evidence。它进入 exact turn，不写进 OpenCode transcript。
+3. 删除这个 session。`session.deleted` 必须清掉 stale turn cache 和 Scope cache。
+4. 开新 session，发一句无关的编码问题。旧 synthetic part 不得再出现。
+
+`(sessionID, messageID)` 对不上当前 user turn 时，也不得注入上一轮 cache。
 
 ## Scope 解析
 

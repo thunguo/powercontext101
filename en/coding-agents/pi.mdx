@@ -124,6 +124,18 @@ Core explicit tools:
 
 Durable mutation needs interactive confirmation. Without UI, Pi returns stable `confirmation_required` and performs no silent write. A rejected confirmation returns `cancelled`.
 
+Reproduce the no-UI path: call `pc_remember` or `/pc remember keep API async` when the Pi tool or command context has `hasUI` set to `false`. You should get:
+
+```json
+{
+  "ok": false,
+  "code": "confirmation_required",
+  "message": "PowerContext refuses explicit durable writes without interactive confirmation."
+}
+```
+
+The Server must not receive a remember request. With a UI, a rejected confirm returns `cancelled`. Do not invent an unverified CLI flag for “no UI mode”.
+
 `agent_end` triggers flush only; it does not record Task Outcome. `session_shutdown` is not a Claude Code Stop hook. Pi does not support managed Skill export. A bundled Skill does not change that fact.
 
 ## Negative checks

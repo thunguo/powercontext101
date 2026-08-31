@@ -72,7 +72,31 @@ after changing the OpenAPI contract, regenerate the client and inspect the diff.
 Return the Memory Citation. Do not store secrets.
 ```
 
-`pc_remember` 会先触发宿主 permission `ask`。批准后应返回 Memory Citation。你也可以用 `/pc` 命令做只读检查。
+按这个最小序列对照，不要只看子弹列表：
+
+1. 让模型调用 `pc_remember`。`tools/pre-execute` 对具名 mutation 固定返回：
+
+```json
+{
+  "kind": "ask",
+  "reason": "PowerContext tool \"pc_remember\" changes durable project context."
+}
+```
+
+2. 在宿主 permission UI 里批准一次。应返回 Memory Citation。拒绝则不得写入。
+3. Review 不是 model tool。列出 pending Candidate：
+
+```text
+/pc review
+```
+
+批准必须由人执行：
+
+```text
+/pc review approve <candidate_id> <expected_version>
+```
+
+`/pc remember` 和 `/pc review` 不走 `tools/pre-execute`。它们是人已经显式发起的 slash command。
 
 换一个请求或新 session，问：
 

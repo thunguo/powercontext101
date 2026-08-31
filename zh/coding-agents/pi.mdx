@@ -124,6 +124,18 @@ Flusher 按 Scope 保留最大 pending position，只有 `current_cursor >= posi
 
 Durable mutation 需要 interactive confirmation。没有 UI 时返回稳定 `confirmation_required`，不会静默写入。拒绝确认则返回 `cancelled`。
 
+无 UI 复现：在 Pi tool / command context 的 `hasUI` 为 `false` 时调用 `pc_remember` 或 `/pc remember keep API async`。应得到：
+
+```json
+{
+  "ok": false,
+  "code": "confirmation_required",
+  "message": "PowerContext refuses explicit durable writes without interactive confirmation."
+}
+```
+
+这时 Server 收不到 remember 请求。有 UI 但点拒绝，应得到 `cancelled`。不要用未经验证的 CLI 开关去猜“无 UI 模式”。
+
 `agent_end` 只触发 flush，不自动记录 Task Outcome。`session_shutdown` 也不是 Claude Code Stop Hook。Pi 不支持 managed Skill export；bundled Skill 不改变这个事实。
 
 ## 负向检查
