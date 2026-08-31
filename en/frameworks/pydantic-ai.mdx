@@ -1,17 +1,19 @@
 ---
-title: "Pydantic AI agent adapter (Preview)"
-description: "Review the Capability and Toolset API; neither PyPI nor Git subdirectory currently provides a standalone install."
+title: "Pydantic AI Agent adapter (Preview)"
+description: "Review the future-facing Capability and Toolset API; neither PyPI nor Git subdirectory installation currently works."
 ---
 
 <Warning>
-Preview: `powercontext-pydantic-ai` is not published to PyPI. It requires final `powercontext[client]>=0.0.3`, which neither the current public package nor the `master` development version satisfies. The old PyPI command and Git subdirectory install both fail dependency resolution.
+Preview and not installable by ordinary users: `powercontext-pydantic-ai` is not on PyPI. Its source metadata requires final `powercontext[client]>=0.0.3`, while the repository is still pre-0.0.3. A Git subdirectory install therefore fails dependency resolution too. There is no working standalone install command to run today.
 </Warning>
 
-This is an API review, not a production installation guide.
+This page documents the API for review and future use. Repository contributors can exercise it through the root development environment, but that is not a supported consumer installation path. Real provider calls and durable-execution hosts were not validated for this page.
 
-## Capability and Toolset
+## Choose the integration surface
 
-### Capability
+### `PowerContext` Capability
+
+The following is future-facing API, not a working installation tutorial:
 
 ```python
 from pydantic_ai import Agent
@@ -20,13 +22,15 @@ from powercontext_pydantic_ai import PowerContext
 
 agent = Agent(
     "openai:gpt-5.2",
-    capabilities=[PowerContext(scope_id="project:example")],
+    capabilities=[PowerContext(scope_id="project:powercontext-101")],
 )
 ```
 
-`PowerContext` adds three tools, automatic recall, and optional capture/flush lifecycle.
+`PowerContext` combines three model tools with once-per-run recall. It can also capture agent events, flush after capture checkpoints, and make a final catch-up flush after the run. Capture is off by default.
 
-### Toolset only
+### `PowerContextToolset`
+
+This future-facing form installs only the same three tools:
 
 ```python
 from pydantic_ai import Agent
@@ -35,30 +39,56 @@ from powercontext_pydantic_ai import PowerContextToolset
 
 agent = Agent(
     "openai:gpt-5.2",
-    toolsets=[PowerContextToolset(scope_id="project:example")],
+    toolsets=[PowerContextToolset(scope_id="project:powercontext-101")],
 )
 ```
 
-The Toolset supplies tools without automatic prepare, capture, or flush.
+It has no automatic recall, capture, checkpoint flush, or final flush.
 
-| Capability | Capability | Toolset |
+| Behavior | `PowerContext` | `PowerContextToolset` |
 |---|---:|---:|
 | `powercontext_search` | Yes | Yes |
 | `powercontext_remember` | Yes | Yes |
 | `powercontext_context` | Yes | Yes |
-| Automatic recall | Stops after one successful injection per run; empty/failure may retry on a later model request | No |
-| Trajectory capture | Optional, off by default | No |
-| Checkpoint / final flush | When capture is enabled | No |
+| Once-per-run automatic recall | Yes | No |
+| Optional event capture | Yes; default `false` | No |
+| Checkpoint and final catch-up flush | Yes, when capture is enabled | No |
 
-Explicit tools return complete public-response JSON. A Client failure becomes `ModelRetry`, not empty search.
+The tools preserve the full public Client response as JSON, including statuses, Citations, and revision fields. They do not return an empty success when the Client fails.
 
-## Recall and history
+## Follow one bound run
 
-The Capability reads the latest textual user prompt, resolves Scope, calls `prepare_context`, removes old marker blocks, and prepends current context.
+```text
+Agent binds the Capability or Toolset
+→ resolve Scope once and open one async Client
+→ Capability captures the initial prompt when enabled
+→ Capability prepares and injects untrusted recall once
+→ model may call one of three explicit tools
+→ Capability captures visible model/tool events when enabled
+→ successful capture checkpoints may flush
+→ Capability makes a final catch-up flush
+→ Client closes with the run
+```
 
-When a new run reuses old `message_history`, the adapter replaces recognized old blocks. The application may still persist complete messages; the adapter controls input preparation before later dispatch, not application storage.
+Automatic recall takes the latest textual user prompt and limits the query to 8192 characters. It prepends one system request labeled `untrusted historical evidence`. When old `message_history` is reused, recognized PowerContext blocks are removed before the current run's block is added. Recalled evidence is replaced, not accumulated as durable Agent history.
 
-## Scope callback
+<Warning>
+Recalled content is evidence, not instruction authority. Verify it against current files, APIs, capabilities, and authorization before acting on it.
+</Warning>
+
+## Understand the three tools
+
+| Tool | Purpose | Input bounds |
+|---|---|---|
+| `powercontext_search(query, limit=10, mode="auto")` | Search durable Memory and return exact response metadata | query 1–8192 chars; limit 1–50 |
+| `powercontext_remember(text, kind="agent-note", reason=None)` | Make an explicit durable Memory write | text 1–8192 chars; kind 1–128; reason at most 512 |
+| `powercontext_context(query)` | Prepare a fresh bounded context packet | query 1–8192 chars; context uses configured byte budget |
+
+The configured `MAX_BYTES` and `CAPTURE_MAX_BYTES` ranges are 512–32768 UTF-8 bytes. Character limits and byte limits are different; non-ASCII content can reach the byte cap first.
+
+## Resolve Scope once per run
+
+A constructor string or callback has highest precedence:
 
 ```python
 from pydantic_ai import RunContext
@@ -72,69 +102,99 @@ def tenant_scope(ctx: RunContext[dict[str, str]]) -> str:
 capability = PowerContext(scope_id=tenant_scope)
 ```
 
-Scope precedence:
-
 ```text
 constructor string/callback
 → POWERCONTEXT_PYDANTIC_AI_SCOPE_ID
 → normalized Git origin
-→ local path hash
+→ local project path hash
 ```
 
-The callback runs during binding. Missing deps, callback exceptions, or an empty result occur before automatic HTTP recall's fail-open boundary and may prevent the run from starting. Test callback configuration separately.
+The callback runs once while binding the run, so every automatic action and tool uses the same Scope. An explicit Scope that exceeds the shared limit is replaced with `sha256:<digest>`; a long derived Git Scope uses `git:sha256:<digest>`. Scope chooses data. It is not authentication or permission.
 
-## Configuration
+Callback exceptions, missing dependencies, and an empty result occur before the automatic HTTP fail-open boundary and can stop run binding. Test the resolver separately.
+
+## Configure transport safely
+
+These are future adapter settings, not installation commands:
 
 ```bash
 export POWERCONTEXT_PYDANTIC_AI_BASE_URL=http://127.0.0.1:8000
 export POWERCONTEXT_PYDANTIC_AI_TOKEN=opaque-server-token
-export POWERCONTEXT_PYDANTIC_AI_SCOPE_ID=project:example
+export POWERCONTEXT_PYDANTIC_AI_SCOPE_ID=project:powercontext-101
+export POWERCONTEXT_PYDANTIC_AI_MAX_BYTES=8000
+export POWERCONTEXT_PYDANTIC_AI_CAPTURE_EVENTS=false
 ```
 
-`TOKEN` is bare and does not include `Bearer `.
+| Setting | Default | Accepted range or rule |
+|---|---:|---|
+| `TIMEOUT` | `10` seconds | Positive |
+| `MAX_BYTES` | `8000` | 512–32768 |
+| `CAPTURE_EVENTS` | `false` | Boolean |
+| `CAPTURE_CHECKPOINT_EVERY` | `5` | 1–100 |
+| `CAPTURE_MAX_BYTES` | `8192` | 512–32768 |
 
-| Setting | Default |
-|---|---:|
-| `TIMEOUT` | `10` seconds |
-| `MAX_BYTES` | `8000` |
-| `CAPTURE_EVENTS` | `false` |
-| `CAPTURE_CHECKPOINT_EVERY` | `5` |
-| `CAPTURE_MAX_BYTES` | `8192` |
+`TOKEN` must be a bare printable ASCII token with no whitespace. Do not include `Bearer `. The base URL must be HTTP or HTTPS, cannot contain credentials, a query, or a fragment, and is still subject to the Client's restriction on plaintext non-loopback HTTP.
 
-## Capture and privacy
+## Decide what capture may send
 
-Capture sends initial user text, visible model text/tool calls, and completed tool arguments/results. Thinking and reasoning parts are excluded.
+With capture enabled, the adapter can send:
 
-Credential-like keys and known credential environment values are redacted. Ordinary code, prompts, and business data may remain sensitive. Redaction is not DLP.
+- the initial textual prompt;
+- visible model text and tool calls;
+- completed tool arguments and results.
 
-Event schema:
+Thinking and reasoning parts are excluded. Credential-shaped keys, known credential environment values, and configured auth values are redacted before Source capture. Sensitive code, prompts, business data, or tool results can remain. Redaction is not a DLP boundary.
+
+Captured events use:
 
 ```text
 powercontext.pydantic-ai-capture-event/v1
 ```
 
-Successful captures are ordered under a run-local lock. Checkpoint count triggers flush, and `after_run` processes remaining Sources.
+Capture creates Sources, not approved Memory. A successful checkpoint or final flush may run extraction if the Server has generation configured, but generated durable knowledge still follows PowerContext's domain and Review rules.
 
-## Failure behavior
+## Distinguish automatic and explicit failures
 
-| Path | Result |
+| Path | Failure behavior |
 |---|---|
-| Client failure during prepare/capture/flush | Fail open; run continues |
-| Scope callback/configuration binding failure | Propagates before the HTTP helper boundary; validate it in advance |
-| Explicit tool Client failure | `ModelRetry` |
-| First 401/403 | One credential-free warning |
+| Automatic recall | Client error fails open; the model request continues without injected context |
+| Automatic capture | Client or serialization error fails open; the Agent run continues |
+| Checkpoint/final flush | Client error, timeout, or no cursor progress fails open |
+| Explicit tool | `ClientError` becomes `ModelRetry`; it is never reported as an empty success |
+| Scope/configuration during binding | Propagates before the automatic HTTP boundary |
+| First 401/403 | Emits one bounded warning without token or content |
 
-## MCP fallback
+Recall, capture, and flush are independent helper paths. Their failure does not prove the Scope is empty, and fail-open does not bypass URL or token validation.
 
-MCP needs no adapter package and supplies explicit tools, but no automatic prepare, trajectory capture, or checkpoint/final flush.
+## Use MCP when the adapter is unavailable
 
-## Current boundaries
+PowerContext MCP does not need the Pydantic AI-specific package. It can expose explicit operations to an Agent, but it does not reproduce this Capability's automatic `prepare_context`, transient history replacement, event capture, or checkpoint/final flush.
 
-- No supported standalone install for ordinary users.
-- Direct Handoff, Candidate Review, Experience, and Skill operations are outside the adapter.
-- Temporal, DBOS, Prefect, and similar durable execution are **Not validated**.
-- Capture approves no durable knowledge.
+## Currently unsupported or not validated
 
-Until compatible packages ship, use the Python Client, MCP, LangGraph, or LangChain for production integration.
+| Item | Status |
+|---|---|
+| Public PyPI installation | Unsupported today |
+| Git subdirectory installation from the current repository | Unsupported today because of the final `>=0.0.3` dependency |
+| Handoff operations | Unsupported by this adapter |
+| Candidate Review operations | Unsupported by this adapter |
+| Direct Experience or Skill operations | Unsupported by this adapter |
+| Temporal, DBOS, Prefect, and similar durable execution | Not validated |
+| Real provider calls on a supported consumer install | Not validated because no such install path exists |
+| Recalled evidence persisted as trusted Agent history | Unsupported; it is untrusted and replaced for each run |
+
+## Completion check
+
+Before adopting a future compatible release, confirm that:
+
+- both the adapter and a compatible final `powercontext[client]` package can actually be installed;
+- you chose `PowerContext` for lifecycle behavior or `PowerContextToolset` for tools only;
+- capture remains off unless its privacy boundary has been reviewed;
+- the Scope callback is deterministic, tenant-safe, and tested outside fail-open handling;
+- the token is bare printable ASCII and the Server URL passes transport restrictions;
+- query, tool limit, and context-byte bounds are enforced;
+- automatic failures continue the run while explicit tool failures remain visible;
+- recalled evidence is treated as temporary untrusted history;
+- unsupported Handoff, Review, Experience, and Skill operations are provided through another approved surface if needed.
 
 Continue with [LangGraph](/en/frameworks/langgraph).

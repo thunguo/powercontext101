@@ -1,17 +1,19 @@
 ---
 title: "Pydantic AI Agent adapter（Preview）"
-description: "阅读 Capability 与 Toolset API；当前 PyPI 和 Git subdirectory 都无法独立安装。"
+description: "查看 future-facing Capability 与 Toolset API；当前 PyPI 和 Git subdirectory 安装都不可用。"
 ---
 
 <Warning>
-Preview：`powercontext-pydantic-ai` 尚未发布到 PyPI。它要求 final `powercontext[client]>=0.0.3`，当前 public package 与 `master` development version 都不满足。旧 PyPI 命令和 Git subdirectory install 都会依赖解析失败。
+Preview，普通用户目前无法安装：`powercontext-pydantic-ai` 尚未发布到 PyPI。其 source metadata 要求 final `powercontext[client]>=0.0.3`，而仓库仍是 pre-0.0.3；Git subdirectory install 也会因此依赖解析失败。当前没有可用的 standalone install command。
 </Warning>
 
-这是一份 API review，不是生产安装教程。
+本页记录 API，供 review 和未来版本使用。仓库 contributor 可以在 root development environment 中运行它，但这不是受支持的 consumer installation path。本页没有验证真实 provider call 或 durable-execution host。
 
-## Capability 与 Toolset
+## 选择 integration surface
 
-### Capability
+### `PowerContext` Capability
+
+下面是 future-facing API，不是当前可运行的安装教程：
 
 ```python
 from pydantic_ai import Agent
@@ -20,13 +22,15 @@ from powercontext_pydantic_ai import PowerContext
 
 agent = Agent(
     "openai:gpt-5.2",
-    capabilities=[PowerContext(scope_id="project:example")],
+    capabilities=[PowerContext(scope_id="project:powercontext-101")],
 )
 ```
 
-`PowerContext` 增加三个工具、automatic recall，以及可选 capture/flush lifecycle。
+`PowerContext` 把三个 model tool 与 once-per-run recall 组合起来。它还可以 capture Agent event，在 capture checkpoint 后 flush，并在 run 结束后做一次 final catch-up flush。Capture 默认关闭。
 
-### Toolset-only
+### `PowerContextToolset`
+
+下面这个 future-facing 写法只安装同样的三个工具：
 
 ```python
 from pydantic_ai import Agent
@@ -35,30 +39,56 @@ from powercontext_pydantic_ai import PowerContextToolset
 
 agent = Agent(
     "openai:gpt-5.2",
-    toolsets=[PowerContextToolset(scope_id="project:example")],
+    toolsets=[PowerContextToolset(scope_id="project:powercontext-101")],
 )
 ```
 
-Toolset 只有工具，不 automatic prepare、capture 或 flush。
+它没有 automatic recall、capture、checkpoint flush 或 final flush。
 
-| 能力 | Capability | Toolset |
+| 行为 | `PowerContext` | `PowerContextToolset` |
 |---|---:|---:|
 | `powercontext_search` | 是 | 是 |
 | `powercontext_remember` | 是 | 是 |
 | `powercontext_context` | 是 | 是 |
-| automatic recall | 成功注入一次后本 run 停止；empty/failure 时后续 model request 可能重试 | 否 |
-| trajectory capture | 可选，默认关 | 否 |
-| checkpoint / final flush | capture 开启时 | 否 |
+| once-per-run automatic recall | 是 | 否 |
+| optional event capture | 是；默认 `false` | 否 |
+| checkpoint 与 final catch-up flush | 是，capture 开启时 | 否 |
 
-显式工具返回完整 public response JSON。Client failure 转成 `ModelRetry`，不是空 search。
+工具会保留完整的 public Client response JSON，包括 status、Citation 和 revision 字段。Client failure 时不会返回空的成功结果。
 
-## Recall 与 history
+## 跟踪一次 bound run
 
-Capability 读取最新 textual user prompt，解析 Scope，调用 `prepare_context`，移除旧 marker block，再 prepend 当前 context。
+```text
+Agent binds the Capability or Toolset
+→ resolve Scope once and open one async Client
+→ Capability captures the initial prompt when enabled
+→ Capability prepares and injects untrusted recall once
+→ model may call one of three explicit tools
+→ Capability captures visible model/tool events when enabled
+→ successful capture checkpoints may flush
+→ Capability makes a final catch-up flush
+→ Client closes with the run
+```
 
-复用旧 `message_history` 开新 run 时，adapter 会替换可识别的旧 block。应用仍可能持久化完整 messages；adapter 只控制下一次 dispatch 前的输入整理。
+Automatic recall 读取最新 textual user prompt，并把 query 限制为 8192 个字符。它 prepend 一条标有 `untrusted historical evidence` 的 system request。复用旧 `message_history` 时，adapter 会先移除能识别的旧 PowerContext block，再加入当前 run 的 block。Recalled evidence 会被替换，不会作为 durable Agent history 不断累积。
 
-## Scope callback
+<Warning>
+Recalled content 是证据，不是 instruction authority。执行前应根据当前 file、API、capability 和 authorization 重新核对。
+</Warning>
+
+## 理解三个工具
+
+| 工具 | 用途 | Input bound |
+|---|---|---|
+| `powercontext_search(query, limit=10, mode="auto")` | 搜索 durable Memory，并返回 exact response metadata | query 1–8192 chars；limit 1–50 |
+| `powercontext_remember(text, kind="agent-note", reason=None)` | 显式写入 durable Memory | text 1–8192 chars；kind 1–128；reason 最多 512 |
+| `powercontext_context(query)` | 为问题准备 fresh bounded context packet | query 1–8192 chars；context 使用配置的 byte budget |
+
+`MAX_BYTES` 与 `CAPTURE_MAX_BYTES` 的可配置范围都是 512–32768 UTF-8 bytes。Character limit 和 byte limit 不是一回事；非 ASCII 内容可能先达到 byte cap。
+
+## 每个 run 只解析一次 Scope
+
+Constructor string 或 callback 的优先级最高：
 
 ```python
 from pydantic_ai import RunContext
@@ -72,69 +102,99 @@ def tenant_scope(ctx: RunContext[dict[str, str]]) -> str:
 capability = PowerContext(scope_id=tenant_scope)
 ```
 
-Scope precedence：
-
 ```text
 constructor string/callback
 → POWERCONTEXT_PYDANTIC_AI_SCOPE_ID
 → normalized Git origin
-→ local path hash
+→ local project path hash
 ```
 
-Callback 在 run binding 时执行。如果 deps 缺失、callback 抛异常或返回空值，错误发生在 automatic HTTP recall 的 fail-open 边界之前，run 可能无法开始。部署前要单独测试 callback configuration。
+Callback 在 run binding 时执行一次，因此所有 automatic action 和 tool 都使用同一个 Scope。显式 Scope 超过共享上限时会改为 `sha256:<digest>`；过长的 derived Git Scope 会使用 `git:sha256:<digest>`。Scope 只负责选数据，不是 authentication 或 permission。
 
-## 配置
+Callback exception、缺少 dependency、返回空值都发生在 automatic HTTP fail-open boundary 之前，可能阻止 run binding。应单独测试 resolver。
+
+## 安全配置 transport
+
+这些是未来 adapter 的 setting，不是安装命令：
 
 ```bash
 export POWERCONTEXT_PYDANTIC_AI_BASE_URL=http://127.0.0.1:8000
 export POWERCONTEXT_PYDANTIC_AI_TOKEN=opaque-server-token
-export POWERCONTEXT_PYDANTIC_AI_SCOPE_ID=project:example
+export POWERCONTEXT_PYDANTIC_AI_SCOPE_ID=project:powercontext-101
+export POWERCONTEXT_PYDANTIC_AI_MAX_BYTES=8000
+export POWERCONTEXT_PYDANTIC_AI_CAPTURE_EVENTS=false
 ```
 
-`TOKEN` 是裸 token，不包含 `Bearer `。
+| Setting | 默认值 | 范围或规则 |
+|---|---:|---|
+| `TIMEOUT` | `10` seconds | 正数 |
+| `MAX_BYTES` | `8000` | 512–32768 |
+| `CAPTURE_EVENTS` | `false` | Boolean |
+| `CAPTURE_CHECKPOINT_EVERY` | `5` | 1–100 |
+| `CAPTURE_MAX_BYTES` | `8192` | 512–32768 |
 
-| Setting | 默认 |
-|---|---:|
-| `TIMEOUT` | `10` seconds |
-| `MAX_BYTES` | `8000` |
-| `CAPTURE_EVENTS` | `false` |
-| `CAPTURE_CHECKPOINT_EVERY` | `5` |
-| `CAPTURE_MAX_BYTES` | `8192` |
+`TOKEN` 必须是没有空白字符的 bare printable ASCII token，不能带 `Bearer `。Base URL 必须使用 HTTP 或 HTTPS，不能含 credential、query 或 fragment；Client 对 non-loopback plaintext HTTP 的限制仍然生效。
 
-## Capture 与隐私
+## 决定 capture 可以发送什么
 
-开启 capture 会发送 initial user text、visible model text/tool calls、completed tool arguments/results。Thinking/reasoning parts 被排除。
+开启 capture 后，adapter 可以发送：
 
-Credential-like keys 和已知 credential env values 会 redaction；普通代码、prompt 和业务数据仍可能敏感。Redaction 不是 DLP。
+- initial textual prompt；
+- visible model text 和 tool call；
+- completed tool argument 和 result。
 
-Event schema：
+Thinking/reasoning part 会被排除。Credential-shaped key、已知 credential environment value 和配置的 auth value 会在 Source capture 前被 redaction。敏感代码、prompt、业务数据或 tool result 仍可能保留；redaction 不是 DLP boundary。
+
+Captured event 使用：
 
 ```text
 powercontext.pydantic-ai-capture-event/v1
 ```
 
-成功 captures 在 run-local lock 下排序；到 checkpoint count 后 flush，`after_run` 处理剩余 Source。
+Capture 创建 Source，不会直接产生 approved Memory。如果 Server 配有 generation，成功的 checkpoint/final flush 可能触发 extraction，但生成的 durable knowledge 仍受 PowerContext domain rule 与 Review rule 约束。
 
-## Failure behavior
+## 区分 automatic 与 explicit failure
 
-| 路径 | 结果 |
+| 路径 | Failure behavior |
 |---|---|
-| prepare/capture/flush 的 Client failure | fail-open，run 继续 |
-| Scope callback/config binding failure | 在 HTTP helper 边界前传播，需预先验证 |
-| explicit tool Client failure | `ModelRetry` |
-| first 401/403 | 一次 credential-free warning |
+| Automatic recall | Client error fail-open；model request 在没有 injected context 的情况下继续 |
+| Automatic capture | Client 或 serialization error fail-open；Agent run 继续 |
+| Checkpoint/final flush | Client error、timeout 或 cursor 无进展时 fail-open |
+| Explicit tool | `ClientError` 转为 `ModelRetry`；不会报告为空的成功结果 |
+| Binding 阶段的 Scope/configuration | 在 automatic HTTP boundary 前传播 |
+| 第一次 401/403 | 发出一次 bounded warning，不含 token 或 content |
 
-## MCP fallback
+Recall、capture、flush 是彼此独立的 helper path。它们失败并不说明 Scope 为空，fail-open 也不会绕过 URL 或 token validation。
 
-MCP 无需 adapter package，提供显式工具，但没有 automatic prepare、trajectory capture、checkpoint/final flush。
+## Adapter 不可用时使用 MCP
 
-## 当前边界
+PowerContext MCP 不需要 Pydantic AI 专用 package。它可以向 Agent 暴露显式 operation，但不会复现该 Capability 的 automatic `prepare_context`、transient history replacement、event capture 或 checkpoint/final flush。
 
-- 普通用户无 supported standalone install；
-- Handoff、Candidate Review、Experience、Skill direct operations 不在 adapter 内；
-- Temporal、DBOS、Prefect 等 durable execution **Not validated**；
-- capture 不批准任何长期知识。
+## 当前不支持或尚未验证
 
-Compatible package 发布前，生产接入使用 Python Client、MCP、LangGraph 或 LangChain。
+| 项目 | 状态 |
+|---|---|
+| Public PyPI installation | 当前不支持 |
+| 从当前仓库执行 Git subdirectory installation | 当前不支持，原因是 final `>=0.0.3` dependency |
+| Handoff operation | 此 adapter 不支持 |
+| Candidate Review operation | 此 adapter 不支持 |
+| Direct Experience 或 Skill operation | 此 adapter 不支持 |
+| Temporal、DBOS、Prefect 等 durable execution | 尚未验证 |
+| 在受支持 consumer install 上运行真实 provider call | 尚未验证，因为当前不存在该 install path |
+| 把 recalled evidence 持久化为 trusted Agent history | 不支持；它是不可信内容，每个 run 都会替换 |
+
+## 完成检查
+
+采用未来的兼容版本前，确认：
+
+- adapter 与兼容的 final `powercontext[client]` package 都能实际安装；
+- 需要 lifecycle behavior 时选择 `PowerContext`，只要工具时选择 `PowerContextToolset`；
+- 未完成 privacy review 前，capture 保持关闭；
+- Scope callback deterministic、tenant-safe，并已在 fail-open handling 之外单独测试；
+- token 是 bare printable ASCII，Server URL 通过 transport restriction；
+- query、tool limit 和 context-byte bound 均被执行；
+- automatic failure 允许 run 继续，explicit tool failure 仍然可见；
+- recalled evidence 被当作 temporary untrusted history；
+- 如果需要 Handoff、Review、Experience、Skill，通过另一个获准 surface 提供。
 
 下一页进入 [LangGraph](/zh/frameworks/langgraph)。

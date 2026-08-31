@@ -3,9 +3,9 @@ title: "框架进阶技巧"
 description: "用可修复的失败案例测试 Scope、临时 recall、UTF-8 预算和 capture-to-Memory 边界。"
 ---
 
-框架接入的问题往往很安静：两个 tenant 共用 Scope、recalled block 混进 history、字符数被当成字节预算，或 capture 被当成 Memory write。下面统一用一种测试结构：错误做法 → 观察 → 修复 → assertion。
+框架接入的错误往往不会立刻暴露：两个 tenant 共用 Scope、recalled block 混进 history、字符数被当成字节预算，或 capture 被当成 Memory write。下面用同一套结构逐项测试这些边界：错误做法 → 观察 → 修复 → assertion。
 
-## 成熟度与 setup 基线
+## 成熟度与安装基线
 
 这些技巧适用于 Preview Pydantic AI Agent adapter、source-only LangGraph adapter 和 source-only LangChain middleware。
 

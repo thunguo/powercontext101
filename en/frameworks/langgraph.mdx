@@ -1,44 +1,52 @@
 ---
 title: "LangGraph"
-description: "Connect to a running Server with three Memory tools, PowerContextRecall, and PowerContextScope. The adapter is async-only."
+description: "Add three Memory tools and transient per-turn recall to an async LangGraph without polluting checkpoints."
 ---
 
-<Note>
-Source install only: `powercontext-langgraph==0.0.1` is not on PyPI and requires Python 3.11+ and LangGraph 1.2+. It does not install or start the Server.
-</Note>
+<Warning>
+Source install only: `powercontext-langgraph==0.0.1` is not published to PyPI. The documented Git URL follows mutable `master`, and the focused package test does not exercise that VCS installation path. Reproducibility is **Not validated**; pin a reviewed commit and its dependencies.
+</Warning>
 
-The adapter has three components:
+The adapter has three parts: `powercontext_tools()` returns three tools, `PowerContextRecall` prepares model input, and `PowerContextScope` carries per-run configuration. It connects to a separately running PowerContext Server.
 
-- `powercontext_tools()`: search, remember, and context `BaseTool` instances;
-- `PowerContextRecall`: a node or `pre_model_hook`;
-- `PowerContextScope`: per-run Scope and connection overrides.
+## Maturity and installation
 
-## Install
+| Item | Status |
+|---|---|
+| Package | Source install only; not PyPI |
+| Version | `0.0.1` |
+| Runtime | Python `>=3.11,<4.0`; LangGraph `>=1.2,<2` |
+| Invocation | **Async only** |
+| Mutable-branch reproducibility | **Not validated** |
+| Real model-provider round trip in this guide | **Not validated** |
 
-Install Server and adapter separately:
+Install the Server and adapter from the reviewed source commit:
 
 ```bash
-uv tool install --force \
-  "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@master"
-
-uv pip install \
-  "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@master#subdirectory=integrations/langgraph"
-
+uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
+uv pip install "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10#subdirectory=integrations/langgraph"
 powercontext server run
 ```
 
-For reproducibility, replace `master` with a tested commit. Repository development may use `uv sync --locked`; adapter-only install does not include in-process Server dependencies needed by the examples.
+For a local checkout at the same commit:
 
-## Minimal agent
+```bash
+git -C /path/to/powercontext checkout 4213d32d672a6fb16e74730eb50b9be6a38bcb10
+uv pip install /path/to/powercontext/integrations/langgraph
+```
+
+<Note>
+Pinning removes the mutable-branch ambiguity, but this guide did not run the upstream VCS-install path or an external-provider round trip. Verify both in your deployment environment.
+</Note>
+
+## Minimum use
+
+`create_react_agent` already reads the `llm_input_messages` channel written by the recall hook.
 
 ```python
+from langchain_core.messages import HumanMessage
 from langgraph.prebuilt import create_react_agent
-from powercontext_langgraph import (
-    PowerContextRecall,
-    PowerContextScope,
-    powercontext_tools,
-)
-
+from powercontext_langgraph import PowerContextRecall, PowerContextScope, powercontext_tools
 
 agent = create_react_agent(
     model,
@@ -50,46 +58,47 @@ agent = create_react_agent(
 
 result = await agent.ainvoke(
     {
-        "messages": [{
-            "role": "user",
-            "content": "What should happen before contract tests?",
-        }]
+        "messages": [
+            HumanMessage(content="What should happen after changing the OpenAPI contract?")
+        ]
     },
-    context=PowerContextScope(
-        scope_id="project:powercontext-101",
-    ),
+    context=PowerContextScope(scope_id="project:powercontext-101"),
 )
 ```
 
 <Warning>
-Recall and tools are async. Use `ainvoke` or `astream`; synchronous `invoke` and `stream` cannot drive them.
+Use `ainvoke` or `astream`. Recall and all three tools are async; `invoke` and `stream` cannot execute them.
 </Warning>
 
-## Actual tool surface
+| Tool | Behavior |
+|---|---|
+| `powercontext_search` | Searches Memory; default `limit=5`, maximum `20`; no search `mode` argument |
+| `powercontext_remember` | Writes one explicit Memory |
+| `powercontext_context` | Prepares bounded context for a query |
+
+`powercontext_search` and `powercontext_context` clamp a model-supplied query to 8,192 Python characters. `powercontext_tools()` returns the tools in search, remember, context order.
+
+## Execution flow
 
 ```text
-powercontext_search(query, limit=5)
-powercontext_remember(text, kind="agent-note", reason=None)
-powercontext_context(query)
+latest human message
+→ resolve per-run Scope and connection settings
+→ prepare_context(query <= 8192 chars, max_bytes)
+→ build ordered llm_input_messages
+→ model step
+→ optional model-requested search / remember / context tool
+→ later model steps reuse the per-turn recall cache
 ```
 
-Search tool `limit` is 1–20, narrower than HTTP's 1–50. Tool-schema validation runs before the body; missing or out-of-range arguments may trigger framework validation rather than the adapter's friendly failure string.
+`PowerContextRecall` is called before each model step, but prepares at most once for the current human turn. A ReAct loop reuses a cache keyed by Scope plus the latest human message ID; when no ID exists, it uses the message text. Including Scope in the key keeps identical tenant prompts separate.
 
-A Server Client error returns a short unavailable string instead of empty Memory. Search hits are compact JSON with `matched_by`, `score`, and `text`, not the full response shape returned by the Pydantic AI Toolset.
+Successful recall produces one leading `SystemMessage`, marked as untrusted historical evidence, followed by the original ordered messages. Empty recall or failure supplies only the original messages.
 
-## Recall uses an ephemeral channel
+### Keep model input ephemeral
 
-`PowerContextRecall` reads the latest human text, clamps query to 8192 characters, calls `prepare_context`, and writes:
+Recall writes a complete input to `llm_input_messages`. It never appends the recalled block to `messages`, so a checkpointer does not accumulate stale context.
 
-```text
-llm_input_messages
-├── PowerContext untrusted system message
-└── original messages
-```
-
-Persisted `messages` remain unchanged. On empty, no human message, or failure, the adapter still overwrites `llm_input_messages` with raw messages so stale recall from a previous step cannot remain in the last-value channel.
-
-## Custom StateGraph
+A custom graph must declare that channel, place recall before the model, and read it in the model node:
 
 ```python
 from typing import Annotated
@@ -106,9 +115,10 @@ class AgentState(TypedDict):
     llm_input_messages: list[BaseMessage]
 
 
-def call_model(state: AgentState):
+async def call_model(state: AgentState):
     model_input = state.get("llm_input_messages") or state["messages"]
-    return {"messages": [model.invoke(model_input)]}
+    response = await model.ainvoke(model_input)
+    return {"messages": [response]}
 
 
 builder = StateGraph(AgentState, context_schema=PowerContextScope)
@@ -116,66 +126,93 @@ builder.add_node("recall", PowerContextRecall())
 builder.add_node("model", call_model)
 builder.add_edge(START, "recall")
 builder.add_edge("recall", "model")
-
 graph = builder.compile(checkpointer=my_checkpointer)
 ```
 
-Reading only `state["messages"]` lets Recall run while the model never sees context.
+Reading only `state["messages"]` silently discards recalled context. Writing the block back to `messages` defeats the checkpoint boundary.
 
-## Scope and cache
+## Scope and configuration
+
+Pass `PowerContextScope` on every invocation in multi-tenant services. Per-run values for Scope, base URL, token, and timeout override their environment settings.
+
+```python
+scope = PowerContextScope(
+    scope_id="tenant:acme:project:api",
+    base_url="https://context.example.com",
+    token="opaque-server-token",
+    timeout=8.0,
+)
+
+result = await agent.ainvoke(state, context=scope)
+```
+
+| Setting | Default |
+|---|---:|
+| `POWERCONTEXT_LANGGRAPH_BASE_URL` | `http://127.0.0.1:8000` |
+| `POWERCONTEXT_LANGGRAPH_TOKEN` | unset |
+| `POWERCONTEXT_LANGGRAPH_SCOPE_ID` | derived or error |
+| `POWERCONTEXT_LANGGRAPH_TIMEOUT` | `10` seconds |
+| `POWERCONTEXT_LANGGRAPH_MAX_BYTES` | `8000`; accepted range `512`–`32768` bytes |
+
+Scope precedence is:
 
 ```text
-PowerContextScope.scope_id / POWERCONTEXT_LANGGRAPH_SCOPE_ID
-→ normalized network Git remote
+PowerContextScope(scope_id=...)
+→ POWERCONTEXT_LANGGRAPH_SCOPE_ID
+→ normalized network Git origin
 → MissingScopeError
 ```
 
-There is no local path fallback. `TOKEN` is bare. `PowerContextScope` can override base URL, token, and timeout, but not settings `max_bytes`.
+There is no local-path fallback. HTTP(S), SSH, Git, and SCP-like network remotes are normalized without credentials. A local path or Windows drive path is not a remote. An overlong explicit Scope is replaced by a bounded SHA-256 identifier.
 
-Recall caches up to 64 entries by Scope plus human message ID, falling back to query text when ID is absent. Standard `add_messages` normally supplies IDs. A custom state that creates repeated identical text with `id=None` may reuse cache across two logical turns; provide unique message IDs.
+The token convention is a bare token without `Bearer `. The adapter does not strictly validate that syntax, so reject malformed configuration before deployment. `repr=False` reduces accidental display; it is not a secret vault. The shared `PowerContextClient` rejects plaintext HTTP to non-loopback hosts unless the caller supplies an explicitly trusted transport.
 
-## Model-free check
+## Why there is no BaseStore
 
-Upstream `inspect_recall.py` starts a temporary Server, seeds explicit Memory, runs the Recall node, and prints the exact system message:
+<Note>
+LangGraph `BaseStore` requires `GetOp`, caller-keyed `PutOp` upsert/delete, and `SearchOp`. Only search maps cleanly to PowerContext Memory. PowerContext assigns Memory identity and versions on the Server; it does not provide caller-key get, put, or delete semantics.
+</Note>
 
-```bash
-uv run python integrations/langgraph/examples/inspect_recall.py
-```
+A search-only store can pass graph assembly and then fail when another node issues get or put. This adapter uses nodes and tools and leaves `compile(store=...)` alone.
 
-It needs the full repository/Server development environment but no external model key. Run `agent_memory_roundtrip.py` later for a real-model flow.
+## Failure, privacy, and Scope boundary
 
-## Why there is no `BaseStore`
+Automatic recall is fail-open. Missing Scope, malformed configuration, validation errors, authentication failures, timeouts, and Server errors skip the recall block and let the graph continue with its original messages. HTTP 401/403 is logged as configuration trouble, not treated as empty Memory.
 
-`BaseStore` requires `GetOp`, caller-keyed `PutOp` upsert/delete, and `SearchOp`. Only Search maps naturally to PowerContext Memory; the Server assigns identity and version.
+Explicit tools do not turn failures into empty success and do not raise through the graph. They return short model-visible strings for unavailable or invalid requests, allowing the model to retry or continue. A real search miss has a separate `(no matching PowerContext memory)` result.
 
-A search-only fake store passes assembly and later fails when another node uses Get or Put. The adapter therefore uses nodes and tools and leaves `compile(store=...)` alone.
+<Warning>
+Recalled content can contain old user or model text. It is evidence, not a current instruction, identity proof, or tool authorization. Keep it on `llm_input_messages`. Scope selects a data partition; derive it from an authenticated tenant/project mapping when isolation matters.
+</Warning>
 
-## Failure behavior
+The adapter performs no automatic capture. Explicit `powercontext_remember` still persists model-selected text, so apply host tool permissions and a retention policy.
 
-- Server unavailable: Recall supplies raw messages to the ephemeral channel and graph continues.
-- Empty: no recall prefix.
-- 401/403: one credential-free error log per Recall instance.
-- Missing Scope/config: automatic recall fails open; tools return unavailable.
-- Remote plaintext HTTP: Client refuses before sending.
-- Repeated id-less text: may hit fallback cache as described above.
+## Currently unsupported or not validated
 
-## Unsupported
+| Item | Status |
+|---|---|
+| Synchronous recall or tools | **Unsupported** |
+| Automatic Source capture or flush | **Unsupported** |
+| `BaseStore` implementation | **Unsupported** by design |
+| Handoff and Candidate Review | **Unsupported** |
+| Experience and Skill operations | **Unsupported** |
+| Reproducible install from mutable `master` | **Not validated** |
+| Real external-provider round trip in this guide | **Not validated** |
 
-- Sync graph API;
-- automatic Source or trajectory capture;
-- PowerContext checkpointing implementation;
-- `BaseStore`;
-- direct Handoff, Review, Experience, or Skill operations;
-- PyPI install.
+## Completion checklist
 
-## Completion check
+- The Server runs separately, and the source-installed adapter is pinned to a reviewed commit.
+- The graph uses `ainvoke` or `astream`.
+- `PowerContextRecall` runs before the model, and a custom model node reads `state.get("llm_input_messages") or state["messages"]`.
+- Checkpointer inspection confirms recalled blocks never enter persisted `messages`.
+- Every invocation receives the intended Scope; a cross-Scope test proves identical prompts stay isolated.
+- `MAX_BYTES` is between 512 and 32,768, long queries are expected to be clamped at 8,192 characters, and remote transport uses HTTPS.
+- With the Server unavailable, recall lets the graph continue; explicit tool failures remain model-visible and distinct from an empty search.
+- Tool permission and retention policy cover explicit Memory writes.
+- Unsupported and Not validated items remain distinct in deployment notes.
 
-- Use `await ...ainvoke`.
-- Pass per-run Scope explicitly.
-- Custom model node reads `llm_input_messages`.
-- Distinct logical turns have distinct message IDs.
-- Checkpointer contains no recalled block.
-- Graph reaches END with Server down.
-- Tool failure remains distinct from empty Memory.
+<Check>
+Run the model-free recall inspection first. Add a real provider only after Scope, Server reachability, transient state, and failure behavior are observable.
+</Check>
 
-Continue with [LangChain](/en/frameworks/langchain).
+Continue with [LangChain](/en/frameworks/langchain) to compare per-request middleware recall and optional completed-turn Source capture.

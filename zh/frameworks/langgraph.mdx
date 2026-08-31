@@ -1,44 +1,52 @@
 ---
 title: "LangGraph"
-description: "用三个 Memory tools、PowerContextRecall 和 PowerContextScope 接入运行中的 Server。当前 adapter 仅支持 async。"
+description: "为 async LangGraph 加入三个 Memory tools 和按 turn 临时召回，不污染 checkpoint。"
 ---
 
-<Note>
-Source install only：`powercontext-langgraph==0.0.1` 尚未发布到 PyPI，要求 Python 3.11+ 和 LangGraph 1.2+。它不安装或启动 Server。
-</Note>
+<Warning>
+仅支持 source install：`powercontext-langgraph==0.0.1` 尚未发布到 PyPI。官方安装 URL 跟随可变的 `master`，focused package test 也没有覆盖这条 VCS install 路径。可复现性为 **Not validated**；请固定经过审阅的 commit 及其依赖。
+</Warning>
 
-LangGraph adapter 有三个组件：
+Adapter 有三个部分：`powercontext_tools()` 返回三个 tools，`PowerContextRecall` 准备模型输入，`PowerContextScope` 携带每个 run 的配置。它连接到单独运行的 PowerContext Server。
 
-- `powercontext_tools()`：search、remember、context 三个 `BaseTool`；
-- `PowerContextRecall`：node 或 `pre_model_hook`；
-- `PowerContextScope`：每个 run 的 Scope 和 connection override。
+## 成熟度与安装
 
-## 安装
+| 项目 | 状态 |
+|---|---|
+| Package | 仅 source install；不在 PyPI |
+| Version | `0.0.1` |
+| Runtime | Python `>=3.11,<4.0`；LangGraph `>=1.2,<2` |
+| Invocation | **仅 async** |
+| 可变分支的可复现性 | **Not validated** |
+| 本指南中的真实模型 provider round trip | **Not validated** |
 
-Server 与 adapter 分开安装：
+从已审阅的 source commit 安装 Server 和 adapter：
 
 ```bash
-uv tool install --force \
-  "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@master"
-
-uv pip install \
-  "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@master#subdirectory=integrations/langgraph"
-
+uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
+uv pip install "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10#subdirectory=integrations/langgraph"
 powercontext server run
 ```
 
-可复现部署应把 `master` 换成验证过的 commit。仓库内开发可运行 `uv sync --locked`；只安装 adapter 不包含示例所需的 in-process Server dependencies。
+如果使用同一 commit 的本地 checkout：
 
-## 最小 Agent
+```bash
+git -C /path/to/powercontext checkout 4213d32d672a6fb16e74730eb50b9be6a38bcb10
+uv pip install /path/to/powercontext/integrations/langgraph
+```
+
+<Note>
+固定 commit 消除了可变分支的歧义，但本指南没有运行上游 VCS install 路径，也没有运行外部 provider round trip。请在部署环境中分别验证。
+</Note>
+
+## 最小用法
+
+`create_react_agent` 已经会读取 recall hook 写入的 `llm_input_messages` channel。
 
 ```python
+from langchain_core.messages import HumanMessage
 from langgraph.prebuilt import create_react_agent
-from powercontext_langgraph import (
-    PowerContextRecall,
-    PowerContextScope,
-    powercontext_tools,
-)
-
+from powercontext_langgraph import PowerContextRecall, PowerContextScope, powercontext_tools
 
 agent = create_react_agent(
     model,
@@ -50,46 +58,47 @@ agent = create_react_agent(
 
 result = await agent.ainvoke(
     {
-        "messages": [{
-            "role": "user",
-            "content": "What should happen before contract tests?",
-        }]
+        "messages": [
+            HumanMessage(content="What should happen after changing the OpenAPI contract?")
+        ]
     },
-    context=PowerContextScope(
-        scope_id="project:powercontext-101",
-    ),
+    context=PowerContextScope(scope_id="project:powercontext-101"),
 )
 ```
 
 <Warning>
-Recall 和 tools 都是 async。使用 `ainvoke` / `astream`；同步 `invoke` / `stream` 无法驱动它们。
+使用 `ainvoke` 或 `astream`。Recall 和三个 tools 都是 async；`invoke` 与 `stream` 无法执行它们。
 </Warning>
 
-## Tools 的真实范围
+| Tool | 行为 |
+|---|---|
+| `powercontext_search` | 搜索 Memory；默认 `limit=5`，最大 `20`；没有 search `mode` 参数 |
+| `powercontext_remember` | 显式写入一条 Memory |
+| `powercontext_context` | 为 query 准备有界 context |
+
+`powercontext_search` 与 `powercontext_context` 会把模型给出的 query 截到 8,192 个 Python characters。`powercontext_tools()` 按 search、remember、context 的顺序返回 tools。
+
+## 执行流程
 
 ```text
-powercontext_search(query, limit=5)
-powercontext_remember(text, kind="agent-note", reason=None)
-powercontext_context(query)
+latest human message
+→ resolve per-run Scope and connection settings
+→ prepare_context(query <= 8192 chars, max_bytes)
+→ build ordered llm_input_messages
+→ model step
+→ optional model-requested search / remember / context tool
+→ later model steps reuse the per-turn recall cache
 ```
 
-Search tool 的 `limit` 是 1–20，比 HTTP API 的 1–50 更窄。Tool validation 发生在函数体之前；缺失参数或越界值可能触发 framework validation，而不是 adapter 的 friendly failure string。
+每个 model step 前都会调用 `PowerContextRecall`，但同一 human turn 最多 prepare 一次。ReAct loop 使用 Scope 加最新 human message ID 作为 cache key；没有 ID 时使用 message text。Key 包含 Scope，因此两个 tenant 的相同 prompt 不会共享 recall content。
 
-Server Client error 返回短 unavailable string，不会让模型把失败理解成空 Memory。Search hit 是精简 JSON，仅保留 `matched_by`、`score`、`text`，不等同 Pydantic AI Toolset 的完整 response。
+Recall 成功时，输入最前面是一条标记为 untrusted historical evidence 的 `SystemMessage`，后面保持原始 messages 顺序。Recall empty 或失败时，只传原始 messages。
 
-## Recall 走临时 channel
+### 保持 model input 临时
 
-`PowerContextRecall` 读取最新 human text，query clamp 到 8192 characters，调用 `prepare_context`，然后写：
+Recall 把完整输入写到 `llm_input_messages`，从不把 recalled block append 到 `messages`，所以 checkpointer 不会积累 stale context。
 
-```text
-llm_input_messages
-├── PowerContext untrusted system message
-└── original messages
-```
-
-Persisted `messages` 不变。Empty、无 human message 或 failure 时，adapter 仍覆盖 `llm_input_messages` 为原始 messages，避免上一次 step 的 stale recall 留在 last-value channel。
-
-## Custom StateGraph
+Custom graph 必须声明这个 channel，在 model 前执行 recall，并由 model node 读取它：
 
 ```python
 from typing import Annotated
@@ -106,9 +115,10 @@ class AgentState(TypedDict):
     llm_input_messages: list[BaseMessage]
 
 
-def call_model(state: AgentState):
+async def call_model(state: AgentState):
     model_input = state.get("llm_input_messages") or state["messages"]
-    return {"messages": [model.invoke(model_input)]}
+    response = await model.ainvoke(model_input)
+    return {"messages": [response]}
 
 
 builder = StateGraph(AgentState, context_schema=PowerContextScope)
@@ -116,66 +126,93 @@ builder.add_node("recall", PowerContextRecall())
 builder.add_node("model", call_model)
 builder.add_edge(START, "recall")
 builder.add_edge("recall", "model")
-
 graph = builder.compile(checkpointer=my_checkpointer)
 ```
 
-只读 `state["messages"]` 会让 Recall 成功但模型看不到 context。
+如果只读 `state["messages"]`，模型会静默丢掉 recalled context。把 recalled block 写回 `messages` 则破坏 checkpoint boundary。
 
-## Scope 与 cache
+## Scope 与配置
+
+多租户服务应在每次 invocation 传入 `PowerContextScope`。每个 run 的 Scope、base URL、token 和 timeout 会覆盖对应环境变量。
+
+```python
+scope = PowerContextScope(
+    scope_id="tenant:acme:project:api",
+    base_url="https://context.example.com",
+    token="opaque-server-token",
+    timeout=8.0,
+)
+
+result = await agent.ainvoke(state, context=scope)
+```
+
+| Setting | 默认值 |
+|---|---:|
+| `POWERCONTEXT_LANGGRAPH_BASE_URL` | `http://127.0.0.1:8000` |
+| `POWERCONTEXT_LANGGRAPH_TOKEN` | 未设置 |
+| `POWERCONTEXT_LANGGRAPH_SCOPE_ID` | 派生或报错 |
+| `POWERCONTEXT_LANGGRAPH_TIMEOUT` | `10` seconds |
+| `POWERCONTEXT_LANGGRAPH_MAX_BYTES` | `8000`；允许范围 `512`–`32768` bytes |
+
+Scope precedence：
 
 ```text
-PowerContextScope.scope_id / POWERCONTEXT_LANGGRAPH_SCOPE_ID
-→ normalized network Git remote
+PowerContextScope(scope_id=...)
+→ POWERCONTEXT_LANGGRAPH_SCOPE_ID
+→ normalized network Git origin
 → MissingScopeError
 ```
 
-没有 local path fallback。`TOKEN` 是 bare token。`PowerContextScope` 可 override base URL、token、timeout，但不能 override settings 中的 `max_bytes`。
+没有 local-path fallback。HTTP(S)、SSH、Git 和 SCP-like network remote 会在移除 credentials 后做 normalization；local path 或 Windows drive path 不是 remote。过长的显式 Scope 会被替换为有界的 SHA-256 identifier。
 
-Recall cache 最多 64 项，key 是 Scope 加 human message ID；没有 ID 时退回 query text。标准 `add_messages` 路径通常提供 ID。自定义 state 如果连续创建相同文本且 `id=None`，可能跨两个逻辑 turn 复用旧 cache；为每个 turn 提供 unique message ID。
+Token 采用不含 `Bearer ` 的 bare token 约定。Adapter 不严格校验该语法，部署前应拒绝错误配置。`repr=False` 只能减少意外显示，不是 secret vault。除非 caller 提供并显式标记 trusted transport，共享的 `PowerContextClient` 会拒绝向非 loopback host 使用明文 HTTP。
 
-## 无模型检查
+## 为什么没有 BaseStore
 
-上游 `inspect_recall.py` 会启动临时 Server、seed explicit Memory、运行 Recall node 并打印 exact system message：
+<Note>
+LangGraph `BaseStore` 要求 `GetOp`、caller-keyed `PutOp` upsert/delete 和 `SearchOp`。只有 search 能自然映射到 PowerContext Memory。Memory identity 与 version 由 Server 分配，并不提供 caller-key get、put 或 delete 语义。
+</Note>
 
-```bash
-uv run python integrations/langgraph/examples/inspect_recall.py
-```
+Search-only store 可能通过 graph assembly，却在其他 node 发出 get 或 put 时失败。因此 adapter 使用 nodes 和 tools，不占用 `compile(store=...)`。
 
-它需要完整仓库/Server development environment，不需要外部模型 key。真实 model round trip 再运行 `agent_memory_roundtrip.py`。
+## Failure、隐私与 Scope boundary
 
-## 为什么没有 `BaseStore`
+Automatic recall 为 fail-open。Scope 缺失、配置错误、validation error、authentication failure、timeout 或 Server error 都会跳过 recalled block，让 graph 继续使用原始 messages。HTTP 401/403 会记录为配置问题，不会冒充 empty Memory。
 
-`BaseStore` 要支持 `GetOp`、caller-keyed `PutOp` upsert/delete 和 `SearchOp`。PowerContext Memory 只有 Search 自然对应；identity 和 version 由 Server 分配。
+Explicit tools 不会把失败伪装成 empty success，也不会把 exception 抛穿 graph。它们返回简短、model-visible 的 unavailable 或 invalid-request string，模型可以重试或继续。真正的 search miss 使用单独的 `(no matching PowerContext memory)` 结果。
 
-Search-only 假实现会通过组装，随后在其他 node 的 Get/Put 上运行时失败。Adapter 因此只接 node/tool，不占 `compile(store=...)`。
+<Warning>
+Recalled content 可能包含旧 user 或 model text。它是 evidence，不是当前 instruction、identity proof 或 tool authorization。把它留在 `llm_input_messages`。Scope 只选择数据分区；需要隔离时，应从 authenticated tenant/project mapping 派生 Scope。
+</Warning>
 
-## Failure behavior
+Adapter 不做 automatic capture。显式 `powercontext_remember` 仍会持久化模型选择的文本，因此要设置 host tool permission 和 retention policy。
 
-- Server unavailable：Recall 返回原 messages 给临时 channel，graph 继续；
-- empty：不加 recall prefix；
-- 401/403：每个 Recall instance 一次不含 token 的 error log；
-- missing Scope/config：automatic recall fail-open，tool 返回 unavailable；
-- remote plaintext HTTP：Client 在发送前拒绝；
-- 同一 text 无 ID：可能命中 fallback cache，见上文。
+## 当前不支持或尚未验证
 
-## 当前不支持
+| 项目 | 状态 |
+|---|---|
+| 同步 recall 或 tools | **Unsupported** |
+| Automatic Source capture 或 flush | **Unsupported** |
+| `BaseStore` implementation | 按设计为 **Unsupported** |
+| Handoff 与 Candidate Review | **Unsupported** |
+| Experience 与 Skill operations | **Unsupported** |
+| 从可变 `master` 进行可复现安装 | **Not validated** |
+| 本指南中的真实外部 provider round trip | **Not validated** |
 
-- sync graph API；
-- automatic Source / trajectory capture；
-- PowerContext checkpointing implementation；
-- `BaseStore`；
-- Handoff、Review、Experience / Skill direct operations；
-- PyPI install。
+## 完成检查清单
 
-## 完成检查
+- Server 单独运行，source-installed adapter 固定到经过审阅的 commit。
+- Graph 使用 `ainvoke` 或 `astream`。
+- `PowerContextRecall` 在 model 前运行；custom model node 读取 `state.get("llm_input_messages") or state["messages"]`。
+- 检查 checkpointer，确认 recalled block 从不进入 persisted `messages`。
+- 每次 invocation 收到预期 Scope；cross-Scope test 证明相同 prompt 仍保持隔离。
+- `MAX_BYTES` 在 512 到 32,768 之间，长 query 会在 8,192 characters 截断，remote transport 使用 HTTPS。
+- Server unavailable 时 recall 让 graph 继续；explicit tool failure 对模型可见，并与 empty search 区分。
+- Explicit Memory write 已纳入 tool permission 与 retention policy。
+- 部署记录没有混淆 Unsupported 与 Not validated。
 
-- 使用 `await ...ainvoke`；
-- 显式传 per-run Scope；
-- custom model node 读取 `llm_input_messages`；
-- unique turn 有稳定且不同的 message ID；
-- checkpointer 不含 recalled block；
-- Server down 时 graph 仍到 END；
-- tool failure 与 empty Memory 可区分。
+<Check>
+先运行 model-free recall inspection。确认 Scope、Server reachability、transient state 和 failure behavior 都可观察后，再加入真实 provider。
+</Check>
 
-下一页是 [LangChain](/zh/frameworks/langchain)。
+下一页进入 [LangChain](/zh/frameworks/langchain)，比较 per-request middleware recall 与可选的 completed-turn Source capture。

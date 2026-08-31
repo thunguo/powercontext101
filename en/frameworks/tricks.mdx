@@ -3,9 +3,9 @@ title: "Framework tricks"
 description: "Test Scope, ephemeral recall, UTF-8 budgets, and capture-to-Memory boundaries with repairable failure cases."
 ---
 
-Framework integrations tend to fail quietly: two tenants share a Scope, recalled blocks leak into history, a character count is mistaken for a byte budget, or capture is treated as a Memory write. The useful test shape is the same each time: wrong approach → observation → repair → assertion.
+Framework integration bugs are often quiet: two tenants share a Scope, recalled blocks leak into history, a character count is mistaken for a byte budget, or capture is treated as a Memory write. Test each boundary the same way: wrong approach → observation → repair → assertion.
 
-## Maturity and setup baseline
+## Maturity and install baseline
 
 These tricks apply to the Preview Pydantic AI Agent adapter, the source-only LangGraph adapter, and the source-only LangChain middleware.
 
