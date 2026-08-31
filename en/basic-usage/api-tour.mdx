@@ -22,11 +22,10 @@ Discover the HTTP contract from the running Server:
 
 ```text
 http://127.0.0.1:8000/docs
-http://127.0.0.1:8000/redoc
 http://127.0.0.1:8000/openapi.json
 ```
 
-When Server authentication is enabled, these discovery routes require a Bearer header too. Do not place a token in the URL.
+`/docs` is a public API reference page. It still opens after you enable Server auth. `/openapi.json` and the API calls themselves need a Bearer header. Do not place a token in the URL.
 
 ## Prepare the example project
 

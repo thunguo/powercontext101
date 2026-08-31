@@ -22,11 +22,10 @@ HTTP 契约可从当前 Server 查看：
 
 ```text
 http://127.0.0.1:8000/docs
-http://127.0.0.1:8000/redoc
 http://127.0.0.1:8000/openapi.json
 ```
 
-开启 Server auth 后，这三个 discovery route 也需要 Bearer header。不要把 token 放进 URL。
+`/docs` 是公开的 API 参考页。开启 Server auth 后它仍可打开。`/openapi.json` 和实际 API 调用需要 Bearer header。不要把 token 放进 URL。
 
 ## 准备示例项目
 
