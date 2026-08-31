@@ -4,6 +4,10 @@ description: "把精确 evidence 变成经过 Review 的 Skill Revision，再在
 ---
 
 <Warning>
+Hermes 和 OpenClaw **不能** managed export。你可以在那里整理 evidence 或做 Review，但导出必须换到 [Codex](/zh/coding-agents/codex) 或 [Claude Code](/zh/coding-agents/claude-code)。OpenClaw 没有 Review / Skill 工具面。
+</Warning>
+
+<Warning>
 PowerContext 把 proposal、Review、export 与 execution 分开，但不会在技术上阻止同一个已授权 caller 同时调用 propose 与 approve。需要职责分离时，宿主必须把 decision/export tool 从提案 Agent 的权限中移除。
 </Warning>
 
@@ -248,4 +252,13 @@ Scheduled Experience incubation 不会绕过这条流程。它可以从 task out
 - Existing、drifted、foreign 与 unsupported destination 都有负向测试。
 - 最终 discovery 与 execution permission 留在宿主。
 
-回到 [通用 Agent 总览](/zh/common-agents/overview)，选择负责提交和 Review 这些操作的宿主 surface。
+回到 [通用 Agent 总览](/zh/common-agents/overview)，选择负责提交和 Review 这些操作的宿主 surface。要真正 export，换到编程宿主：
+
+<Columns cols={2}>
+  <Card title="导出到 Codex" icon="terminal" href="/zh/coding-agents/codex" arrow="true" cta="打开 Codex">
+    managed export target `codex` 是 **Supported**。Review 完成后在这里执行 `powercontext skill export`。
+  </Card>
+  <Card title="导出到 Claude Code" icon="terminal" href="/zh/coding-agents/claude-code" arrow="true" cta="打开 Claude Code">
+    managed export target `claude_code` 是 **Supported**。不要和 setup 命令里的 `claude-code` 混用。
+  </Card>
+</Columns>

@@ -4,6 +4,10 @@ description: "Turn exact evidence into a reviewed Skill Revision, then export it
 ---
 
 <Warning>
+Hermes and OpenClaw **cannot** managed-export a Skill. You may gather evidence or run Review there, but export only on [Codex](/en/coding-agents/codex) or [Claude Code](/en/coding-agents/claude-code). OpenClaw has no Review / Skill tool surface.
+</Warning>
+
+<Warning>
 PowerContext separates proposal, Review, export, and execution, but it does not technically prevent one authorized caller from invoking both propose and approve. The host must withhold decision/export tools from the proposing agent when separation of duties is required.
 </Warning>
 
@@ -248,4 +252,13 @@ Scheduled Experience incubation does not bypass this flow. It may create pending
 - Existing, drifted, foreign, and unsupported destinations have negative tests.
 - The host retains final discovery and execution permission.
 
-Return to [Common agents overview](/en/common-agents/overview) to choose the host surface that will submit and review these operations.
+Return to [Common agents overview](/en/common-agents/overview) to choose the host surface that will submit and review these operations. To export, switch to a coding host:
+
+<Columns cols={2}>
+  <Card title="Export to Codex" icon="terminal" href="/en/coding-agents/codex" arrow="true" cta="Open Codex">
+    The managed export target `codex` is **Supported**. Run `powercontext skill export` here after Review.
+  </Card>
+  <Card title="Export to Claude Code" icon="terminal" href="/en/coding-agents/claude-code" arrow="true" cta="Open Claude Code">
+    The managed export target `claude_code` is **Supported**. Do not mix it with the `claude-code` setup name.
+  </Card>
+</Columns>
