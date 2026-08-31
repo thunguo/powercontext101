@@ -64,9 +64,9 @@ keywords:
   <Tab title="我用编程 Agent">
     阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [编程 Agent 总览](/zh/coding-agents/overview) → 对应宿主页。
 
-    选择 Codex、Claude Code、DSH、OpenCode 或 Pi。它们连接同一个 Server，但 Hook 事件、注入位置、capture、flush 和权限确认并不相同。
+    选择 Codex、Claude Code、DSH、OpenCode 或 Pi。它们连接同一个 Server，但 Hook 事件、注入位置、capture、flush 和权限确认并不相同。WorkBuddy 有独立 `setup` / `doctor`，但不在 first-class catalog。Agent Plugin 没有 setup，只提供便携 Skill 与 MCP。
 
-    完成标志：自动 recall 失败时普通编码任务仍能继续；显式 Memory 或 Handoff 操作失败时，宿主会把错误告诉你。
+    完成标志：自动 recall 失败时普通编码任务仍能继续；显式 Memory 或 Handoff 操作失败时，宿主会把错误告诉你。Agent Plugin 没有自动 recall，验收时只检查显式 MCP 失败是否可见。
   </Tab>
   <Tab title="我在写新集成">
     先完成 [Hook 与插件](/zh/coding-agents/hooks-and-plugins)，再比较至少两个现有宿主，最后阅读[扩展 Hook](/zh/coding-agents/extend-hooks)。
@@ -90,7 +90,7 @@ keywords:
 5. 尝试一次显式写入。它必须明确失败，不能假装保存成功。
 
 <Info>
-PowerContext 仓库包含 WorkBuddy 和 Bub 集成，但当前 101 不为它们单独维护路径。WorkBuddy 有正式 how-to；Bub 目前主要由 integration 目录里的 README 说明，尚不是与 first-class hosts 相同的安装路径。
+Bub 目前主要由 integration 目录里的 README 说明，101 不为它单独维护路径。它也不在官方 12 个 configure how-to 里。
 </Info>
 
 ## 下一步

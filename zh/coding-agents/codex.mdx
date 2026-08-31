@@ -53,7 +53,9 @@ Hook 从 plugin `.mcp.json` 推导 API base，默认连到 `http://127.0.0.1:800
 | `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE` | `false` | 测试用：capture 后等待 flush |
 | `POWERCONTEXT_CODEX_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP timeout |
 | `POWERCONTEXT_CODEX_HTTP_BUDGET_SECONDS` | `4` | 一轮 prepare/capture 总预算 |
+| `POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` | `4` | flush 最多调用次数；允许 `1–16` |
 | Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
+| Hook timeout | `10` | Codex 外层 hook timeout，单位秒 |
 
 `POWERCONTEXT_CODEX_SERVER_URL` 会被忽略。`server_url` 只来自 plugin `.mcp.json`。不要把 token 写进 `.mcp.json`、Server URL 或静态 MCP header。当前工作不能落成 Source 时：
 
@@ -114,7 +116,7 @@ UserPromptSubmit
 
 Recall 与 capture 独立 fail-open。Redirect、unknown schema、oversize 和 deadline 都有安全处理。自动 capture 只记录 prompt，不记录 final response 或 Task Outcome。Flush 没追上时，bounded retries 结束后继续 turn，不谎报 Memory 已生成。
 
-MCP 提供显式 Memory、Work Contract、Handoff、acknowledgement、Outcome 和 Review。`project-context` Skill 把 `handoff this work` / `交接当前工作` 当成一次 durable Handoff 的明确授权；commit 仍需要这类祈使句。讨论 Handoff 设计，或说 “preview and make no writes”，不能调用 `handoff_current_work`，因为后者会写 boundary Source。
+MCP 提供显式 Memory、Work Contract、Handoff、acknowledgement、Outcome 和 Review。插件 README 若写 Review 未暴露，以当前 Server MCP 投影为准。`project-context` Skill 把 `handoff this work` / `交接当前工作` 当成一次 durable Handoff 的明确授权；commit 仍需要这类祈使句。讨论 Handoff 设计，或说 “preview and make no writes”，不能调用 `handoff_current_work`，因为后者会写 boundary Source。
 
 Bundled Skill 与 `powercontext skill export --target codex` 写出的 managed Skill 是不同对象。不要混用。
 

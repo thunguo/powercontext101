@@ -64,9 +64,9 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
   <Tab title="I use a coding agent">
     Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Coding agents overview](/en/coding-agents/overview) → the selected host page.
 
-    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ.
+    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ. WorkBuddy has dedicated `setup` / `doctor` commands but is not in the first-class catalog. Agent Plugin has no setup command; it only ships a portable Skill and MCP configuration.
 
-    You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you.
+    You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you. Agent Plugin has no automatic recall; verify that an explicit MCP failure stays visible.
   </Tab>
   <Tab title="I am building an integration">
     Complete [Hooks and plugins](/en/coding-agents/hooks-and-plugins), compare at least two existing hosts, then read [Extend hooks](/en/coding-agents/extend-hooks).
@@ -90,7 +90,7 @@ Use one question to verify any path:
 5. Attempt an explicit write. It must report failure rather than pretend the data was saved.
 
 <Info>
-PowerContext includes WorkBuddy and Bub integrations, but this version of PowerContext 101 does not maintain separate paths for them. WorkBuddy has a formal how-to. Bub is currently documented mainly in its integration-local README and does not share the first-class host installation path.
+Bub is currently documented mainly in its integration-local README. PowerContext 101 does not maintain a separate path for it, and it is not one of the 12 official configure how-tos.
 </Info>
 
 ## Next step

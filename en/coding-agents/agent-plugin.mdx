@@ -1,0 +1,154 @@
+---
+title: "Agent Plugin"
+description: "Load the portable project-context Skill and MCP configuration, verify Memory with a Citation, and do not pretend automatic recall exists."
+---
+
+<Warning>
+There is no `powercontext setup agent-plugin` or `doctor agent-plugin`. This package does not implement automatic recall, capture, or Runtime. The repository has package contract tests; a real host-process E2E is **Not validated**. Permission is **Host-gated**. Managed Skill export is **Unsupported**.
+</Warning>
+
+Agent Plugin is a portable package for hosts that can load Agent Plugin skills and MCP configuration. It is a client of a running PowerContext Server. It does not embed storage, start the Server, or add MCP tools. Memory, Handoff, and persistence stay with the Server's existing MCP tools.
+
+For the full loading procedure, use the Configure Agent Plugin how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
+
+## Obtain the package and load it
+
+Clone a checkout that contains the integration package, then start the Server separately:
+
+```bash
+git clone https://github.com/oceanbase/powercontext.git
+cd powercontext
+
+uv run powercontext server run
+```
+
+The package root is:
+
+```text
+integrations/agent-plugin/powercontext/
+```
+
+It contains:
+
+| File | Role |
+|---|---|
+| `plugin.json` | Agent Plugins 1.0.0 metadata; `name` is `powercontext`, `version` is `0.1.0` |
+| `mcp.json` | Streamable HTTP configuration pointing at `http://127.0.0.1:8000/mcp` |
+| `skills/project-context/SKILL.md` | Reusable instructions for explicit Memory and Handoff |
+
+VS Code loads local directories through `chat.pluginLocations`. Replace the path with your clone, and point at the package root that contains `plugin.json`:
+
+```json
+{
+  "chat.plugins.enabled": true,
+  "chat.pluginLocations": {
+    "/absolute/path/to/cloned/powercontext/integrations/agent-plugin/powercontext": true
+  }
+}
+```
+
+Reload VS Code. Confirm that PowerContext appears in the Agent Plugins view, and that chat can see the `project-context` skill and the `powercontext` MCP server.
+
+## Configuration boundary
+
+`mcp.json` is the entire connection surface of this package:
+
+```json
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "powercontext": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+Agent Plugins 1.0.0 does not define a portable credential-reference field for remote MCP servers. The checked-in `mcp.json` therefore contains no static credentials, token placeholders, or `POWERCONTEXT_*` variables. When the Server requires auth, configure it in the loading host or client. Do not put a Bearer token in this file.
+
+This package has no host-specific environment-variable table and no owned paths written by setup.
+
+## Minimal verification
+
+Check the Server first:
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+There is no `doctor agent-plugin`. A successful load only means the host can see the Skill and MCP entry. It does not prove Server reachability or recall.
+
+In a chat that has loaded the package, save the learning-path answer explicitly:
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+This is MCP `remember_memory` and does not need a generation model. The host should return an exact Citation.
+
+Ask again in a new request that reuses the same `scope_id`:
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+There is no automatic injection channel. The model must call `search_memory` or `get_memory_entry` to read the Memory you just stored. Recalled content includes a Citation and remains untrusted historical evidence.
+
+## Scope resolution
+
+This Skill does not read `.git/powercontext/codex-workspace.json` and does not derive Scope from a Git remote. Before the first PowerContext tool call, choose one `scope_id` for the current task and reuse it for every Memory and Handoff call in that task.
+
+Prefer a project identifier that stays stable across compatible hosts. When the GitHub repository is known:
+
+```text
+git:github.com/owner/repository
+```
+
+If the user or host provides an explicit Scope, use that value. When Scope is ambiguous, ask before writing.
+
+## No automatic path
+
+```text
+compatible host loads plugin.json + mcp.json + Skill
+→ you start the Server separately
+→ chat may use MCP tools
+→ no prepare_context on prompt
+→ no Source capture
+```
+
+Automatic recall, capture, and flush are **Unsupported** here. They are not fail-open helper paths. When MCP is unavailable, the Skill says to report it once and continue: do not retry in a loop, invent restored context, or claim that Memory or Handoff succeeded.
+
+Explicit Memory and Handoff still go through Server MCP. The Skill uses model-free `handoff_current_work`, then has the receiver call `continue_handoff` with `selection: "prepared"`. It does not call `activate_handoff` or `finalize_handoff`.
+
+The bundled Skill is not a managed Skill export. Agent Plugin is not a current export target.
+
+## Negative checks
+
+- Stop the Server, then call `remember_memory`. MCP must report failure and must not pretend the write succeeded.
+- Stop the Server, then ask a normal question. There is no automatic recall to fail open; the host should continue and say MCP is unavailable when PowerContext is required.
+- Open the checked-in `mcp.json`. It must have no `headers`, token, or `POWERCONTEXT_*`.
+- Point `chat.pluginLocations` at the repository root instead of the package root. The host should not treat that as a valid Agent Plugin.
+
+## Current limits
+
+- There is no setup or doctor command.
+- A real VS Code or other Agent Plugin host-process E2E is **Not validated**. `tests/agent_plugin/test_contract.py` only checks the package and documentation contract.
+- Automatic recall, capture, and flush are **Unsupported**.
+- Managed Skill export is **Unsupported**.
+- Authentication is not portable; the 1.0.0 schema has no credential-reference for remote MCP.
+
+## Completion checklist
+
+- The package root contains `plugin.json`, `mcp.json`, and `skills/project-context/SKILL.md`.
+- The host can see the `project-context` Skill and the `powercontext` MCP server.
+- Server health, readiness, and capabilities were checked separately.
+- Explicit `remember_memory` returned a Citation for the OpenAPI decision.
+- The next question found it through MCP search or get, not through automatic injection.
+- MCP failure stayed visible, and you did not treat the bundled Skill as a managed export.
+
+Continue with [Extend hooks](/en/coding-agents/extend-hooks).

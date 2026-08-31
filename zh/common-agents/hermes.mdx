@@ -90,6 +90,22 @@ hermes powercontext search "deployment decision" \
 
 `doctor hermes` 检查 Hermes CLI、provider plugin 和 command companion。它不能证明 Server 可达、PowerContext 已被选为 provider、provider 配置正确，也不检查 recall/capture。显式 smoke operation 能补上其中一部分。
 
+在新的交互会话里，再用学习路径那道题对齐其他宿主：
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+然后提问：
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+上面的 `hermes powercontext remember preference` 是 CLI smoke。统一题用来确认 Citation 通道。Hermes 自动 recall 走 provider prefetch，不是 Codex 那种 `additionalContext`。
+
 ## Tool surface
 
 Provider 有四个聚焦的 Memory tool：

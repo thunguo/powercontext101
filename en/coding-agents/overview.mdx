@@ -1,9 +1,11 @@
 ---
 title: "Coding agents overview"
-description: "Compare events, injection, capture, permissions, and validation levels across Codex, Claude Code, DSH, OpenCode, and Pi."
+description: "Compare first-class coding hosts, plus the WorkBuddy and Agent Plugin surfaces."
 ---
 
-The five hosts connect to one Server but do not share one Hook API. Their common layer is the domain contract: resolve Scope, prepare temporary context, capture Source independently, and put explicit writes behind host permissions.
+The five first-class coding hosts connect to one Server but do not share one Hook API. Their common layer is the domain contract: resolve Scope, prepare temporary context, capture Source independently, and put explicit writes behind host permissions.
+
+Official configure how-tos also cover [WorkBuddy](/en/coding-agents/workbuddy) and [Agent Plugin](/en/coding-agents/agent-plugin). WorkBuddy has dedicated `setup` / `doctor` commands but is not in `setup select`. Agent Plugin has no setup command; it only ships a portable Skill and MCP configuration.
 
 ## Common execution flow
 
@@ -33,6 +35,22 @@ host event
 
 A bundled `project-context` Skill is guidance shipped by an integration. It does not prove managed Skill export support.
 
+## WorkBuddy and Agent Plugin
+
+| Capability | WorkBuddy | Agent Plugin |
+|---|---|---|
+| Automatic event | `UserPromptSubmit` | None |
+| Injection | `additionalContext` | None; MCP only |
+| Prompt capture | Yes | No |
+| Explicit interface | MCP | MCP |
+| Handoff | MCP + Skill | MCP + Skill |
+| Permission | Host-gated | Host-gated |
+| Managed Skill export | Unsupported | Unsupported |
+| Real-host E2E | Not validated (service-chain only) | Not validated (package contract only) |
+| Catalog | Dedicated `setup` / `doctor`; not first-class | No setup / doctor |
+
+Do not describe WorkBuddy as a `setup select` member. Do not describe Agent Plugin as a host that prepares context automatically.
+
 ## Setup and doctor
 
 ```bash
@@ -57,5 +75,7 @@ Do not copy one host's permission model onto another. Pi refuses durable write w
 - Need pre-step and curated HTTP tools: DSH.
 - Need exact-turn transient cache and real-host E2E: OpenCode.
 - Need boundary flush and no-UI fail-closed: Pi.
+- Need a Codex-like Hook + MCP path on WorkBuddy: WorkBuddy. Run `setup workbuddy` separately.
+- Need a portable Skill + MCP package without a host-specific integration: Agent Plugin.
 
 Read [Hooks and plugins](/en/coding-agents/hooks-and-plugins), then open the matching host page.

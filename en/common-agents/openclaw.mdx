@@ -87,6 +87,20 @@ Then use a direct/private OpenClaw session to:
 4. Revise it, then retry the old citation and confirm the conflict.
 5. Retire the current citation and confirm it no longer appears as active Memory.
 
+Also run the learning-path question used by the other hosts. First store it with `powercontext_memory_store`:
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+Then ask:
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
 `doctor openclaw` only checks that the CLI exists and that `memory-powercontext` reports `enabled=true`, `status="loaded"`, and `memorySlotSelected=true`. It does not check OpenClaw version, endpoint, Gateway token, Server reachability, the five allowlist entries, or an actual recall/capture round trip. Single-host setup does not run this final doctor for you.
 
 ## Private-session gate

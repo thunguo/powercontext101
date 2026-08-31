@@ -175,7 +175,9 @@
                   "zh/coding-agents/claude-code",
                   "zh/coding-agents/dsh",
                   "zh/coding-agents/opencode",
-                  "zh/coding-agents/pi"
+                  "zh/coding-agents/pi",
+                  "zh/coding-agents/workbuddy",
+                  "zh/coding-agents/agent-plugin"
                 ]
               }
             ]
@@ -290,7 +292,9 @@
                   "en/coding-agents/claude-code",
                   "en/coding-agents/dsh",
                   "en/coding-agents/opencode",
-                  "en/coding-agents/pi"
+                  "en/coding-agents/pi",
+                  "en/coding-agents/workbuddy",
+                  "en/coding-agents/agent-plugin"
                 ]
               }
             ]

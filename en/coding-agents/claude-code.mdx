@@ -75,9 +75,11 @@ Non-secret options can be set during setup or overridden for one launch:
 | `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE` | `false` | Test-only flush |
 | `POWERCONTEXT_CLAUDE_REQUEST_TIMEOUT_SECONDS` | `1` | Per-request HTTP timeout |
 | `POWERCONTEXT_CLAUDE_HTTP_BUDGET_SECONDS` | `4` | Total prepare/capture budget for one turn |
+| `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` | `4` | Maximum flush calls; allowed range `1–16` |
 | Recall budget | `8000` | `max_bytes` the hook sends to `prepare_context`; no matching env |
+| Hook timeout | `10` | Outer Claude Code hook timeout in seconds |
 
-Do not put the token in the Server URL, plugin options, `.mcp.json`, or logs. `headersHelper` reads the complete Authorization value from the environment only. Use HTTPS for a remote endpoint.
+`POWERCONTEXT_CLAUDE_*` takes precedence over `CLAUDE_PLUGIN_OPTION_*` and plugin options. Do not put the token in the Server URL, plugin options, `.mcp.json`, or logs. `headersHelper` reads the complete Authorization value from the environment only. Use HTTPS for a remote endpoint.
 
 ```bash
 export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
@@ -143,7 +145,7 @@ Do not infer these from other Claude Code events.
 
 Recall failure does not block capture; capture failure does not erase valid `additionalContext`. The hook rejects redirects, bounds response size and wall-clock time, and emits diagnostics without prompt, Scope, content, or token.
 
-MCP performs exact Memory maintenance, Prepared/committed Handoff, acknowledgement, and Outcome. Persisting a final result requires an explicit operation. The `project-context` Skill guides a one-turn Handoff, but commit still needs an explicit imperative.
+MCP performs exact Memory maintenance, Prepared/committed Handoff, acknowledgement, Outcome, and Review. Persisting a final result requires an explicit operation. The `project-context` Skill guides a one-turn Handoff, but commit still needs an explicit imperative. If a plugin README says Review is not exposed, trust the current Server MCP projection.
 
 `powercontext skill export --target claude_code` is the managed Skill export. The bundled Skill is not that export.
 

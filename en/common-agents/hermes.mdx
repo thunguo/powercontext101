@@ -90,6 +90,22 @@ hermes powercontext search "deployment decision" \
 
 `doctor hermes` checks the Hermes CLI, provider plugin, and command companion. It does not prove that the Server is reachable, that PowerContext is the selected provider, that the provider configuration is correct, or that recall/capture works. The explicit smoke operations cover some of that missing ground.
 
+In a new interactive session, also run the learning-path question used by the other hosts:
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+Then ask:
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+The `hermes powercontext remember preference` commands remain the CLI smoke. The shared question confirms the Citation channel. Hermes automatic recall uses provider prefetch, not Codex-style `additionalContext`.
+
 ## Tool surface
 
 The provider supplies four focused Memory tools:

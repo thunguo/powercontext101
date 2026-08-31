@@ -53,7 +53,9 @@ The hook derives its API base from plugin `.mcp.json`, which defaults to `http:/
 | `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE` | `false` | Test-only: wait for flush after capture |
 | `POWERCONTEXT_CODEX_REQUEST_TIMEOUT_SECONDS` | `1` | Per-request HTTP timeout |
 | `POWERCONTEXT_CODEX_HTTP_BUDGET_SECONDS` | `4` | Total prepare/capture budget for one turn |
+| `POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` | `4` | Maximum flush calls; allowed range `1–16` |
 | Recall budget | `8000` | `max_bytes` the hook sends to `prepare_context`; no matching env |
+| Hook timeout | `10` | Outer Codex hook timeout in seconds |
 
 `POWERCONTEXT_CODEX_SERVER_URL` is ignored. `server_url` comes only from plugin `.mcp.json`. Do not put the token in `.mcp.json`, the Server URL, or a static MCP header. Disable capture when the current work must not become Source evidence:
 
@@ -114,7 +116,7 @@ UserPromptSubmit
 
 Recall and capture fail open independently. Redirect, unknown schema, oversize, and deadline paths are bounded. Automatic capture stores the prompt only, not the final response or a Task Outcome. If flush never catches up, bounded retries end and the turn continues without claiming Memory exists.
 
-MCP exposes explicit Memory, Work Contract, Handoff, acknowledgement, Outcome, and Review. The `project-context` Skill treats `handoff this work` / `交接当前工作` as explicit authorization for one durable Handoff; commit still requires that kind of imperative. Discussing Handoff design, or asking to “preview and make no writes,” must not call `handoff_current_work`, because that operation writes a boundary Source.
+MCP exposes explicit Memory, Work Contract, Handoff, acknowledgement, Outcome, and Review. If a plugin README says Review is not exposed, trust the current Server MCP projection. The `project-context` Skill treats `handoff this work` / `交接当前工作` as explicit authorization for one durable Handoff; commit still requires that kind of imperative. Discussing Handoff design, or asking to “preview and make no writes,” must not call `handoff_current_work`, because that operation writes a boundary Source.
 
 The bundled Skill and a managed Skill written by `powercontext skill export --target codex` are different objects. Do not mix them.
 

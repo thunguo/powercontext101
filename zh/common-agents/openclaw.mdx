@@ -87,6 +87,20 @@ powercontext doctor openclaw
 4. Revise 后重试旧 citation，确认得到 conflict。
 5. Retire 当前 citation，确认它不再作为 active Memory 出现。
 
+再用学习路径那道题对齐其他宿主。先用 `powercontext_memory_store` 保存：
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+然后提问：
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
 `doctor openclaw` 只检查 CLI 是否存在，以及 `memory-powercontext` 是否报告 `enabled=true`、`status="loaded"`、`memorySlotSelected=true`。它不检查 OpenClaw 版本、endpoint、Gateway token、Server 可达性、五项 allowlist，也不做实际 recall/capture round trip。单宿主 setup 不会替你运行最终 doctor。
 
 ## Private-session gate

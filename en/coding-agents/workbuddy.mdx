@@ -1,0 +1,153 @@
+---
+title: "WorkBuddy"
+description: "Install the UserPromptSubmit hook, MCP, and project-context Skill, verify additionalContext recall, and keep explicit write failures visible."
+---
+
+<Warning>
+WorkBuddy has its own `setup` / `doctor` commands, but it is not in the first-class catalog used by `setup select` and `doctor integrations`. A real host-process E2E is **Not validated**; the repository has a service-chain test only. Permission is **Host-gated**. Managed Skill export is **Unsupported**. No formal minimum WorkBuddy version is declared.
+</Warning>
+
+WorkBuddy's surface is close to Codex: a short-lived `UserPromptSubmit` hook prepares and captures automatically, HTTP MCP performs explicit Memory and Handoff operations, and the bundled `project-context` Skill binds those paths. Setup does not start the Server and does not open WorkBuddy.
+
+For the full install, use the Configure WorkBuddy how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
+
+## Install and activate
+
+The hook process needs Python 3.11 or newer on `PATH`. Start the Server in one terminal:
+
+```bash
+powercontext server run
+```
+
+In another terminal, install the hooks, MCP server, and Skill:
+
+```bash
+powercontext setup workbuddy --source oceanbase/powercontext --ref master
+
+powercontext doctor
+powercontext doctor workbuddy
+```
+
+Setup writes these owned paths under `WORKBUDDY_HOME` (`~/.workbuddy` when unset) and rolls back its snapshot on failure:
+
+```text
+hooks/workbuddy_powercontext_hook.py
+hooks/workbuddy_settings.py
+hooks/prepared_context.py
+hooks/powercontext_project_scope.py
+settings.json
+mcp.json
+skills/project-context/
+```
+
+It merges the `UserPromptSubmit` hook, preserves unrelated settings and other MCP servers, and resolves command placeholders in the Skill. It does not start the Server and does not open WorkBuddy.
+
+`doctor workbuddy` checks the hook files, that settings register the PowerContext hook, that `mcp.json` contains a `powercontext` server, and that the owned Skill has no unresolved placeholders. It does not launch WorkBuddy, contact the Server, or test recall. `doctor integrations` will not list it.
+
+Restart WorkBuddy after setup. During each prompt, the hook status should show `Syncing PowerContext`.
+
+## Configuration defaults
+
+The hook reads `POWERCONTEXT_WORKBUDDY_` environment variables. The MCP entry uses the same templates, which WorkBuddy expands from the environment:
+
+| Key | Default | Meaning |
+|---|---|---|
+| MCP `url` | `${POWERCONTEXT_WORKBUDDY_SERVER_URL:-http://127.0.0.1:8000}/mcp` | Template written into `mcp.json` by setup |
+| `POWERCONTEXT_WORKBUDDY_SERVER_URL` | `http://127.0.0.1:8000` | Server base shared by the hook and MCP |
+| `POWERCONTEXT_WORKBUDDY_AUTHORIZATION` | Unset | Complete Bearer header |
+| `POWERCONTEXT_WORKBUDDY_SCOPE_ID` | Unset | Explicit Scope; otherwise Workstream / Git / path |
+| `POWERCONTEXT_WORKBUDDY_CAPTURE_PROMPTS` | `true` | Capture the current user prompt as Source |
+| `POWERCONTEXT_WORKBUDDY_FLUSH_ON_CAPTURE` | `false` | Testing only: wait for flush after capture |
+| `POWERCONTEXT_WORKBUDDY_REQUEST_TIMEOUT_SECONDS` | `1.0` | Per-request HTTP timeout |
+| `POWERCONTEXT_WORKBUDDY_HTTP_BUDGET_SECONDS` | `4.0` | Shared prepare/capture budget for one prompt |
+| `POWERCONTEXT_WORKBUDDY_FLUSH_MAX_CALLS` | `4` | Maximum flush calls; allowed range `1–16` |
+| Recall budget | `8000` | `max_bytes` sent to `prepare_context`; no matching env |
+| Hook timeout | `10` | Outer WorkBuddy hook timeout in seconds |
+
+Do not put the token in `mcp.json` or the Server URL. The URL cannot contain credentials, a query string, or a fragment; plain HTTP is accepted only for loopback. Restart WorkBuddy after changing environment variables. Disable capture when the current work must not become Source evidence:
+
+```bash
+export POWERCONTEXT_WORKBUDDY_CAPTURE_PROMPTS=false
+```
+
+## Minimal verification
+
+Check the Server first:
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+Then save the learning-path answer explicitly in WorkBuddy:
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+This is MCP `remember_memory` and does not need a generation model. WorkBuddy should return an exact Citation.
+
+Open a new session in the same project directory and ask:
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+When automatic recall succeeds, `UserPromptSubmit` injects a bounded `PreparedContext` through hook-stdout `additionalContext`. The content includes a Citation and is labeled untrusted historical evidence. It serves the current prompt only and does not capture the assistant final response as Source.
+
+## Scope resolution
+
+WorkBuddy uses the same order and the same binding file as Codex / Claude Code:
+
+1. A nonempty `POWERCONTEXT_WORKBUDDY_SCOPE_ID`.
+2. A Git-private Workstream binding at `.git/powercontext/codex-workspace.json`.
+3. The normalized Git `remote.origin.url`, written as `git:...`.
+4. A `local:<sha256>` identifier for the project root.
+
+The binding lives in the Git directory. It is outside the worktree and is not committed. Shared Memory requires the same Server and the exact same `scope_id` on both sides.
+
+## Automatic path and explicit tools
+
+```text
+UserPromptSubmit
+→ resolve Scope
+→ prepare_context (max_bytes=8000)
+→ validate powercontext.prepared-context.v1
+→ additionalContext
+→ independently capture the prompt
+```
+
+Recall, capture, and flush fail open independently. After the outer 10-second hook timeout, WorkBuddy continues the current prompt. Automatic capture stores the prompt only, not the final response or a Task Outcome.
+
+MCP exposes explicit Memory and Handoff. The bundled Skill treats `交接`, `交接当前工作`, or `handoff this work` as explicit authorization for one durable Handoff. Discussing design, or asking for a preview, must not call `handoff_current_work`.
+
+The bundled Skill is not a managed Skill export. WorkBuddy is not a current export target.
+
+## Negative checks
+
+- Stop the Server, then ask a normal coding question. The hook should fail open; WorkBuddy continues.
+- Stop the Server, then call explicit `remember_memory`. MCP must report failure and must not pretend the write succeeded.
+- Remove `POWERCONTEXT_WORKBUDDY_AUTHORIZATION` while Server auth is enabled. The hook fails open and emits `authentication_failed`; MCP stays unavailable without blocking the session.
+- Do not put the token in `mcp.json`. The file should keep the environment-variable template only.
+
+## Current limits
+
+- A real WorkBuddy host-process E2E is **Not validated**. `test_workbuddy_service_chain.py` only proves that the hook and MCP can share one service configuration.
+- WorkBuddy is outside the first-class bulk catalog. `setup select` and `doctor integrations` will not list it.
+- No formal minimum WorkBuddy version is declared.
+- Managed Skill export is **Unsupported**.
+- Doctor is an install check, not a recall or permission-UI proof.
+
+## Completion checklist
+
+- `doctor workbuddy` sees hooks, settings, MCP, and the owned Skill.
+- Server health, readiness, and capabilities were checked separately.
+- A new session can recall the OpenAPI decision you saved explicitly from `additionalContext`, with a Citation.
+- Ordinary work continues when automatic recall fails.
+- Explicit Memory or Handoff failure is visible in WorkBuddy.
+- You did not treat the bundled Skill as a managed export.
+
+Continue with [Agent Plugin](/en/coding-agents/agent-plugin).

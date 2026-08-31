@@ -75,9 +75,11 @@ claude
 | `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE` | `false` | 测试用 flush |
 | `POWERCONTEXT_CLAUDE_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP timeout |
 | `POWERCONTEXT_CLAUDE_HTTP_BUDGET_SECONDS` | `4` | 一轮 prepare/capture 总预算 |
+| `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` | `4` | flush 最多调用次数；允许 `1–16` |
 | Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
+| Hook timeout | `10` | Claude Code 外层 hook timeout，单位秒 |
 
-不要把 token 写进 Server URL、plugin options、`.mcp.json` 或日志。`headersHelper` 只从环境读取完整 Authorization。远程 endpoint 使用 HTTPS。
+`POWERCONTEXT_CLAUDE_*` 优先于 `CLAUDE_PLUGIN_OPTION_*` 和 plugin options。不要把 token 写进 Server URL、plugin options、`.mcp.json` 或日志。`headersHelper` 只从环境读取完整 Authorization。远程 endpoint 使用 HTTPS。
 
 ```bash
 export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
@@ -143,7 +145,7 @@ UserPromptSubmit
 
 Recall failure 不阻止 capture；capture failure 不删除 valid `additionalContext`。Hook 拒绝 redirect，限制 response size 与 wall-clock deadline，诊断不含 prompt、Scope、content 或 token。
 
-MCP 负责 exact Memory maintenance、Prepared/committed Handoff、acknowledgement 和 Outcome。最终结果要持久化时必须显式调用。`project-context` Skill 指导 one-turn Handoff，但 commit 仍需明确祈使句。
+MCP 负责 exact Memory maintenance、Prepared/committed Handoff、acknowledgement、Outcome 和 Review。最终结果要持久化时必须显式调用。`project-context` Skill 指导 one-turn Handoff，但 commit 仍需明确祈使句。插件 README 若写 Review 未暴露，以当前 Server MCP 投影为准。
 
 `powercontext skill export --target claude_code` 才是 managed Skill export。Bundled Skill 不是它。
 
