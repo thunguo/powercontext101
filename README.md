@@ -37,6 +37,8 @@ Validate the documentation before submitting changes:
 mint validate
 ```
 
+Pull requests also run this check in `.github/workflows/docs-validate.yml`. A broken `docs.json` entry or MDX frontmatter should fail CI.
+
 ## Content workflow
 
 Read [AGENTS.md](AGENTS.md) before editing.

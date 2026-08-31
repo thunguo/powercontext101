@@ -1,0 +1,25 @@
+name: docs-validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  mint-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Mintlify CLI
+        run: npm install --global mint
+
+      - name: Validate documentation
+        run: mint validate
