@@ -165,6 +165,16 @@ These cases must land on this page:
 - OpenCode does not share the Codex / Claude Code Workstream binding. Cross-host sharing requires both sides to resolve the exact same `scope_id`.
 - Redirect, unknown schema, oversize, and timeout block injection without blocking the ordinary turn.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer in a stable Scope with `pc_remember`. Pass `context.ask` first, then confirm the Citation.
+2. Open a new session and ask the same question.
+3. The recall must include a Citation and appear only as an exact-turn synthetic part on the current user turn. It must not enter the OpenCode transcript.
+4. Stop the Server and ask again. Automatic recall may fail. Ordinary coding should continue. After you delete the old session, stale context must not be injected.
+5. Run `pc_remember` again. The tool should return a failure such as `unavailable` and must not pretend the write succeeded.
+
 ## Completion checklist
 
 - OpenCode is `>=1.18.21,<2`.

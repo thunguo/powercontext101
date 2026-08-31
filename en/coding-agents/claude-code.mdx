@@ -165,6 +165,16 @@ MCP performs exact Memory maintenance, Prepared/committed Handoff, acknowledgeme
 - Automatic extraction needs a generation model; explicit Memory does not.
 - `setup claude-code` and export target `claude_code` are different names.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer in a stable Scope with MCP `remember_memory`. Do not rely on a prompt Source alone.
+2. Open a new session, confirm `/hooks` and `/mcp`, and ask the same question.
+3. The recall must include a Citation and appear only in `additionalContext`. v1 does not capture the assistant final response.
+4. Stop the Server and ask an ordinary coding question. Claude Code should continue.
+5. Make another explicit MCP write. The failure must stay visible.
+
 ## Completion checklist
 
 - `doctor claude-code` sees the plugin enabled.

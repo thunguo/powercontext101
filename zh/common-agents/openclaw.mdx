@@ -207,6 +207,16 @@ Lifecycle recall、capture 与 Flush 会 fail-open。显式 tool failure 返回�
 - Doctor 是安装检查，不是 Server 或 runtime E2E test。
 - 本页没有运行真实 OpenClaw host process E2E，状态是 **Not validated**。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 `powercontext_memory_store` 保存答案。五个 Memory tool 里只有 store 负责这次写入。
+2. 开一个新的 private / direct session，再问同一句。
+3. 召回必须带 Citation，并且只作为这次 latest-user prepare 的不可信历史进入模型输入。
+4. 停掉 Server 后再问。自动 recall 可以失败，会话应继续。
+5. 再调用 `powercontext_memory_store`。失败必须可见，不能假装保存成功。
+
 ## 完成检查
 
 - OpenClaw 是 `>=2026.8.1-beta.2`；runtime 使用推荐的 Node 24.15+ 环境。

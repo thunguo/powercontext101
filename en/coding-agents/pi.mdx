@@ -143,6 +143,16 @@ Durable mutation needs interactive confirmation. Without UI, Pi returns stable `
 - Automatic extraction needs a generation model; explicit Memory does not.
 - Invalid local configuration must not prevent Pi from starting. Tools may be unavailable, but ordinary coding should continue.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer in a stable Scope with `pc_remember` or `/pc remember`. With a UI, pass `ui.confirm` first.
+2. Open a new session and ask the same question.
+3. The recall must include a Citation and appear only at the end of `systemPrompt`, in the block that starts with `PowerContext host-supplied context`.
+4. Stop the Server and ask an ordinary coding question. Recall, capture, and flush must not block the agent.
+5. With the Server still down, run `pc_remember` again. A UI session must show the failure. Without a UI, the stable result is `confirmation_required`. Do not write silently.
+
 ## Completion checklist
 
 - Node is `>=22.19`, and `doctor pi` sees `powercontext-pi`.

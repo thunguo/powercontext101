@@ -165,6 +165,16 @@ Bundled `project-context` Skill 只是 integration 自带说明。它不是 mana
 - OpenCode 与 Codex / Claude Code 没有共享 Workstream binding。要跨宿主共享，先让两边解析出完全相同的 `scope_id`。
 - Redirect、unknown schema、oversize 和 timeout 会阻止注入，但不阻断普通 turn。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 `pc_remember` 保存答案。先过 `context.ask`，再确认 Citation。
+2. 开一个新 session，再问同一句。
+3. 召回必须带 Citation，并且只出现在当前 user turn 的 exact-turn synthetic part，不写进 OpenCode transcript。
+4. 停掉 Server 后再问。自动 recall 可以失败，普通编码应继续。删掉旧 session 后，不得再注入 stale context。
+5. 再跑 `pc_remember`。Tool 应返回失败，例如 `unavailable`，不能假装写入成功。
+
 ## 完成检查
 
 - OpenCode 是 `>=1.18.21,<2`。

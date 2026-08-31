@@ -208,6 +208,16 @@ Test these cases:
 - Redirects are rejected, and invalid, oversized, timed-out, or non-2xx responses are normalized.
 - A real Hermes host-process E2E is **Not validated** by this page.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer explicitly in a stable Scope with `powercontext_remember` or `/pc remember`. The CLI smoke `hermes powercontext remember` does not replace this step.
+2. Open a new interactive session and ask the same question.
+3. The recall must include a Citation and appear only in Hermes provider prefetch context, not in a Codex-style `additionalContext` payload.
+4. Stop the Server and ask again. Prefetch may fail. Ordinary conversation should continue.
+5. Call `powercontext_remember` again. The failure must stay visible. Do not pretend the write succeeded.
+
 ## Completion checklist
 
 - Hermes Agent is `>=0.20.4`.

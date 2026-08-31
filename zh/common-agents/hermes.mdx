@@ -208,6 +208,16 @@ Hermes 0.20.4 不会把 caller session、user、workspace 或 Scope context 交�
 - Redirect 会被拒绝；invalid、oversized、timeout 或 non-2xx response 会被规范化处理。
 - 本页没有运行真实 Hermes host process E2E，状态是 **Not validated**。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 `powercontext_remember` 或 `/pc remember` 显式保存答案。CLI smoke `hermes powercontext remember` 不能代替这一步。
+2. 开一个新交互会话，再问同一句。
+3. 召回必须带 Citation，并且只出现在 Hermes provider prefetch 的上下文里，不是 Codex 那种 `additionalContext`。
+4. 停掉 Server 后再问一次。prefetch 可以失败，普通对话应继续。
+5. 再调用 `powercontext_remember`。失败必须可见，不能假装保存成功。
+
 ## 完成检查
 
 - Hermes Agent 是 `>=0.20.4`。

@@ -129,6 +129,16 @@ The bundled Skill is guidance only. DSH is not a managed Skill export target.
 - Plugin load still requires DeepSeek Harness peer modules.
 - Automatic extraction needs a generation model; explicit Memory does not.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer in a stable Scope with `pc_remember`. Pass the `tools/pre-execute` `ask` first, then confirm the Citation.
+2. Send a new request that will `enter` the model, and ask the same question.
+3. The recall must include a Citation and appear only in the plugin message appended after enter, starting with `PowerContext host-supplied context`.
+4. Stop the Server and ask again. Automatic recall may fail. A non-enter downstream result must not be replaced.
+5. Run `pc_remember` again. The failure must stay visible. Do not disguise it as an empty success.
+
 ## Completion checklist
 
 - `doctor dsh` sees id `powercontext-dsh` in dump-config.

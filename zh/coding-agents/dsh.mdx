@@ -129,6 +129,16 @@ Bundled Skill 只是说明。DSH 不是 managed Skill export target。
 - Plugin load 仍需要 DeepSeek Harness peer modules。
 - 自动 extraction 需要 generation model；显式 Memory 不需要。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 `pc_remember` 保存答案。先过 `tools/pre-execute` 的 `ask`，再看 Citation。
+2. 换一个会 `enter` 模型的新请求，再问同一句。
+3. 召回必须带 Citation，并且只出现在 enter 之后、以 `PowerContext host-supplied context` 开头的 plugin message。
+4. 停掉 Server 后再问。自动 recall 可以失败；非 enter 的 downstream 结果不得被替换。
+5. 再跑 `pc_remember`。失败必须可见，不能伪装成 empty success。
+
 ## 完成检查
 
 - `doctor dsh` 在 dump-config 里看到 id `powercontext-dsh`。

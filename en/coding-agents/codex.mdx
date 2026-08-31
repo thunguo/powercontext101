@@ -137,6 +137,16 @@ The bundled Skill and a managed Skill written by `powercontext skill export --ta
 - Automatic extraction needs a generation model; explicit Memory does not.
 - This page does not repeat the official one-line Handoff tutorial; that belongs in official how-to.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer in a stable Scope with MCP `remember_memory`. Do not rely on automatic capture alone.
+2. Open a new Codex session, confirm `/mcp` still sees the Server, and ask the same question.
+3. The recall must include a Citation and appear only in `UserPromptSubmit` `additionalContext`.
+4. Stop the Server and ask an ordinary coding question. The hook may fail open. Coding should continue.
+5. Call MCP `remember_memory` again. The failure must stay visible. Do not pretend the write succeeded.
+
 ## Completion checklist
 
 - `doctor codex` sees the plugin installed and enabled.

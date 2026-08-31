@@ -207,6 +207,16 @@ Lifecycle recall, capture, and Flush fail open. Explicit tool failures return st
 - Doctor is an installation check, not a Server or runtime E2E test.
 - A real OpenClaw host-process E2E is **Not validated** by this page.
 
+## Finish the shared check on this host
+
+> What should happen after the OpenAPI contract changes?
+
+1. Store the answer in a stable Scope with `powercontext_memory_store`. Of the five Memory tools, only store performs this write.
+2. Open a new private / direct session and ask the same question.
+3. The recall must include a Citation and enter the model only as untrusted history from this latest-user prepare.
+4. Stop the Server and ask again. Automatic recall may fail. The session should continue.
+5. Call `powercontext_memory_store` again. The failure must stay visible. Do not pretend the write succeeded.
+
 ## Completion checklist
 
 - OpenClaw is `>=2026.8.1-beta.2`; the runtime uses the recommended Node 24.15+ environment.

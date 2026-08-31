@@ -143,6 +143,16 @@ Durable mutation 需要 interactive confirmation。没有 UI 时返回稳定 `co
 - 自动 extraction 需要 generation model；显式 Memory 不需要。
 - 无效本地配置不得阻止 Pi 启动；此时 tools 可能不可用，普通编码仍应继续。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 `pc_remember` 或 `/pc remember` 保存答案。有 UI 时先过 `ui.confirm`。
+2. 开一个新 session，再问同一句。
+3. 召回必须带 Citation，并且只出现在 `systemPrompt` 末尾、以 `PowerContext host-supplied context` 开头的那段。
+4. 停掉 Server 后再问普通编码问题。Recall / capture / flush 不得阻断 Agent。
+5. Server 仍停着时再跑 `pc_remember`。有 UI 时失败必须可见；无 UI 时应收 `confirmation_required`，不得静默写入。
+
 ## 完成检查
 
 - Node 是 `>=22.19`，`doctor pi` 看到 `powercontext-pi`。

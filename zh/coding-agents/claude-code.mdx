@@ -165,6 +165,16 @@ MCP 负责 exact Memory maintenance、Prepared/committed Handoff、acknowledgeme
 - 自动 extraction 需要 generation model；显式 Memory 不需要。
 - `setup claude-code` 与 export target `claude_code` 是两个不同名字。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 MCP `remember_memory` 保存答案。不要只靠 prompt Source。
+2. 开一个新 session，用 `/hooks` 和 `/mcp` 确认激活，再问同一句。
+3. 召回必须带 Citation，并且只出现在 `additionalContext`。v1 不会自动采集 assistant final response。
+4. 停掉 Server 后再问普通编码问题。Claude Code 应继续。
+5. 再做一次显式 MCP write。失败必须可见。
+
 ## 完成检查
 
 - `doctor claude-code` 看到 plugin enabled。

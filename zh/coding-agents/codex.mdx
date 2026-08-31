@@ -137,6 +137,16 @@ Bundled Skill 与 `powercontext skill export --target codex` 写出的 managed S
 - 自动 extraction 需要 generation model；显式 Memory 不需要。
 - 本页不复述官方 one-line Handoff tutorial；那是官方 how-to 的职责。
 
+## 在这个宿主上做完统一题
+
+> 修改 OpenAPI 契约后，下一步应该做什么？
+
+1. 在固定 Scope 里用 MCP `remember_memory` 保存答案。不要只靠自动 capture。
+2. 开一个新 Codex session，用 `/mcp` 确认仍连着 Server，再问同一句。
+3. 召回必须带 Citation，并且只出现在 `UserPromptSubmit` 的 `additionalContext`。
+4. 停掉 Server 后再问普通编码问题。Hook 可以 fail-open，编码应继续。
+5. 再调用 MCP `remember_memory`。失败必须可见，不能假装保存成功。
+
 ## 完成检查
 
 - `doctor codex` 看到 plugin installed 且 enabled。
