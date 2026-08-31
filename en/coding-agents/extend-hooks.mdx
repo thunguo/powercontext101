@@ -48,6 +48,22 @@ There is no unified HostAdapter SDK today. Do not invent one for cleaner documen
 
 Managed Skill export currently supports Codex and Claude Code only. Adding export for a new host requires a projection contract and drift tests; a bundled Skill is not enough.
 
+## How to start a sixth host
+
+Do not begin by copying `POST /v1/context/prepare`. Write in this order:
+
+1. Discover host capability first: prompt event, injection channel, permission / UI, and version probe. If one of those is missing, mark **Unsupported** or **Not validated** and do not start an installer.
+2. Compare at least two existing hosts. Read [Hooks and plugins](/en/coding-agents/hooks-and-plugins), then compare [OpenCode](/en/coding-agents/opencode) (real host-process E2E is **Supported** and **Version-gated** `>=1.18.21,<2`) with [Codex](/en/coding-agents/codex) (hook plus MCP; real host E2E is **Not validated**).
+3. Write tests before the adapter. Name these existing modules:
+   - unit contract: `tests/test_transport.py`, `tests/codex_plugin/test_recall.py`, `tests/claude_code_plugin/test_hook.py`
+   - service-chain: `tests/e2e/test_codex_service_chain.py`, `tests/e2e/test_dsh_http_chain.py`
+   - setup / doctor: `tests/test_setup_select.py`, `tests/test_doctor_integrations.py`, and the matching `tests/test_*_cli.py`
+   - real-host E2E: treat `tests/e2e/test_opencode_plugin_host.py` as the current bar; an HTTP-only chain is not enough
+   - negative security: Server down, wrong auth, redirect, unknown schema, oversize, stale turn, no UI
+4. Add the name to `FIRST_CLASS_HOSTS` in `cli/hosts.py` only after the version gate, idempotent setup, activation probe, and real-host E2E exist. A standalone `setup` command, such as WorkBuddy, does not enter that catalog by itself.
+
+There is no unified HostAdapter SDK. Do not invent one to make the docs look symmetrical.
+
 ## Delivery checklist
 
 - Host version gate and activation probe exist.

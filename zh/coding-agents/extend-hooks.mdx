@@ -48,6 +48,22 @@ Installer / Doctor
 
 Managed Skill export 只有 Codex/Claude Code。新宿主要增加 export，必须单独实现 projection contract 与 drift tests，不能因为有 bundled Skill 就标 Supported。
 
+## 第六个宿主怎么立项
+
+不要先抄 `POST /v1/context/prepare`。按这个顺序写：
+
+1. 先发现宿主 capability：prompt event、injection channel、permission / UI、version probe。缺其中一项，先标 **Unsupported** 或 **Not validated**，不要开 installer。
+2. 对照至少两个现有宿主。先读 [Hook 与插件](/zh/coding-agents/hooks-and-plugins)，再比 [OpenCode](/zh/coding-agents/opencode)（真实 host-process E2E 是 **Supported**，且 **Version-gated** `>=1.18.21,<2`）和 [Codex](/zh/coding-agents/codex)（Hook + MCP，真实 host E2E 是 **Not validated**）。
+3. 先写测试，再写 adapter。现有分层可以点名这些模块：
+   - unit contract：`tests/test_transport.py`、`tests/codex_plugin/test_recall.py`、`tests/claude_code_plugin/test_hook.py`
+   - service-chain：`tests/e2e/test_codex_service_chain.py`、`tests/e2e/test_dsh_http_chain.py`
+   - setup / doctor：`tests/test_setup_select.py`、`tests/test_doctor_integrations.py`、对应 `tests/test_*_cli.py`
+   - real-host E2E：以 `tests/e2e/test_opencode_plugin_host.py` 为标杆；只打 HTTP 的 chain 不算
+   - 负向安全：Server down、wrong auth、redirect、unknown schema、oversize、stale turn、no UI
+4. 只有 version gate、幂等 setup、activation probe 和 real-host E2E 都齐了，才能把名字加进 `cli/hosts.py` 的 `FIRST_CLASS_HOSTS`。独立 `setup` 命令（例如 WorkBuddy）不自动进入这个 catalog。
+
+当前没有统一 HostAdapter SDK。不要为了对齐文档虚构一个。
+
 ## 交付 checklist
 
 - Host version gate 和 activation probe 已实现。
