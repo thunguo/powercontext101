@@ -1,0 +1,61 @@
+---
+title: "See the Memory you just wrote"
+description: "Give the Dashboard the same Scope as the Client, and confirm it is a window onto the same database."
+---
+
+The Dashboard is the Server's own read-only window. It is on `/` by default. It does not store a second copy of Memory, and it does not discover every Scope you have written.
+
+## Default URL
+
+```text
+http://127.0.0.1:8000/
+```
+
+With no Dashboard Scope configured, the page opens and the list is empty. That is not missing data.
+
+A Dashboard initialization failure logs a warning only. The HTTP API and [MCP](/en/basic-usage/mcp) keep serving. `/` then returns 404; `/health/live` stays 200.
+
+## Use the same Scope as the tutorial
+
+The [install page](/en/basic-usage/install-and-run) uses the stable Scope `project:powercontext-101`. The [API tour](/en/basic-usage/api-tour) prints `scope:` and, by default, appends a UUID. The Dashboard needs that **exact** `scope_id`.
+
+Put this in `.env`:
+
+```bash
+POWERCONTEXT_SERVER_DASHBOARD_ENABLED=true
+POWERCONTEXT_SERVER_DASHBOARD_SCOPES=[{"scope_id":"project:powercontext-101","display_name":"PowerContext 101"}]
+```
+
+If you just ran the API tour, paste the full printed `scope:` into `scope_id`. Do not truncate it.
+
+The CLI does not load `.env` implicitly:
+
+```bash
+powercontext server run --env-file .env
+```
+
+Reload `/` and select the Scope you just added. The Memory count should match the entry you stored with `remember_memory`.
+
+<Warning>
+The Dashboard and the Client must share the same `scope_id` and the same database URL / `POWERCONTEXT_HOME`. Changing home or URL opens another empty database. That looks like a lost Scope.
+</Warning>
+
+## It is not another database
+
+| Object | Relationship |
+|---|---|
+| Dashboard | Shows durable data for configured Scopes only |
+| Python Client / HTTP / MCP | Read and write the same database |
+| Configured Dashboard publication | Publishes an approved managed Skill to a preconfigured target. It is **not** `powercontext skill export` |
+
+Ownership and drift checks for publication live on [Let the agent extend itself](/en/common-agents/agent-self-extension). This page only looks at Memory.
+
+With Bearer enabled, `/` still opens, but `/dashboard/scopes` needs the token. The page asks for the same Server token. Do not put the token in the URL.
+
+## Completion check
+
+- You saw the empty state before configuring a Scope, and you did not change Client code to “fix” it.
+- After configuring the exact Client `scope_id`, you can see the Memory the API tour just wrote.
+- A write to an unconfigured Scope stays invisible in the Dashboard.
+- You did not treat an empty Dashboard as a broken database.
+- You did not treat Dashboard publication as CLI export.

@@ -1,0 +1,61 @@
+---
+title: "用 Dashboard 看见刚写的 Memory"
+description: "给 Dashboard 配上和 Client 相同的 Scope，确认它看的是同一套数据库，而不是另一份数据。"
+---
+
+Dashboard 是 Server 自己的只读窗口。默认开在 `/`。它不另存一套 Memory，也不会自动发现你写过的每一个 Scope。
+
+## 默认入口
+
+```text
+http://127.0.0.1:8000/
+```
+
+没有配置 Dashboard Scope 时，页面能打开，但列表是空的。这不是数据丢了。
+
+Dashboard 初始化失败只打 warning。HTTP API 和 [MCP](/zh/basic-usage/mcp) 仍可用。`/` 这时会 404，`/health/live` 仍是 200。
+
+## 配上和教程相同的 Scope
+
+[安装页](/zh/basic-usage/install-and-run) 用稳定 Scope `project:powercontext-101`。[API 串讲](/zh/basic-usage/api-tour) 会打印 `scope:`；脚本默认再拼一段 UUID。Dashboard 必须用**逐字相同**的 `scope_id`。
+
+在 `.env` 里写：
+
+```bash
+POWERCONTEXT_SERVER_DASHBOARD_ENABLED=true
+POWERCONTEXT_SERVER_DASHBOARD_SCOPES=[{"scope_id":"project:powercontext-101","display_name":"PowerContext 101"}]
+```
+
+如果你刚跑完 API 串讲，把打印出来的完整 `scope:` 填进 `scope_id`，不要截断。
+
+CLI 不会隐式加载 `.env`：
+
+```bash
+powercontext server run --env-file .env
+```
+
+刷新 `/`，在 Scope 下拉框里选中刚配的项。Memory 计数应能对上你刚 `remember_memory` 的条目。
+
+<Warning>
+Dashboard 和 Client 必须共用同一个 `scope_id`，以及同一个 database URL / `POWERCONTEXT_HOME`。换了 home 或 URL，你会看见另一套空库，这很像 Scope 丢了。
+</Warning>
+
+## 它不是另一套数据库
+
+| 对象 | 关系 |
+|---|---|
+| Dashboard | 只展示已配置 Scope 里、Server 已经持久化的数据 |
+| Python Client / HTTP / MCP | 读写同一套数据库 |
+| configured Dashboard publication | 把已批准的 managed Skill 发到预先配置的 target；**不是** `powercontext skill export` |
+
+publication 的 ownership / drift 检查见[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。本页只看到 Memory。
+
+开启 Bearer 后，`/` 仍可打开，但 `/dashboard/scopes` 要带 token。页面会要你输入同一个 Server token。不要把 token 放进 URL。
+
+## 完成检查
+
+- 未配 Scope 时，你见过空状态，没有去改 Client 代码。
+- 配上与 Client 逐字相同的 `scope_id` 后，能看见 API 串讲刚写入的 Memory。
+- 换一个未配置的 Scope 再写一条，Dashboard 仍看不到它。
+- 你没有把 Dashboard 空当成数据库坏了。
+- 你没有把 Dashboard publication 当成 CLI export。
