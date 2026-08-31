@@ -31,6 +31,14 @@ Automatic tests should cover Server down, 401/403 vs empty, unknown schema, size
 
 Capture remains Source evidence until scheduler or flush processes it. Each host page states capture content, secret filtering, size bounds, and whether boundary flush exists.
 
+```text
+prompt capture
+→ Source position
+→ optional flush / scheduler
+→ extraction candidate
+→ Memory commit or no-op
+```
+
 ## Setup contract
 
 A host installer should gate versions, preserve foreign config, record ownership, reject foreign-file overwrite, expose partial failure or rollback, distinguish installed from active, and provide doctor plus a real-host activation probe.
