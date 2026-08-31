@@ -85,7 +85,8 @@
                 "group": "本站",
                 "pages": [
                   "zh/start/index",
-                  "zh/start/learning-path"
+                  "zh/start/learning-path",
+                  "zh/start/troubleshooting"
                 ]
               }
             ]
@@ -209,7 +210,8 @@
                 "group": "This site",
                 "pages": [
                   "en/start/index",
-                  "en/start/learning-path"
+                  "en/start/learning-path",
+                  "en/start/troubleshooting"
                 ]
               }
             ]

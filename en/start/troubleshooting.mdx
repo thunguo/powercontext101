@@ -1,0 +1,45 @@
+---
+title: "Troubleshooting"
+description: "Match symptoms already documented on this site, then return to the original page. Do not treat 401, an empty Dashboard, or capture as a new class of failure."
+icon: wrench
+---
+
+This page only collects misuse already written in PowerContext 101. Each step names the symptom, then sends you back. It does not invent new cases.
+
+<Steps titleSize="h3">
+  <Step title="Scope strings do not match" icon="split">
+    The Client, Dashboard, host env, and `--scope-id` must match exactly. `project:powercontext-101` and `project:powercontext-101:<uuid>` are different Scopes. See [Scope](/en/mental-model/scope).
+  </Step>
+  <Step title="You changed home or the database URL" icon="database">
+    A new `POWERCONTEXT_HOME` or database URL opens another database. That looks like a lost Scope. Check the data directory on [Install and run the Server](/en/basic-usage/install-and-run), then check Scope.
+  </Step>
+  <Step title="You treated 401/403 as empty" icon="shield">
+    `empty` means this Scope has nothing to recall right now. 401/403 is an auth failure. The host should record a content-free outcome, inject nothing, and must not pretend there is no Memory. See [fail-open](/en/mental-model/fail-open) and [Connect with MCP](/en/basic-usage/mcp).
+  </Step>
+  <Step title="Capture succeeded, search finds no Memory" icon="file-plus">
+    Capturing a Source records that something happened. It does not become durable Memory by itself. Without a generation model, the Source stays pending. Use `remember_memory` for a fact you already accept, or read [Source and Memory](/en/basic-usage/source-and-memory).
+  </Step>
+  <Step title="Doctor passed, recall failed" icon="stethoscope">
+    `powercontext doctor` and `doctor <host>` are installation diagnostics. They do not prove the Server is reachable or that a new session recalled anything. Separate package, Server, and host checks. See the [common agents overview](/en/common-agents/overview) and the host page you used.
+  </Step>
+  <Step title="The Dashboard is empty, but the data is there" icon="layout-dashboard">
+    An unconfigured Dashboard Scope shows an empty page. Configure the same `scope_id` as the Client and keep the same database URL. Steps are on [See the Memory you just wrote](/en/basic-usage/dashboard).
+  </Step>
+  <Step title="The Preview adapter will not install" icon="triangle-alert">
+    The Pydantic AI Agent adapter is **Preview**. Neither PyPI nor the current Git subdirectory install works. First integration is [LangGraph](/en/frameworks/langgraph) or [LangChain](/en/frameworks/langchain), not the Preview page.
+  </Step>
+  <Step title="You treated a bundled Skill as managed export" icon="package">
+    `project-context` is host-shipped guidance. `powercontext skill export` is the managed Skill path. OpenCode, DSH, Pi, Hermes, and OpenClaw cannot export. See [Let the agent extend itself](/en/common-agents/agent-self-extension).
+  </Step>
+  <Step title="You reused Candidate version as Artifact Revision" icon="git-compare">
+    Candidate `version` and Artifact `Revision` are different concurrency domains. Editing a proposal bumps Candidate version. Approval creates an immutable Revision. Mixing them produces conflicts. See [Let the agent extend itself](/en/common-agents/agent-self-extension).
+  </Step>
+  <Step title="Preview and make no writes called Handoff" icon="hand">
+    `handoff_current_work` writes a boundary Source. Discussing a design, or saying “preview and make no writes,” must not call it. See [Codex](/en/coding-agents/codex) and [Connect with MCP](/en/basic-usage/mcp).
+  </Step>
+  <Step title="Server down, and you expected automatic recall to error" icon="power">
+    Automatic recall, capture, and optional flush may fail open. The original task should continue. Explicit Memory writes, Handoff commit, Review, and Skill export must fail visibly. See [fail-open](/en/mental-model/fail-open).
+  </Step>
+</Steps>
+
+A fuller misuse lesson is not this page. Finish the one item on your current path first.
