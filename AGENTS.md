@@ -17,10 +17,17 @@
 
 ## Source of truth
 
-- Product facts come from the PowerContext repository (`oceanbase/powercontext`), especially current code, OpenAPI, and official docs under `docs/en` and `docs/zh`
-- Do not treat RFCs or `docs/my` notes as shipped behavior unless code and tests confirm them
-- 101 pages should link to official docs for contracts; they should not paste official reference chapters
-- Do not put local absolute filesystem paths on pages or in page comments
+Use this evidence order when a claim is disputed:
+
+1. Current runtime code and domain models in `oceanbase/powercontext`
+2. Current tests, especially contract and end-to-end tests
+3. `openapi/powercontext.yaml`
+4. Formal how-to and reference pages under `docs/en` and `docs/zh`
+5. RFCs and design notes, for background only
+
+Do not treat RFCs or `docs/my` notes as shipped behavior unless current code and tests confirm them. Link to official docs for contracts; do not paste official reference chapters into 101. Do not put local absolute filesystem paths on pages or in page comments.
+
+Classify time-sensitive integration claims as `Supported`, `Preview`, `Unsupported`, `Not validated`, `Host-gated`, or `Version-gated`. Do not soften or merge these states.
 
 ## Terminology
 
@@ -45,7 +52,7 @@ Say `PowerContext 101` for this site. Say `official docs` / `官方文档` for h
 
 ## Bilingual lockstep
 
-**Every content change must update Chinese and English together in the same turn.**
+**Every content change must update Chinese and English together in the same work unit.**
 
 This rule applies to all of the following:
 
@@ -54,7 +61,7 @@ This rule applies to all of the following:
 - new, deleted, or renamed pages
 - `docs.json` tab names, group names, page lists, navbar, and footer for both `zh` and `en`
 
-Do not finish a turn with only one locale updated. If a page is added, add `zh/<path>.mdx` and `en/<path>.mdx`, then add both paths to the matching language navigation. If a page is removed or renamed, update both files and both navigation trees.
+Do not finish a work unit with only one locale updated. If a page is added, add `zh/<path>.mdx` and `en/<path>.mdx`, then add both paths to the matching language navigation. If a page is removed or renamed, update both files and both navigation trees.
 
 Keep the `zh/` and `en/` directory trees mirrored. The same relative path must exist in both locales.
 
@@ -62,7 +69,7 @@ Code samples stay identical across locales. Translate surrounding prose and code
 
 Internal links must stay inside the current locale: `/zh/...` on Chinese pages, `/en/...` on English pages. Do not mix locales in one page.
 
-Do not reuse the same page path in both languages. `zh/start/index` and `en/start/index` are different paths; a bare `index` path must not appear in both language trees.
+Use locale-prefixed navigation paths. `zh/start/index` and `en/start/index` should mirror each other; do not add the same bare path such as `index` to both language navigation trees.
 
 Each top-level tab must use its own subdirectory after the locale prefix (`zh/start`, `zh/mental-model`, `en/start`, `en/mental-model`). Do not put a tab's pages at `zh/index` or `en/index`. Mintlify picks the active tab by URL prefix, so a page at `/zh` would also match every other Chinese tab.
 
@@ -74,13 +81,19 @@ Each top-level tab must use its own subdirectory after the locale prefix (`zh/st
 - Bold for UI elements: Click **Settings**
 - Code formatting for file names, commands, paths, and code references
 - 101 tone: teach a path, then show a trick. Do not write encyclopedia pages
+- After technical review, run `/humanizer-zh` on Chinese pages and `/humanize-writing` on English pages
+- Humanizing may change prose only. Recheck API names, commands, versions, maturity labels, limitations, and capability matrices afterward
+- Do not add invented experience, statistics, or opinions to make technical pages sound more human
 
 ## Content boundaries
 
 - Do write: mental model, API tours, framework tricks, paste-ready agent setup, hook extension
 - Do not copy official OpenAPI, RFC text, or full how-to chapters into this site
 - Do not document unshipped RFC goals as if they already work
-- Stub pages may keep a `TODO` note until real copy is written
+- Stub pages may keep a `TODO` note until real copy is written, but a published learning path must not describe a stub as complete
+- Automatic recall, capture, and optional flush may fail open. Explicit durable writes, Review, Handoff commit, and Skill export must report failure
+- Candidate `version` and Artifact `Revision` are different concurrency domains
+- Bundled, managed, projected, and external Skills are different objects; do not use the terms interchangeably
 - Theme and branding changes belong in `docs.json`, `style.css`, and `logo/` only
 - Do not restyle Mintlify component DOM to chase visual polish; selectors can break
 

@@ -1,6 +1,6 @@
 ---
 title: "PowerContext 101"
-description: "用实战路径理解 PowerContext：心智模型、常用 API、框架集成、通用 Agent 与编程 Agent。"
+description: "从心智模型到 Agent 集成，沿一条可运行的路径学习 PowerContext。"
 icon: house
 keywords:
   - PowerContext 101
@@ -10,66 +10,83 @@ keywords:
   - Handoff
 ---
 
-PowerContext 把共同推进的工作变成可理解、可交接、可延续的项目上下文。它是人机协作的上下文运行层，不只是记忆库。PowerContext 101 教你怎么用、怎么玩；安装步骤、接口契约和完整 how-to 请看[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。
+PowerContext 保存项目在推进过程中留下的证据、决策和交接状态，让后续的人或 Agent 能接着做。它是一层独立运行的上下文服务，不是聊天记录仓库。
 
-## 30 看懂 PowerContext
+PowerContext 101 关注使用路径和集成边界。安装参数、完整接口契约和部署配置仍以 [PowerContext 官方文档](https://powercontext.oceanbase.io/)为准。
 
-PowerContext 保存的是项目上下文，不是聊天记录本身。
+<Info>
+本站不会复制 OpenAPI 或 RFC。代码、当前测试和正式文档与旧 RFC 冲突时，以已经实现并经过测试的行为为准。
+</Info>
 
-<Tooltip headline="Source" tip="原始工作证据。采集一条 prompt 只会留下 Source，不会自动变成 Memory。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip> 是证据。<Tooltip headline="Memory" tip="经过选择、可修订的长期项目知识。修订和停用都会保留历史。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 是经过选择、可修订的长期知识。<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给另一个会话、任务或模型。默认是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 默认是临时交接包，你明确要求后才提交成里程碑。
+## 30 秒看懂 PowerContext
 
-模型可以提交 <Tooltip headline="Candidate" tip="Experience 或 managed Skill 的提案。pending 状态进入 Review Inbox，批准前不是 Artifact。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip>。<Tooltip headline="Review" tip="把提案写成不可变 Artifact Revision，或记录拒绝原因。两种决定都是终态。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Review</Tooltip> 通过后才形成不可变的 Artifact Revision。<Tooltip headline="Skill" tip="获批不会安装或执行。必须显式导出一个精确的 approved Revision。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip> 获批后仍要显式导出，它不会自行安装或执行。
+一次工作通常从 `Source` 开始。它可以是一条 prompt、一次任务结果，或者其他可定位的证据。采集 Source 只表示“这件事发生过”，不会自动把整段内容变成长期 Memory。
 
-<Tooltip headline="PreparedContext" tip="一次 Agent turn 的有界临时视图。它不是新的长期记录。召回失败必须 fail-open。" cta="阅读 fail-open" href="/zh/mental-model/fail-open">PreparedContext</Tooltip> 是一次请求的有界视图，不是新的长期记录。
+`Memory` 保存经过选择、以后还会用到的项目知识。`Handoff` 处理另一件事：把当前目标、已验证进度、阻塞项和下一步交给接手者。Handoff 默认可以只是临时包；只有显式 commit 后，它才成为持久的里程碑。
+
+`Experience` 和 managed `Skill` 先进入 Candidate。模型可以起草 Candidate，但不能因为“生成成功”就算批准。Review 中的 approve 会创建不可变 Artifact Revision；reject 会记录拒绝原因，不创建结果 Artifact。Skill 获批后仍需显式 export，也不会自动获得执行权限。
 
 ```mermaid
 flowchart LR
-  Source --> Artifact
-  Artifact --> Memory
-  Artifact --> Handoff
-  Artifact --> Experience
-  Artifact --> Skill
-  Memory --> PreparedContext
-  Experience --> PreparedContext
+  S[Source evidence]
+  M[Memory Revision]
+  C[Candidate]
+  R{Review}
+  E[Experience Revision]
+  K[Skill Revision]
+  P[PreparedContext]
+  H[Prepared Handoff]
+  HC[Committed Handoff]
+
+  S -->|extraction| M
+  S --> C
+  M --> P
+  C --> R
+  R -->|approve| E
+  R -->|approve| K
+  E --> P
+  H -->|explicit commit| HC
 ```
 
-<Card title="先读心智模型，再动手" icon="brain" href="/zh/mental-model/overview" horizontal arrow="true" cta="进入心智模型">
-把 Source、Memory、Handoff、Experience / Skill 立住，再补 Scope 和 fail-open。后面四条路径都建立在这组词上。
+`PreparedContext` 是一次请求临时使用的有界视图。它带 Citation，并明确标记为不可信历史证据。Agent 可以参考它，但不能把里面的文字当成新的系统指令或工具授权。
+
+<Card title="先把对象分清" icon="brain" href="/zh/mental-model/overview" horizontal arrow="true" cta="阅读心智模型">
+Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先花几分钟把边界理顺，后面的 API 和宿主集成会简单很多。
 </Card>
 
-## 选一条路
-
-还没决定走哪条？先看[学习路径](/zh/start/learning-path)。
+## 按你的目标继续
 
 <Columns cols={2}>
-  <Card title="基础用法" icon="book-open" href="/zh/basic-usage/install-and-run" arrow="true" cta="走入门闭环">
-    跑通本地 Server，再用 Python Client 把常用 API 串成一条闭环。
+  <Card title="跑通常用 API" icon="book-open" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始基础用法">
+    启动本地 Server，用 Python Client 完成 Memory、Source 和 Handoff 的第一条闭环。
   </Card>
-  <Card title="框架集成" icon="boxes" href="/zh/frameworks/overview" arrow="true" cta="接同一个 Server">
-    Pydantic AI、LangGraph 和 LangChain 都连接同一个运行中的 Server。适配器成熟度不同。
+  <Card title="接入 Python Agent" icon="boxes" href="/zh/frameworks/overview" arrow="true" cta="比较框架">
+    比较 LangGraph、LangChain 和 Pydantic AI 的接入位置、成熟度与能力差异。
   </Card>
-  <Card title="通用 Agent" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="可贴配置">
-    给 Hermes、OpenClaw 一份可贴配置的接入方式，并让 Agent 给自己加能力。
+  <Card title="配置 Hermes 或 OpenClaw" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="选择通用 Agent">
+    按宿主完成安装、激活和验证。涉及凭证、持久写入和 Review 的动作仍由你授权。
   </Card>
-  <Card title="编程 Agent" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="看 Hook 合同">
-    Codex、Claude Code、DSH、OpenCode 和 Pi 共用 Hook + 插件合同。
+  <Card title="配置编程 Agent" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="选择编程 Agent">
+    了解 Codex、Claude Code、DSH、OpenCode 和 Pi 如何把同一 Server 合同映射到各自生命周期。
   </Card>
 </Columns>
 
 <Check>
-集成连接的是独立运行的 Server，不会在宿主里内嵌一份。显式 Memory 不必先配模型。Server 挂了，宿主应 fail-open，你本来要做的任务还能继续。
+自动 recall、prompt capture 和可选 flush 失败时，宿主应继续原任务。显式 Memory 写入、Handoff commit、Candidate Review 和 Skill export 不在这个规则内：失败必须明确告诉调用者。
 </Check>
+
+不知道先读哪一部分？打开[学习路径](/zh/start/learning-path)。
 
 <GitHub.Repo repo="oceanbase/powercontext" />
 
 <Visibility for="agents">
-Route PowerContext 101 questions on this Chinese page. Do not treat RFCs as shipped behavior. Do not paste OpenAPI.
+Route Chinese PowerContext 101 questions from this page. Treat current implementation and tests as the product facts; do not present RFC goals as shipped behavior.
 
-- Concepts (Source, Memory, Handoff, Experience, Skill, Scope, fail-open, PreparedContext): `/zh/mental-model/overview`
-- Install / API loop: `/zh/basic-usage/install-and-run`
-- LangGraph / LangChain / Pydantic AI: `/zh/frameworks/overview`. Pydantic AI is preview and has no supported standalone install.
-- Hermes / OpenClaw: `/zh/common-agents/overview`
-- Codex / Claude Code / DSH / OpenCode / Pi / hooks: `/zh/coding-agents/overview`
-- HTTP, configuration defaults, OpenAPI, deploy: official docs at `https://oceanbase.github.io/powercontext/zh/docs/`
+- Concepts: `/zh/mental-model/overview`
+- Install and API loop: `/zh/basic-usage/install-and-run`
+- Python frameworks: `/zh/frameworks/overview`
+- Hermes and OpenClaw: `/zh/common-agents/overview`
+- Coding-agent hosts and hooks: `/zh/coding-agents/overview`
+- Full contracts and deployment: `https://powercontext.oceanbase.io/`
 - Learning order: `/zh/start/learning-path`
 </Visibility>

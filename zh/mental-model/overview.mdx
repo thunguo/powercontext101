@@ -1,14 +1,142 @@
 ---
 title: "心智模型总览"
-description: "PowerContext 把工作证据变成有来源、有版本、可审核、可检索、可交接的上下文资产。"
+description: "分清 PowerContext 中的证据、长期资产、临时上下文和工作交接。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+如果把 PowerContext 只理解成“给 Agent 加记忆”，后面很快会遇到问题：一条 prompt 到底算不算 Memory？模型生成的 Skill 能不能直接安装？Handoff 为什么有时查不到 latest？
 
-## 本页将覆盖
+答案不在某个 API 参数里，而在对象边界里。
 
-- Source → Artifact Revision → Memory / Experience / Skill / Handoff
-- PreparedContext 是请求时的有界视图，不是长期记录
-- 模型可以提案，Review 才能批准，Skill 还要显式导出
+## 先看三条路径
+
+PowerContext 同时处理三类事情。
+
+```mermaid
+flowchart TB
+  subgraph Recall[Durable knowledge and request-time recall]
+    S1[Source] --> M[Memory Revision]
+    M --> P[PreparedContext]
+    E[Approved Experience] --> P
+  end
+
+  subgraph ReviewFlow[Experience and Skill governance]
+    S2[Source or approved Artifact] --> C[Candidate]
+    C --> R{Review}
+    R -->|approve| E
+    R -->|approve| K[Skill Revision]
+    R -->|reject| X[Rejected Candidate]
+    K --> EX[Explicit export]
+  end
+
+  subgraph Work[Work transfer]
+    W[Current work] --> H[Prepared Handoff]
+    H -->|optional commit| HC[Committed Handoff Revision]
+    H --> CO[Continue]
+    HC --> CO
+    CO --> A[Acknowledgement and Task Outcome]
+  end
+```
+
+这三条路径可以引用彼此的证据，但不会自动合并。写入 Memory 不会顺便创建 Handoff；批准 Skill 也不会把它塞进下一次 PreparedContext。
+
+## 六种值，不要混用
+
+| 值 | 解决什么问题 | 是否持久 | 是否可直接当成当前指令 |
+|---|---|---:|---:|
+| `Source` | 记录发生过什么，并提供可定位证据 | 是 | 否 |
+| Artifact `Revision` | 保存某个长期资产的不可变历史快照 | 是 | 否 |
+| `Candidate` | 保存尚待 Review 的 Experience 或 Skill 提案 | 是 | 否 |
+| `PreparedContext` | 为一次请求准备相关、带 Citation 的上下文 | 否 | 否 |
+| Prepared `Handoff` | 临时传递当前工作状态 | 由调用方持有 | 否 |
+| Skill projection | 把一个 approved Skill Revision 导出到宿主目录 | 是，可重建 | 仍由宿主决定 |
+
+### Source 是证据
+
+Source 可以保存 prompt、任务结果或其他工作材料。它回答“当时发生了什么”。
+
+采集 Source 不等于把内容写进 Memory。自动抽取还需要 generation pipeline；你也可以绕过抽取，显式写入已经确认的 Memory。
+
+### Artifact Revision 保存历史
+
+Memory、Experience、Skill 和 committed Handoff 都有 Artifact Revision。Revision 是不可变快照。同一个逻辑资产更新时会产生下一 Revision，旧版本仍然可以按精确引用读取。
+
+精确引用包含 family、artifact ID 和 revision：
+
+```text
+family/artifact_id@revision
+```
+
+Candidate 有自己的 `version`，它用于 Review 前的并发控制。Candidate version 2 和 Artifact Revision 2 没有对应关系。
+
+### PreparedContext 只活一轮
+
+`prepare_context` 根据 Scope、查询和字节预算构造 PreparedContext。结果只有两种正常状态：
+
+- `ready`：有非空内容和 Citation；
+- `empty`：没有合适内容，不是故障。
+
+PreparedContext 不会写回长期历史。宿主应把它标成 `untrusted_history`，并在当前模型请求中临时注入。
+
+### Handoff 可以不 commit
+
+Prepared Handoff 是可检查、可传递的临时值。你可以直接把它交给接手者，也可以显式 commit 成 Handoff Revision，作为以后可按 exact 或 latest 继续的里程碑。
+
+commit 是独立动作。没有 commit，就没有新的 durable Handoff head。
+
+### Experience 和 Skill 要经过 Review
+
+模型或用户可以提交 Candidate。Review 有两个终态：
+
+- approve：创建或修订 Artifact，并记录精确 `result_artifact`；
+- reject：记录原因，不创建结果 Artifact。
+
+只有 approved current Experience 可以进入 PreparedContext。Skill 从不进入 PreparedContext。它需要显式 export，PowerContext 也不会因为 export 就授予执行权限。
+
+## 三条边界
+
+### 持久化边界
+
+PreparedContext 和 Prepared Handoff 是临时值。Source、Candidate 和 Artifact Revision 会持久化。Skill projection 是 Artifact 的宿主副本，不是新的权威来源。
+
+### Review 边界
+
+generation 只负责生成提案。Review 决定是否批准。两者不能合并成“模型生成成功，所以已上线”。
+
+### 执行权限边界
+
+Scope 只选择数据。Citation 只说明来源和版本。Review 只决定是否创建 Artifact。这些机制都不会授予工具权限，也不会证明历史内容仍然符合当前工作区状态。
+
+## 一个贯穿本站的例子
+
+后面的章节会反复使用同一件事：修改 PowerContext 的 OpenAPI 契约。
+
+1. 捕获一条 Source：契约已修改，需要重新生成 client 并运行 contract tests。
+2. 显式保存 Memory：运行 contract tests 前先重新生成并检查 checked-in client。
+3. 新请求通过 PreparedContext 召回这条 Memory。
+4. 把当前进度整理为 Handoff，交给下一位 Agent。
+5. 根据结果提交 Experience Candidate。
+6. Review approve 后，再从 Experience 生成 Skill Candidate。
+7. Skill 获批后显式导出到支持的宿主。
+
+每一步都会留下不同的 ID、Citation 或 Revision。本站会保留这些值，让你看到系统真正做了什么。
+
+## 常见误解
+
+<AccordionGroup>
+  <Accordion title="捕获 prompt 后为什么搜索不到 Memory？">
+    capture 只保存 Source。要么配置 generation pipeline 并处理 Source window，要么显式调用 Memory 写入接口。
+  </Accordion>
+  <Accordion title="为什么 approved Skill 没出现在召回结果里？">
+    这是设计如此。PreparedContext 可以包含 active Memory 和 approved current Experience，不包含 Skill。Skill 要显式导出给宿主。
+  </Accordion>
+  <Accordion title="为什么 Prepared Handoff 没有成为 latest？">
+    Prepared Handoff 尚未 commit。它可以用于临时 continue，但不会自动成为持久里程碑。
+  </Accordion>
+  <Accordion title="有 Citation 是否代表内容仍然正确？">
+    Citation 让来源和版本可检查，不保证内容仍然新鲜。接手者仍要检查当前文件、能力和授权。
+  </Accordion>
+</AccordionGroup>
+
+## 下一步
+
+继续读 [Source](/zh/mental-model/source)，了解证据如何获得稳定身份、journal position 和处理进度。准备直接接入宿主前，还应读 [Scope](/zh/mental-model/scope) 和 [fail-open](/zh/mental-model/fail-open)。

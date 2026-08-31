@@ -1,14 +1,172 @@
 ---
 title: "fail-open and PreparedContext"
-description: "PreparedContext is built from scope, relevance, and a byte budget. Recall failure must not block the original task."
+description: "Keep the original task running when automatic context enhancement fails, and report explicit mutation failures."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+PowerContext runs beside the host's primary task. A temporary Server outage should not stop coding, answering a question, or continuing the work.
 
-## This page will cover
+That is the purpose of fail-open behavior. It applies to automatic, auxiliary paths. When a user explicitly asks to save, approve, commit, or export something, the failure must remain visible.
 
-- PreparedContext is temporary, cited, and untrusted historical evidence
-- Shared byte budgets and ready versus empty results
-- How hooks, adapters, and tools fail open when the Server is down
+## PreparedContext is temporary
+
+A host calls `prepare_context` with:
+
+- a `scope_id`;
+- the current query;
+- a `max_bytes` budget.
+
+The Server selects relevant content from active Memory and the approved current Experience heads, then returns a `PreparedContext`.
+
+Two outcomes are normal:
+
+| status | Meaning | Host behavior |
+|---|---|---|
+| `ready` | Non-empty content whose `content_bytes` matches the UTF-8 byte length | Inject it temporarily as untrusted historical evidence |
+| `empty` | No suitable content | Inject nothing and continue the original task |
+
+`empty` is not a Server failure or an authentication error.
+
+PreparedContext includes exact Citations and a visible trust marker:
+
+```text
+BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
+{"trust":"untrusted_history","items":[...]}
+END_POWERCONTEXT_PREPARED_CONTEXT_V1
+```
+
+The host must not promote this text to system instruction authority just because PowerContext returned it. A Citation identifies the source and version; it does not prove that the content still matches live files, capabilities, or authorization.
+
+## Paths that may fail open
+
+### Automatic recall
+
+If the Server is down, a request times out, the schema is unknown, or the response is too large, the host skips injection and continues the model request. It should emit bounded diagnostics without logging the query, Scope, prepared content, token, or response body.
+
+### Automatic prompt or turn capture
+
+A capture failure should not stop the host task. It must not remove valid context that recall already prepared.
+
+The reverse matters too. A host that supports capture may still attempt it when recall fails. Recall and capture are not one transaction.
+
+### Optional boundary flush
+
+Some hosts try to flush after capture or at a session boundary so new Sources can reach the extraction pipeline sooner. If the cursor does not catch up or the Server is unavailable, the current turn still proceeds.
+
+### Statistics and telemetry
+
+A statistics failure should not roll back a successful domain write.
+
+## Operations that must report failure
+
+| Operation | Why silent continuation is wrong |
+|---|---|
+| `remember`, revise, or retire | The caller explicitly requested a durable Memory change |
+| Handoff commit | No new durable milestone exists after failure |
+| Candidate revise, approve, or reject | Review must apply to the Candidate version that was inspected |
+| Skill export or publish | A conflict or local drift must not be overwritten |
+| Authentication and transport checks | fail-open cannot bypass access control or send credentials elsewhere |
+
+The host conversation may continue after an explicit operation fails. It still has to say that the requested operation did not complete.
+
+<Warning>
+Do not tell the user that data was saved and hide the failure in a log. The visible result of an explicit mutation must match durable state.
+</Warning>
+
+## A comparison experiment
+
+Suppose Claude Code receives:
+
+```text
+What should I do after changing the OpenAPI contract?
+```
+
+The hook attempts recall and prompt capture independently.
+
+### Recall fails and capture succeeds
+
+- No PreparedContext is injected.
+- Claude Code still receives the original prompt.
+- The prompt Source may still be stored.
+- Diagnostics record `server_unavailable` or the applicable failure category.
+
+### Recall succeeds and capture fails
+
+- The validated `additionalContext` is still injected.
+- The capture error does not erase the recall result.
+- The task continues.
+
+### An explicit retire fails
+
+The user then asks an MCP tool to retire an exact Memory entry after the Server has stopped:
+
+- the MCP operation returns unavailable or an error;
+- the host cannot claim that the Memory was retired;
+- the user may continue other work and retry after recovery.
+
+All three cases leave the host running. Only the first two are automatic fail-open paths.
+
+## Security boundaries remain fail-closed
+
+### Authentication failure is not empty recall
+
+A 401 or 403 indicates a configuration or authorization problem. Treating it as `empty` hides the fault and may convince a user that the Scope simply has no history.
+
+### Do not follow redirects
+
+A hook must not follow a 30x response to another host while carrying an Authorization header. Protecting the credential matters more than completing automatic recall.
+
+### Reject unknown schemas
+
+Valid JSON is not enough. If the host does not recognize the schema version, it skips injection and records `version_mismatch` or `invalid_response`.
+
+### Bound response size and wall time
+
+Hooks cap response size and total wall-clock time. They stop the automatic path at the limit instead of reading an unbounded response into memory.
+
+### Keep transport checks
+
+The PowerContext Client rejects plaintext HTTP to non-loopback hosts. The Server also requires authentication or an explicit unsafe opt-in when binding beyond loopback. fail-open behavior does not disable either check.
+
+## `degraded` is not `not_ready`
+
+Readiness separates database failures from optional inference failures:
+
+- a database or runtime failure returns `not_ready` with HTTP 503;
+- a failed configured generation or embedding probe returns `degraded` with HTTP 200;
+- database operations that do not depend on the failed inference capability remain available; an operation that needs that generation or embedding provider may still fail.
+
+When readiness says `degraded`, inspect the affected capability instead of treating the entire Server as offline.
+
+## What diagnostics should contain
+
+A useful automatic-path diagnostic contains only the metadata needed to troubleshoot:
+
+```json
+{
+  "component": "powercontext.claude_code.recall",
+  "event": "context_prepare",
+  "outcome": "server_unavailable",
+  "http_status": 503
+}
+```
+
+It should not contain the prompt, Scope, Memory text, Citation, token, or provider response body.
+
+Common outcomes include:
+
+- `empty`
+- `authentication_failed`
+- `version_mismatch`
+- `server_unavailable`
+- `invalid_response`
+
+## A practical rule
+
+Ask two questions when a PowerContext operation fails:
+
+1. Was this an automatic helper action or a durable action requested by the user?
+2. Would skipping it make the user believe that state changed when it did not?
+
+Automatic helper paths can usually continue. Any operation that changes durable state, approves content, or publishes files must return its real result.
+
+Continue with [Install and run the Server](/en/basic-usage/install-and-run), then observe the difference between `ready`, `degraded`, and a completely unavailable Server.

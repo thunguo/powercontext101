@@ -1,6 +1,6 @@
 ---
 title: "学习路径"
-description: "先读心智模型，再按你的宿主或框架选择一条实战路径。"
+description: "先建立最小心智模型，再按你的框架或宿主完成一条可验证的路径。"
 icon: route
 keywords:
   - learning path
@@ -10,111 +10,96 @@ keywords:
   - fail-open
 ---
 
-先读心智模型，再跑通本地 Server，然后只选一条路径走完最小闭环。查契约时离开 101，打开官方文档。
+第一次使用 PowerContext，不必把整站从头读到尾。先弄清几个对象，再完成一条与你当前工作有关的路径。
 
 <Steps titleSize="h3">
-  <Step title="读心智模型" icon="brain">
-    先立住 Source、Memory、Handoff、Experience / Skill，再读 Scope 和 fail-open。从[心智模型总览](/zh/mental-model/overview)开始。
+  <Step title="理解对象边界" icon="brain">
+    从[心智模型总览](/zh/mental-model/overview)开始，然后读 [Scope](/zh/mental-model/scope) 和 [fail-open](/zh/mental-model/fail-open)。至少要分清 Source、Memory、PreparedContext 和 Handoff。
   </Step>
-  <Step title="跑通本地 Server" icon="server">
-    官方前提是 macOS 或 Linux、Python 3.11+ 和 `uv`。安装与健康检查写在[安装并运行 Server](/zh/basic-usage/install-and-run)。更细的命令和部署看[官方安装指南](https://oceanbase.github.io/powercontext/zh/docs/how-to/install-and-run/)。
+  <Step title="启动本地 Server" icon="server">
+    按[安装并运行 Server](/zh/basic-usage/install-and-run)完成最小配置。显式 Memory 和 FTS 不需要 inference provider。
   </Step>
-  <Step title="选一条实战路径" icon="route">
-    用下面的身份 Tab 选路，并走完该路径的最小闭环。不要同时开四条线。
+  <Step title="只选一条路径" icon="route">
+    根据下面的工作目标继续。先把一个闭环跑通，再回来看其他框架和宿主。
   </Step>
-  <Step title="查契约时离开 101" icon="book-open">
-    HTTP、配置默认值、OpenAPI 和逐步 how-to 属于[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。101 只教怎么用、怎么玩。
+  <Step title="需要契约时查官方文档" icon="book-open">
+    OpenAPI、完整配置、部署和逐项命令属于 [PowerContext 官方文档](https://powercontext.oceanbase.io/)。101 解释为什么这样用，以及如何验证它真的工作。
   </Step>
 </Steps>
 
 <Warning>
-官方安装路径是 macOS 或 Linux。本页不写 Windows 变通，避免把它写成未验证教程。
+当前文档化的安装路径是 macOS 或 Linux，Python 版本为 3.11 及以上。本教程不提供未经验证的 Windows 变通方案。
 </Warning>
 
-<Tip>
-显式 Memory 不必先配 inference provider。只有要从 Source 自动抽取 Memory 时，才需要配置生成模型。
-</Tip>
-
-## 按身份选路
+## 按工作目标选择
 
 <Tabs>
-  <Tab title="我写 Python Agent">
-    顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [常用 API 串讲](/zh/basic-usage/api-tour) → [框架集成](/zh/frameworks/overview)。
+  <Tab title="第一次接触">
+    阅读顺序：
 
-    最小闭环是：Python Client 跑通 `remember`、`search` 和 `prepare_context`，再接到 LangGraph 或 LangChain。Pydantic AI 仍是预览，不能当成可独立安装的路径。
+    1. [心智模型总览](/zh/mental-model/overview)
+    2. [Scope](/zh/mental-model/scope)
+    3. [fail-open](/zh/mental-model/fail-open)
+    4. [安装并运行 Server](/zh/basic-usage/install-and-run)
+    5. [常用 API 串讲](/zh/basic-usage/api-tour)
+
+    完成标志：你能写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
+
+    可以先跳过框架和宿主页。
   </Tab>
-  <Tab title="我用编程 Agent">
-    顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [编程 Agent](/zh/coding-agents/overview)，再选 Codex、Claude Code、DSH、OpenCode 或 Pi。
+  <Tab title="我写 Python Agent">
+    阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [常用 API 串讲](/zh/basic-usage/api-tour) → [框架集成](/zh/frameworks/overview)。
 
-    最小闭环是：`powercontext setup <host>`、`powercontext doctor`，然后在新会话里召回一条你自己写下的 Memory。
+    先用 Python Client 跑通 `remember_memory`、`search_memory` 和 `prepare_context`，再选择 LangGraph 或 LangChain。Pydantic AI Agent adapter 目前是 Preview，普通安装路径不可用，不要把它作为第一次接入。
+
+    如果你只需要自动 recall，可以暂时跳过 Handoff 和 Skill。
   </Tab>
   <Tab title="我用 Hermes / OpenClaw">
-    顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [Hermes](/zh/common-agents/hermes) 或 [OpenClaw](/zh/common-agents/openclaw)。
+    阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [Hermes](/zh/common-agents/hermes) 或 [OpenClaw](/zh/common-agents/openclaw)。
 
-    最小闭环是：`powercontext setup <host>`、`powercontext doctor`，再把对应宿主页贴给 Agent，让它自己完成配置。Hermes 在 setup 之后还要运行 `hermes memory setup`，并选择 PowerContext。逐步命令见[官方 Hermes 指南](https://oceanbase.github.io/powercontext/zh/docs/how-to/configure-hermes/)。
+    完成标志：宿主插件已安装并激活，`powercontext doctor <host>` 通过，而且新会话能召回你显式保存的 Memory。
+
+    Hermes 在 `powercontext setup hermes` 后还要运行 `hermes memory setup` 并选择 PowerContext。OpenClaw 需要确认插件占用了 memory slot。安装、凭证和持久写入仍受你的授权控制。
+  </Tab>
+  <Tab title="我用编程 Agent">
+    阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [编程 Agent 总览](/zh/coding-agents/overview) → 对应宿主页。
+
+    选择 Codex、Claude Code、DSH、OpenCode 或 Pi。它们连接同一个 Server，但 Hook 事件、注入位置、capture、flush 和权限确认并不相同。
+
+    完成标志：自动 recall 失败时普通编码任务仍能继续；显式 Memory 或 Handoff 操作失败时，宿主会把错误告诉你。
+  </Tab>
+  <Tab title="我在写新集成">
+    先完成 [Hook 与插件](/zh/coding-agents/hooks-and-plugins)，再比较至少两个现有宿主，最后阅读[扩展 Hook](/zh/coding-agents/extend-hooks)。
+
+    你的产物不是一段能调用 `/v1/context/prepare` 的代码，而是一份可验证的 adapter contract：Scope、临时注入、Source capture、权限、诊断、安装和 real-host E2E 都有明确行为。
+
+    Basic Usage 的 Handoff 和 Skill 教程可以等到 adapter 的 recall/capture 主链稳定后再补。
   </Tab>
 </Tabs>
 
-## 最小闭环
+## 先完成这个检查
 
-做到这些，再往下翻 tricks。
+无论选择哪条路径，都用同一个简单问题验收：
 
-<Columns cols={2}>
-  <Card title="基础用法" icon="book-open" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始闭环">
-    Client 能 `remember`、`search`、`prepare_context`，并且你分得清 Source 和 Memory。
-  </Card>
-  <Card title="框架集成" icon="boxes" href="/zh/frameworks/overview" arrow="true" cta="看适配器">
-    图或 agent 连上同一个 Server，召回和采集 fail-open。Pydantic AI 只读预览页。
-  </Card>
-  <Card title="通用 Agent" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="去可贴配置">
-    setup、doctor，再把宿主页交给 Agent。Agent 能自己完成配置。
-  </Card>
-  <Card title="编程 Agent" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="看合同">
-    setup、doctor，新会话能召回你写下的 Memory。Hook 做 recall / capture，插件做显式写。
-  </Card>
-</Columns>
+> 修改 OpenAPI 契约后，下一步应该做什么？
 
-<AccordionGroup>
-  <Accordion title="什么时候回官方文档" icon="book-open">
-    安装细节、OpenAPI、配置项、某个宿主的逐步 how-to，以及部署，都回[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。
+1. 在固定 Scope 中显式保存答案。
+2. 换一个请求或新会话提问。
+3. 检查召回内容是否带 Citation，并确认它只按该 adapter 的约定进入当前模型输入；是否持久化 message history 由宿主和应用决定。
+4. 停止 Server 后再问一次。自动 recall 可以失败，但原任务应继续。
+5. 尝试一次显式写入。它必须明确失败，不能假装保存成功。
 
-    常用入口：[核心概念](https://oceanbase.github.io/powercontext/zh/docs/explanation/core-concepts/)、[安装和运行](https://oceanbase.github.io/powercontext/zh/docs/how-to/install-and-run/)、[HTTP API](https://oceanbase.github.io/powercontext/zh/docs/reference/http-api/)、[配置](https://oceanbase.github.io/powercontext/zh/docs/reference/configuration/)、[部署 Server](https://oceanbase.github.io/powercontext/zh/docs/how-to/deploy-server/)。
-  </Accordion>
-  <Accordion title="本站暂不单列的官方集成" icon="puzzle">
-    WorkBuddy 和 Bub 在官方仓库里有集成。101 只在这里点到，不单开页面。需要时回[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。
-  </Accordion>
-  <Accordion title="适配器成熟度" icon="boxes">
-    Pydantic AI 适配器是预览：未发布到 PyPI，当前也没有受支持的独立安装方式。LangChain 和 LangGraph 从 Git subdirectory 安装。不要把三者写成同一成熟度。
-  </Accordion>
-</AccordionGroup>
-
-## 把这段交给 Agent
-
-<Prompt description="让 Agent 按你的宿主选路，而不是把 101 当成官方 reference。" icon="bot" actions={["copy", "cursor"]}>
-你在带读者学习 PowerContext 101。本站是实战教程，不是官方 reference。
-
-先问读者用的是哪种宿主或框架：Python Agent、编程 Agent（Codex / Claude Code / DSH / OpenCode / Pi），还是 Hermes / OpenClaw。
-
-然后按当前站点的学习路径页指路：
-
-- 概念问题先读 `/zh/mental-model/overview`
-- 安装与 API 闭环走 `/zh/basic-usage/install-and-run`
-- LangGraph / LangChain / Pydantic AI 走 `/zh/frameworks/overview`。Pydantic AI 仍是预览，不能当成可独立安装
-- Hermes / OpenClaw 走 `/zh/common-agents/overview`
-- 编程 Agent 与 hooks 走 `/zh/coding-agents/overview`
-
-查 HTTP、配置默认值、OpenAPI 或部署时，打开 https://oceanbase.github.io/powercontext/zh/docs/ ，不要在 101 展开契约。
-
-不要把 RFC 或未合并设计当成已上线行为。
-</Prompt>
+<Info>
+PowerContext 仓库包含 WorkBuddy 和 Bub 集成，但当前 101 不为它们单独维护路径。WorkBuddy 有正式 how-to；Bub 目前主要由 integration 目录里的 README 说明，尚不是与 first-class hosts 相同的安装路径。
+</Info>
 
 ## 下一步
 
 <Columns cols={2}>
-  <Card title="继续心智模型" icon="brain" href="/zh/mental-model/overview" arrow="true" cta="先立住词汇">
-    还没把 Source 和 Memory 分开？先读总览。
+  <Card title="先读心智模型" icon="brain" href="/zh/mental-model/overview" arrow="true" cta="分清对象">
+    如果 Source、Memory 和 PreparedContext 还会混在一起，从这里开始。
   </Card>
-  <Card title="直接去安装" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="跑通 Server">
-    词汇已经够用？去跑本地 Server。
+  <Card title="启动本地 Server" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始运行">
+    如果对象边界已经清楚，直接完成无模型的第一个闭环。
   </Card>
 </Columns>

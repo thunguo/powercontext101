@@ -1,6 +1,6 @@
 ---
 title: "Learning path"
-description: "Read the mental model first, then pick a practical path for your host or framework."
+description: "Learn the minimum mental model, then complete one verifiable path for your framework or host."
 icon: route
 keywords:
   - learning path
@@ -10,111 +10,96 @@ keywords:
   - fail-open
 ---
 
-Read the mental model first. Run the local Server next. Then finish one path's smallest closed loop. Leave 101 when you need a contract, and open the official docs.
+You do not need to read the whole site in order. Learn the object boundaries first, then finish the path that matches the work in front of you.
 
 <Steps titleSize="h3">
-  <Step title="Read the mental model" icon="brain">
-    Lock Source, Memory, Handoff, and Experience / Skill, then read Scope and fail-open. Start at the [mental model overview](/en/mental-model/overview).
+  <Step title="Understand the object boundaries" icon="brain">
+    Start with the [mental model overview](/en/mental-model/overview), then read [Scope](/en/mental-model/scope) and [fail-open](/en/mental-model/fail-open). At minimum, separate Source, Memory, PreparedContext, and Handoff.
   </Step>
-  <Step title="Run the local Server" icon="server">
-    The official prerequisites are macOS or Linux, Python 3.11+, and `uv`. Install and health checks live in [Install and run the Server](/en/basic-usage/install-and-run). For exact commands and deploy steps, use the [official install guide](https://oceanbase.github.io/powercontext/en/docs/how-to/install-and-run/).
+  <Step title="Start a local Server" icon="server">
+    Follow [Install and run the Server](/en/basic-usage/install-and-run) with the minimum configuration. Explicit Memory and FTS do not require an inference provider.
   </Step>
-  <Step title="Pick one practical path" icon="route">
-    Use the persona tabs below and finish that path's smallest closed loop. Do not open all four tracks at once.
+  <Step title="Choose one path" icon="route">
+    Continue by goal below. Finish one working loop before comparing other frameworks and hosts.
   </Step>
-  <Step title="Leave 101 for contracts" icon="book-open">
-    HTTP, configuration defaults, OpenAPI, and step-by-step how-tos belong in the [official docs](https://oceanbase.github.io/powercontext/en/docs/). 101 teaches how to use PowerContext and how to play with it.
+  <Step title="Use official docs for contracts" icon="book-open">
+    OpenAPI, complete configuration, deployment, and command references belong in the [official PowerContext docs](https://powercontext.oceanbase.io/). PowerContext 101 explains how to use those interfaces and verify the result.
   </Step>
 </Steps>
 
 <Warning>
-The official install path is macOS or Linux. This page does not teach a Windows workaround, so it does not become an unverified tutorial.
+The documented installation targets are macOS and Linux with Python 3.11 or later. This tutorial does not provide an unverified Windows workaround.
 </Warning>
 
-<Tip>
-Explicit Memory does not need an inference provider first. Configure a generation model only when you want Memory extracted from Sources automatically.
-</Tip>
-
-## Pick a path by role
+## Choose by goal
 
 <Tabs>
-  <Tab title="I write Python agents">
-    Order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [API tour](/en/basic-usage/api-tour) → [Frameworks](/en/frameworks/overview).
+  <Tab title="I am new to PowerContext">
+    Read in this order:
 
-    The smallest closed loop is: run `remember`, `search`, and `prepare_context` with the Python Client, then attach LangGraph or LangChain. Pydantic AI is still preview. Do not treat it as a supported standalone install.
+    1. [Mental model overview](/en/mental-model/overview)
+    2. [Scope](/en/mental-model/scope)
+    3. [fail-open](/en/mental-model/fail-open)
+    4. [Install and run the Server](/en/basic-usage/install-and-run)
+    5. [API tour](/en/basic-usage/api-tour)
+
+    You are done when you can write one Memory, find it with `search_memory`, and use `prepare_context` to obtain a cited `PreparedContext`.
+
+    Skip framework and host pages for now.
   </Tab>
-  <Tab title="I use a coding agent">
-    Order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Coding agents](/en/coding-agents/overview), then pick Codex, Claude Code, DSH, OpenCode, or Pi.
+  <Tab title="I write Python agents">
+    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [API tour](/en/basic-usage/api-tour) → [Framework integration](/en/frameworks/overview).
 
-    The smallest closed loop is: `powercontext setup <host>`, `powercontext doctor`, then recall a Memory you wrote in a new session.
+    First run `remember_memory`, `search_memory`, and `prepare_context` with the Python Client. Then choose LangGraph or LangChain. The Pydantic AI agent adapter is a Preview and has no working standalone installation path, so it is not a good first integration.
+
+    If you only need automatic recall, you can skip Handoff and Skill for now.
   </Tab>
   <Tab title="I use Hermes / OpenClaw">
-    Order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
+    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
 
-    The smallest closed loop is: `powercontext setup <host>`, `powercontext doctor`, then paste the host page to the agent and let it finish setup. After Hermes setup, also run `hermes memory setup` and choose PowerContext. For the full command sequence, see the [official Hermes guide](https://oceanbase.github.io/powercontext/en/docs/how-to/configure-hermes/).
+    You are done when the plugin is installed and active, `powercontext doctor <host>` passes, and a new session can recall a Memory you stored explicitly.
+
+    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. Installation, credentials, and durable writes still require your authorization.
+  </Tab>
+  <Tab title="I use a coding agent">
+    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Coding agents overview](/en/coding-agents/overview) → the selected host page.
+
+    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ.
+
+    You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you.
+  </Tab>
+  <Tab title="I am building an integration">
+    Complete [Hooks and plugins](/en/coding-agents/hooks-and-plugins), compare at least two existing hosts, then read [Extend hooks](/en/coding-agents/extend-hooks).
+
+    The deliverable is not merely code that calls `/v1/context/prepare`. Write a verifiable adapter contract covering Scope, transient injection, Source capture, permissions, diagnostics, installation, and real-host end-to-end tests.
+
+    You can postpone the Basic Usage Handoff and Skill tutorials until the adapter's recall and capture path is stable.
   </Tab>
 </Tabs>
 
-## Smallest closed loop
+## Run this check first
 
-Hit these outcomes before you chase tricks.
+Use one question to verify any path:
 
-<Columns cols={2}>
-  <Card title="Basic usage" icon="book-open" href="/en/basic-usage/install-and-run" arrow="true" cta="Start the loop">
-    The Client can `remember`, `search`, and `prepare_context`, and you can tell Source from Memory.
-  </Card>
-  <Card title="Frameworks" icon="boxes" href="/en/frameworks/overview" arrow="true" cta="See the adapters">
-    The graph or agent talks to the same Server. Recall and capture fail-open. Read Pydantic AI as preview only.
-  </Card>
-  <Card title="Common agents" icon="bot" href="/en/common-agents/overview" arrow="true" cta="Open paste-ready setup">
-    Run setup and doctor, then hand the host page to the agent. The agent can finish configuration itself.
-  </Card>
-  <Card title="Coding agents" icon="terminal" href="/en/coding-agents/overview" arrow="true" cta="Read the contract">
-    Run setup and doctor. A new session can recall a Memory you wrote. Hooks do recall / capture. Plugins do explicit writes.
-  </Card>
-</Columns>
+> What should happen after the OpenAPI contract changes?
 
-<AccordionGroup>
-  <Accordion title="When to leave for official docs" icon="book-open">
-    Install details, OpenAPI, configuration, host how-tos, and deploy belong in the [official docs](https://oceanbase.github.io/powercontext/en/docs/).
+1. Store the answer explicitly in a stable Scope.
+2. Ask again in a new request or session.
+3. Confirm that the recalled content has a Citation and enters the current model input through the adapter's documented channel; durable message-history storage remains a host or application decision.
+4. Stop the Server and ask again. Automatic recall may fail, but the original task should continue.
+5. Attempt an explicit write. It must report failure rather than pretend the data was saved.
 
-    Common doors: [Core concepts](https://oceanbase.github.io/powercontext/en/docs/explanation/core-concepts/), [Install and run](https://oceanbase.github.io/powercontext/en/docs/how-to/install-and-run/), [HTTP API](https://oceanbase.github.io/powercontext/en/docs/reference/http-api/), [Configuration](https://oceanbase.github.io/powercontext/en/docs/reference/configuration/), and [Deploy the Server](https://oceanbase.github.io/powercontext/en/docs/how-to/deploy-server/).
-  </Accordion>
-  <Accordion title="Official integrations this site does not split out" icon="puzzle">
-    WorkBuddy and Bub have official integrations in the repository. 101 mentions them here and does not give them their own pages. Use the [official docs](https://oceanbase.github.io/powercontext/en/docs/) when you need them.
-  </Accordion>
-  <Accordion title="Adapter maturity" icon="boxes">
-    The Pydantic AI adapter is preview: it is not on PyPI, and it has no supported standalone install today. LangChain and LangGraph install from a Git subdirectory. Do not describe the three adapters as equally mature.
-  </Accordion>
-</AccordionGroup>
-
-## Hand this to an agent
-
-<Prompt description="Let an agent pick a path from your host, instead of treating 101 as the official reference." icon="bot" actions={["copy", "cursor"]}>
-You are guiding a reader through PowerContext 101. This site is a practical tutorial, not the official reference.
-
-Ask which host or framework the reader uses first: a Python agent, a coding agent (Codex / Claude Code / DSH / OpenCode / Pi), or Hermes / OpenClaw.
-
-Then route from this site's learning path:
-
-- Concept questions go to `/en/mental-model/overview`
-- Install and the API loop go to `/en/basic-usage/install-and-run`
-- LangGraph / LangChain / Pydantic AI go to `/en/frameworks/overview`. Pydantic AI is preview and is not a supported standalone install
-- Hermes / OpenClaw go to `/en/common-agents/overview`
-- Coding agents and hooks go to `/en/coding-agents/overview`
-
-For HTTP, configuration defaults, OpenAPI, or deploy, open https://oceanbase.github.io/powercontext/en/docs/ . Do not expand contracts on 101.
-
-Do not treat RFCs or unmerged design notes as shipped behavior.
-</Prompt>
+<Info>
+PowerContext includes WorkBuddy and Bub integrations, but this version of PowerContext 101 does not maintain separate paths for them. WorkBuddy has a formal how-to. Bub is currently documented mainly in its integration-local README and does not share the first-class host installation path.
+</Info>
 
 ## Next step
 
 <Columns cols={2}>
-  <Card title="Continue the mental model" icon="brain" href="/en/mental-model/overview" arrow="true" cta="Lock the vocabulary">
-    Still mixing Source and Memory? Read the overview first.
+  <Card title="Read the mental model" icon="brain" href="/en/mental-model/overview" arrow="true" cta="Separate the objects">
+    Start here if Source, Memory, and PreparedContext still sound interchangeable.
   </Card>
-  <Card title="Go install" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Run the Server">
-    Vocabulary is enough? Run the local Server.
+  <Card title="Start a local Server" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Run the first loop">
+    If the boundaries are clear, continue with the first model-free workflow.
   </Card>
 </Columns>

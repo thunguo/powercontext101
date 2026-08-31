@@ -1,6 +1,6 @@
 ---
 title: "PowerContext 101"
-description: "A practical path through PowerContext: mental model, common APIs, frameworks, common agents, and coding agents."
+description: "Learn PowerContext along a runnable path, from its mental model to agent integrations."
 icon: house
 keywords:
   - PowerContext 101
@@ -10,70 +10,83 @@ keywords:
   - Handoff
 ---
 
-PowerContext turns shared work into project context you can understand, hand off, and continue. It is a context runtime for human-agent collaboration, not just a memory store. PowerContext 101 teaches you how to use it and how to play with it. For install steps, interface contracts, and complete how-tos, read the [official docs](https://oceanbase.github.io/powercontext/en/docs/).
+PowerContext keeps the evidence, decisions, and handoff state produced while a project moves forward, so another person or agent can continue the work. It runs as a separate context service. It is not a chat transcript store.
+
+PowerContext 101 focuses on working paths and integration boundaries. For installation options, complete interface contracts, and deployment settings, use the [official PowerContext docs](https://powercontext.oceanbase.io/).
 
 <Info>
-This site is not a copy of the official docs. It does not paste OpenAPI or RFC text. An unshipped RFC is not released behavior.
+This site does not copy the OpenAPI contract or RFCs. When an older RFC differs from current code, tests, and formal documentation, this site describes the implemented and tested behavior.
 </Info>
 
 ## A 30-second mental model
 
-PowerContext stores project context, not the chat transcript itself.
+Work usually begins with a `Source`: a prompt, a task result, or another piece of identifiable evidence. Capturing a Source records that something happened. It does not turn the whole input into durable Memory.
 
-A <Tooltip headline="Source" tip="Raw work evidence. Capturing a prompt creates a Source only. It does not become Memory by itself." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> is evidence. <Tooltip headline="Memory" tip="Selected, revisioned, durable project knowledge. Revising or retiring an entry keeps history." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> is selected, revisioned, durable knowledge. A <Tooltip headline="Handoff" tip="Package the current objective, verified progress, blockers, and next step for another session, task, or model. It stays temporary by default." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip> is a temporary work package by default. You commit it as a milestone only when you ask to keep it.
+`Memory` holds selected project knowledge that will matter later. A `Handoff` has a different job. It packages the current objective, verified progress, blockers, and next action for whoever takes over. A Handoff can remain temporary; it becomes a durable milestone only after an explicit commit.
 
-A model can submit a <Tooltip headline="Candidate" tip="A proposal for an Experience or managed Skill. Pending items enter the Review Inbox. They are not Artifacts yet." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Candidate</Tooltip>. <Tooltip headline="Review" tip="Write an immutable Artifact Revision, or record a rejection reason. Both decisions are terminal." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Review</Tooltip> is what creates an immutable Artifact Revision. A <Tooltip headline="Skill" tip="Approval does not install or execute it. You must export one exact approved Revision." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Skill</Tooltip> still needs an explicit export after approval. It does not install or execute itself.
-
-<Tooltip headline="PreparedContext" tip="A bounded temporary view for one Agent turn. It is not a new durable record. Recall must fail-open." cta="Read fail-open" href="/en/mental-model/fail-open">PreparedContext</Tooltip> is a bounded view for one request, not a new durable record.
+`Experience` and managed `Skill` content first enters a Candidate. A model may draft the Candidate, but successful generation is not approval. An approve decision during Review creates an immutable Artifact Revision. A reject decision records the reason and creates no result Artifact. An approved Skill still needs an explicit export and receives no execution authority from PowerContext.
 
 ```mermaid
 flowchart LR
-  Source --> Artifact
-  Artifact --> Memory
-  Artifact --> Handoff
-  Artifact --> Experience
-  Artifact --> Skill
-  Memory --> PreparedContext
-  Experience --> PreparedContext
+  S[Source evidence]
+  M[Memory Revision]
+  C[Candidate]
+  R{Review}
+  E[Experience Revision]
+  K[Skill Revision]
+  P[PreparedContext]
+  H[Prepared Handoff]
+  HC[Committed Handoff]
+
+  S -->|extraction| M
+  S --> C
+  M --> P
+  C --> R
+  R -->|approve| E
+  R -->|approve| K
+  E --> P
+  H -->|explicit commit| HC
 ```
 
-<Card title="Read the mental model first" icon="brain" href="/en/mental-model/overview" horizontal arrow="true" cta="Open the mental model">
-Lock Source, Memory, Handoff, and Experience / Skill, then add Scope and fail-open. Every path below uses this vocabulary.
+`PreparedContext` is a bounded view built for one request. It includes Citations and is labeled as untrusted historical evidence. An agent may use it as evidence, but the text cannot grant tools or replace current system and user instructions.
+
+<Card title="Separate the objects first" icon="brain" href="/en/mental-model/overview" horizontal arrow="true" cta="Read the mental model">
+Source, Memory, PreparedContext, and Handoff are easy to blur together. Their boundaries make the API and host integrations much easier to reason about.
 </Card>
 
-## Pick a path
-
-Not sure which path to take? Start with the [learning path](/en/start/learning-path).
+## Continue by goal
 
 <Columns cols={2}>
-  <Card title="Basic usage" icon="book-open" href="/en/basic-usage/install-and-run" arrow="true" cta="Run the first loop">
-    Run the local Server, then string the common APIs into one loop with the Python Client.
+  <Card title="Run the common APIs" icon="book-open" href="/en/basic-usage/install-and-run" arrow="true" cta="Start with basic usage">
+    Start a local Server, then use the Python Client to complete a first Memory, Source, and Handoff loop.
   </Card>
-  <Card title="Frameworks" icon="boxes" href="/en/frameworks/overview" arrow="true" cta="Talk to one Server">
-    Pydantic AI, LangGraph, and LangChain all connect to the same running Server. Adapter maturity differs.
+  <Card title="Connect a Python agent" icon="boxes" href="/en/frameworks/overview" arrow="true" cta="Compare frameworks">
+    Compare where LangGraph, LangChain, and Pydantic AI connect, along with their maturity and capability differences.
   </Card>
-  <Card title="Common agents" icon="bot" href="/en/common-agents/overview" arrow="true" cta="Paste to configure">
-    Give Hermes or OpenClaw a paste-ready setup, then let the agent add capabilities for itself.
+  <Card title="Configure Hermes or OpenClaw" icon="bot" href="/en/common-agents/overview" arrow="true" cta="Choose a common agent">
+    Install, activate, and verify the selected host. Credentials, durable writes, and Review decisions still require your authorization.
   </Card>
-  <Card title="Coding agents" icon="terminal" href="/en/coding-agents/overview" arrow="true" cta="Read the hook contract">
-    Codex, Claude Code, DSH, OpenCode, and Pi share one Hook + plugin contract.
+  <Card title="Configure a coding agent" icon="terminal" href="/en/coding-agents/overview" arrow="true" cta="Choose a coding agent">
+    See how Codex, Claude Code, DSH, OpenCode, and Pi map the same Server contract onto different host lifecycles.
   </Card>
 </Columns>
 
 <Check>
-Integrations connect to a separately running Server. They do not embed one. Explicit Memory does not need a model first. If the Server is down, the host should fail-open so your original task can continue.
+A host should continue its original task when automatic recall, prompt capture, or an optional flush fails. Explicit Memory writes, Handoff commits, Candidate Review, and Skill export follow a different rule: the caller must see the failure.
 </Check>
+
+Not sure where to begin? Open the [learning path](/en/start/learning-path).
 
 <GitHub.Repo repo="oceanbase/powercontext" />
 
 <Visibility for="agents">
-Route PowerContext 101 questions on this English page. Do not treat RFCs as shipped behavior. Do not paste OpenAPI.
+Route English PowerContext 101 questions from this page. Treat current implementation and tests as the product facts; do not present RFC goals as shipped behavior.
 
-- Concepts (Source, Memory, Handoff, Experience, Skill, Scope, fail-open, PreparedContext): `/en/mental-model/overview`
-- Install / API loop: `/en/basic-usage/install-and-run`
-- LangGraph / LangChain / Pydantic AI: `/en/frameworks/overview`. Pydantic AI is preview and has no supported standalone install.
-- Hermes / OpenClaw: `/en/common-agents/overview`
-- Codex / Claude Code / DSH / OpenCode / Pi / hooks: `/en/coding-agents/overview`
-- HTTP, configuration defaults, OpenAPI, deploy: official docs at `https://oceanbase.github.io/powercontext/en/docs/`
+- Concepts: `/en/mental-model/overview`
+- Install and API loop: `/en/basic-usage/install-and-run`
+- Python frameworks: `/en/frameworks/overview`
+- Hermes and OpenClaw: `/en/common-agents/overview`
+- Coding-agent hosts and hooks: `/en/coding-agents/overview`
+- Full contracts and deployment: `https://powercontext.oceanbase.io/`
 - Learning order: `/en/start/learning-path`
 </Visibility>

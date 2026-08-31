@@ -132,6 +132,7 @@
                 "group": "框架",
                 "pages": [
                   "zh/frameworks/overview",
+                  "zh/frameworks/pydantic-ai-server-inference",
                   "zh/frameworks/pydantic-ai",
                   "zh/frameworks/langgraph",
                   "zh/frameworks/langchain",
@@ -239,13 +240,14 @@
             ]
           },
           {
-            "tab": "Frameworks",
+            "tab": "Framework Integration",
             "icon": "boxes",
             "pages": [
               {
                 "group": "Integrations",
                 "pages": [
                   "en/frameworks/overview",
+                  "en/frameworks/pydantic-ai-server-inference",
                   "en/frameworks/pydantic-ai",
                   "en/frameworks/langgraph",
                   "en/frameworks/langchain",

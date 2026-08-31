@@ -1,14 +1,140 @@
 ---
 title: "Scope"
-description: "A scope is a data isolation boundary. It selects data; it does not prove identity or grant execution rights."
+description: "A Scope selects one isolated set of data. It is not identity, authentication, or tool authorization."
 ---
 
+Most PowerContext operations require a `scope_id`. That value decides which set of data the request reads or writes.
+
+A wrong Scope often looks like missing data: “I wrote this already, so why is search empty?” The more serious failure is using one Scope for projects or tenants that should remain separate.
+
+## What Scope isolates
+
+PowerContext keeps related state under the same `scope_id`:
+
+- the Source journal and processing cursor;
+- the Memory lifecycle and active search projections;
+- the Experience and Skill Candidate Inbox;
+- Handoff history and Work continuity;
+- scope-local runtime cache entries, locks, and statistics.
+
+Another Scope cannot read this data unless the application writes it there separately.
+
+```mermaid
+flowchart LR
+  A[scope: project-a] --> AS[Sources]
+  A --> AM[Memory]
+  A --> AC[Candidates]
+  A --> AH[Handoffs]
+
+  B[scope: project-b] --> BS[Sources]
+  B --> BM[Memory]
+  B --> BC[Candidates]
+  B --> BH[Handoffs]
+```
+
+## What Scope does not do
+
+Scope is not a security identity.
+
+Knowing `scope_id="project:payments"` does not prove that the caller belongs to the payments team or may use a write tool. Bearer authentication, Server deployment boundaries, and host permission gates control access.
+
+Scope also grants no execution authority. Recalled content from the correct Scope is still historical evidence. The agent must follow current system and user instructions and check the live workspace.
+
+<Warning>
+Do not accept a user-controlled string as an authorized Scope. Authenticate and authorize the caller first, then map the request to an allowed `scope_id`.
+</Warning>
+
+## Choose a stable Scope
+
+A useful Scope survives the work. It should not change with every session.
+
+| Scenario | Prefer | Avoid |
+|---|---|---|
+| One code repository | A normalized Git remote or explicit project ID | A temporary worktree path |
+| Multi-tenant service | An explicit Scope mapped from an authenticated tenant/project | The service process working directory |
+| Local project without Git | A stable path hash when the adapter supports it, or an explicit Scope | A new random ID on every run |
+| Sharing across hosts | The same stable value on each host | Each host's session ID |
+
+Scope strings are case-sensitive. `project:PowerContext` and `project:powercontext` select different data.
+
+## There is no universal derivation order
+
+Integrations derive Scope from the information their host provides. Their rules differ.
+
+| Integration | Current derivation |
+|---|---|
+| Pydantic AI agent adapter | Constructor string/callback → environment → normalized Git remote → local path hash |
+| LangGraph | Invocation Scope/environment → normalized network Git remote → error if missing |
+| LangChain | Invocation Scope/environment → normalized network Git remote → error if missing |
+| Codex / Claude Code | Workstream binding where applicable, Git remote, or project path; see each host page for exact precedence |
+| OpenClaw | Trusted agent identity; project mode adds a project hash but retains the agent dimension |
+
+The mental model therefore gives selection rules rather than one fictional precedence list. Keep adapter-specific fallback behavior on the adapter page.
+
+### Git remotes are normalized
+
+Integrations remove credentials from a remote URL before deriving Scope. These URLs should identify the same repository, and the token must not appear in the Scope:
+
+```text
+https://user:token@example.com/org/repo.git
+https://example.com/org/repo.git
+```
+
+LangGraph and LangChain detect Windows drive-letter paths so they are not mistaken for SCP-style remotes. Other adapters do not all apply the same guard. On Windows or with unusual Git configuration, prefer an explicit Scope and inspect the derived value.
+
+## Share data across hosts
+
+Codex and Claude Code can derive the same project Scope for one repository. Memory stored explicitly in one host can then be recalled in the other.
+
+Sharing requires all three conditions:
+
+1. Both hosts connect to the same PowerContext Server.
+2. They resolve to exactly the same `scope_id`.
+3. Their reads and writes use the required access authorization.
+
+Similar-looking directories are not enough. When sharing fails, inspect the final Scope before debugging search.
+
 <Note>
-TODO: Body copy is not written yet. This page is an outline stub.
+OpenClaw project mode currently keeps the agent ID in its Scope. Two agents in the same project do not automatically share a pure project Scope.
 </Note>
 
-## This page will cover
+## ScopeCache inside the Server
 
-- scope_id isolates Sources, Memory, Candidates, and Handoffs
-- Priority among Git remotes, Workstream bindings, and explicit scopes
-- A scope is not authentication and not tool authorization
+The Server caches runtime composition and one scope-local write lock for active Scopes. Its default capacity is 128 inactive entries.
+
+This is not a data cache:
+
+- eviction does not delete Sources, Memory, or Handoffs from the database;
+- an entry with active operations or lock waiters cannot be evicted;
+- the cache may temporarily exceed capacity when every entry is active;
+- after operations finish, the Server trims the least recently used inactive entries.
+
+Writes in one Scope are serialized to protect head and cursor updates. Read-only search and an in-progress rerank should not all be serialized behind that write lock.
+
+## Common failures
+
+### A write succeeded, but the Dashboard is empty
+
+Check that the Dashboard and client use exactly the same Scope. Changing the database URL also reveals a different data set and can look like a Scope problem.
+
+### Two tenants see the same Memory
+
+Make sure the application did not use the service process working directory or one fixed string for every tenant. Resolve Scope from an authorized tenant/project mapping.
+
+### LangGraph raises MissingScope in a local directory
+
+LangGraph does not fall back to a local path hash when no network Git remote is available. Pass `PowerContextScope(scope_id=...)` for the invocation.
+
+### Every new session starts from scratch
+
+The application probably used a session ID as Scope. Use a stable project or tenant Scope instead.
+
+## Checklist
+
+- Is the Scope stable and free of credentials?
+- Does a multi-tenant application authorize first and select Scope second?
+- Do hosts that should share data resolve to exactly the same value?
+- Did you assume that all adapters use the same fallback?
+- Did you mistake cache eviction for deletion of durable data?
+
+Continue with [fail-open](/en/mental-model/fail-open) to decide which failures may leave the original task running and which operations must report an error.

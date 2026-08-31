@@ -1,14 +1,16 @@
 ---
-title: "Pydantic AI"
-description: "Attach a Pydantic AI agent with a Capability or a Toolset. This adapter is still a preview."
+title: "Pydantic AI agent adapter (Preview)"
+description: "Attach a Pydantic AI agent with a Capability or Toolset. No working standalone installation path is currently available."
 ---
 
-<Note>
-TODO: Body copy is not written yet. This page is an outline stub.
-</Note>
+<Warning>
+Preview: the adapter is not published to PyPI. The current Git subdirectory install also fails its dependency constraint, so this is not a ready-to-install user tutorial.
+</Warning>
 
 ## This page will cover
 
-- Current install status: not independently published; keep the preview warning
-- Basics: the PowerContext Capability and its three tools
-- Advanced: Toolset-only mode, scope callbacks, capture, and flush
+- `PowerContext` Capability: three tools, automatic recall per run, and optional capture / flush
+- `PowerContextToolset`: the same three explicit tools without automatic lifecycle behavior
+- Per-run Scope callbacks, history replacement, and privacy boundaries
+- Automatic fail-open behavior versus explicit-tool `ModelRetry`
+- The current lack of Handoff, Review, and direct Experience / Skill operations

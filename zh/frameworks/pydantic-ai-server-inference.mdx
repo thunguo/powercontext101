@@ -1,0 +1,17 @@
+---
+title: "Pydantic AI Server inference"
+description: "了解 PowerContext Server 如何通过 Pydantic AI 使用 generation 和 embedding 模型。"
+---
+
+<Note>
+TODO: 正文将在 Framework Integration 批次完成。本页先把 Server inference 与 Pydantic AI Agent adapter 分开。
+</Note>
+
+这里的 Pydantic AI 运行在 PowerContext Server 内部，用于结构化生成、embedding 和可选 reranking。它不是 Agent adapter，也不会给你的 Pydantic AI Agent 自动增加工具。
+
+## 本页将覆盖
+
+- 无模型 Server 仍可提供 explicit Memory 和 FTS
+- generation 与 embedding 是独立能力
+- Source extraction、Experience / Skill / Handoff generation 和 reranking
+- embedding profile、vector / hybrid search 与失败降级

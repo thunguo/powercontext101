@@ -1,14 +1,16 @@
 ---
-title: "Pydantic AI"
-description: "用 Capability 或 Toolset 把 Pydantic AI Agent 接到 PowerContext。当前仍是 preview。"
+title: "Pydantic AI Agent adapter（Preview）"
+description: "用 Capability 或 Toolset 把 Pydantic AI Agent 接到 PowerContext。当前普通安装路径不可用。"
 ---
 
-<Note>
-TODO: 正文待写。本页只建立大纲。
-</Note>
+<Warning>
+Preview：该 adapter 尚未发布到 PyPI。当前 Git subdirectory 安装也会因为依赖版本约束失败，不要把本页当成可直接安装的用户教程。
+</Warning>
 
 ## 本页将覆盖
 
-- 当前安装状态：尚未独立发布，正文需写明 preview
-- 入门：PowerContext Capability 与三个工具
-- 进阶：Toolset-only、scope 回调、capture 与 flush
+- `PowerContext` Capability：三个工具、每 run 自动 recall，以及可选 capture / flush
+- `PowerContextToolset`：只提供三个显式工具
+- per-run Scope callback、history replacement 与隐私边界
+- 自动路径 fail-open 与显式工具 `ModelRetry` 的区别
+- 当前不支持的 Handoff、Review、Experience / Skill 操作
