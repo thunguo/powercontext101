@@ -1,21 +1,100 @@
 ---
 title: "DeepSeek Harness"
-description: "用 agent/pre-step middleware 与原生 pc_* HTTP tools 接入 PowerContext。"
+description: "用 agent/pre-step 注入 plugin message，用 pc_* HTTP tools 做显式写入，并把 mutation 交给宿主 ask。"
 ---
 
-DSH integration 不是 MCP plugin。它在 `agent/pre-step` 做 recall/capture，并注册 curated `pc_*` HTTP tools 与 `/pc` 人工命令。
+<Warning>
+DSH 当前没有正式最低 host version。`test_dsh_http_chain.py` 验证 HTTP contract，不是完整真实 host-process E2E，状态是 **Not validated**。Mutation 在 `tools/pre-execute` 返回 `ask`，属于 **Host-gated**。managed Skill export 是 **Unsupported**。
+</Warning>
 
-## 安装
+DSH integration 不是 MCP plugin。它在 `agent/pre-step` 做 recall/capture，注册 curated `pc_*` HTTP tools，并提供 `/pc` 人工命令。Setup 调用 `dsh plugin --profile web add`，不会启动 Server。
+
+完整安装看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure DeepSeek Harness how-to。本页只写 101 的验证合同。
+
+## 安装并激活
+
+先确认 web profile 存在，再启动 Server：
+
+```bash
+powercontext server run
+```
+
+然后安装 built plugin：
 
 ```bash
 powercontext setup dsh --source oceanbase/powercontext --ref master
-powercontext server run
+
+powercontext doctor
 powercontext doctor dsh
 ```
 
-Setup 要求 built plugin 中有 `lib/index.js`，通过 `dsh plugin --profile web add` 安装。Doctor 用 `--dump-config` 检查 exact plugin ID。正式最低 DSH version 与真实 host E2E 均 **Not validated**。
+Setup 要求 `integrations/dsh/plugins/powercontext/lib/index.js` 已经构建。它把该目录交给 `dsh plugin --profile web add`，并创建 PowerContext 用户数据目录。同一 ref 的可用 checkout 会被复用；损坏的 checkout 会被替换。Setup 不会启动 Server。
 
-## Pre-step flow
+`doctor dsh` 检查 `dsh` 是否在 PATH，并用 `--profile web --dump-config` 查找 exact plugin id `powercontext-dsh`。只出现 package name 不够。它不联系 Server，不测 recall。
+
+装完后开一个新的 `dsh web` session。
+
+## 配置默认值
+
+环境变量可以覆盖连接和 capture。`timeoutMs`、`requestTimeoutMs`、`maxBytes` 和 `flushMaxCalls` 是 plugin patch 设置，不是环境变量。
+
+| Key | 默认值 | 含义 |
+|---|---|---|
+| `POWERCONTEXT_DSH_BASE_URL` | `http://127.0.0.1:8000` | 正在运行的 Server |
+| `POWERCONTEXT_DSH_SCOPE_ID` | 未设置 | 显式 Scope；无 workspace cwd 时必须设置 |
+| `POWERCONTEXT_DSH_AUTHORIZATION` | 未设置 | 完整 Authorization header |
+| `POWERCONTEXT_DSH_CAPTURE_PROMPTS` | `true` | 采集 user-originated prompt |
+| `POWERCONTEXT_DSH_FLUSH_ON_CAPTURE` | `false` | 测试用 flush |
+| `maxBytes` | `8000` | Recall budget，限制在 `512–32768` |
+| `timeoutMs` | `4000` | pre-step 总预算 |
+| `requestTimeoutMs` | `1000` | 单次 HTTP timeout |
+
+不要把 token 写进 patch 文件或 Server URL。当前工作不能落成 Source 时：
+
+```bash
+export POWERCONTEXT_DSH_CAPTURE_PROMPTS=false
+dsh web
+```
+
+## 最小验证
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+在 DSH 里显式保存：
+
+```text
+Use PowerContext pc_remember to store this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+`pc_remember` 会先触发宿主 permission `ask`。批准后应返回 Memory Citation。你也可以用 `/pc` 命令做只读检查。
+
+换一个请求或新 session，问：
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+自动召回成功时，只有 downstream 决定 `enter` 模型，plugin 才会追加一条 plugin message。这条 message 以 `PowerContext host-supplied context` 开头，内容带 Citation。非 enter 的 downstream 结果不得被替换。
+
+## Scope 解析
+
+DSH 按这个顺序解析 Scope：
+
+1. 非空的 `POWERCONTEXT_DSH_SCOPE_ID`。
+2. session workspace cwd 上的规范化 Git remote，写成 `git:...`。
+3. 同一 workspace 的 `local:<sha256>`。
+
+没有 workspace cwd 时，automatic path 跳过，显式工具返回稳定 unscoped 状态：`No project workspace on this session. Set scopeId or open a workspace.` Plugin 不会回退到 Harness 进程目录。
+
+DSH 不读取 Codex / Claude Code 的 Workstream binding。
+
+## 自动路径与显式工具
 
 ```text
 agent/pre-step
@@ -27,27 +106,38 @@ agent/pre-step
 → only when downstream enters model, append plugin message
 ```
 
-这允许 full batch 帮助 recall，同时只把 user content 作为 Source。
+完整 batch 帮助 recall，Source 仍然只含 user content。`next()` 必须只调用一次。Server、validation 或 wrapping failure 不替换 downstream result。
 
-## Tools 与 permission
+显式 surface 覆盖 Memory、Handoff、Experience / Skill generation 和只读 Candidate。Dangerous / admin operations 不注册。Named mutation 在 `tools/pre-execute` 返回 `ask`，由宿主 permission UI 决定。Candidate approve / reject / revise 不是普通 model tool；留给人工 `/pc review` 或其他受控 surface。
 
-DSH 暴露 Memory、Handoff、Experience/Skill generation 和 read-only Candidate operations。Dangerous/admin operations 不注册。
+Bundled Skill 只是说明。DSH 不是 managed Skill export target。
 
-Named mutation 在 `tools/pre-execute` 返回 `ask`，由宿主 permission UI 决定。Candidate approve/reject/revise 不作为普通 model tools；留给人工 `/pc review` 或其他受控 surface。
+## 负向检查
 
-## Failure behavior
+- 停掉 Server 后再问普通编码问题。Agent 应继续。
+- Server 仍停着时再跑 `pc_remember`。失败必须可见，不能伪装成 empty success。
+- Permission deny：mutation 不得执行。
+- Missing cwd：automatic path 跳过或返回 unscoped，不得猜进程目录。
+- Downstream 不是 `enter`：不注入 plugin message。
+- Approval tool 不得出现在 model surface。
 
-Missing cwd 时 automatic path 跳过或返回稳定 unscoped 状态。Server/validation/wrapping failure 不替换 downstream result。Permission denial 必须对 mutation 可见。
+## 当前限制
 
-## 验证
+- 真实 DSH host-process E2E 是 **Not validated**。HTTP-chain 测试不是完整宿主。
+- 没有正式最低 DSH version。
+- managed Skill export 是 **Unsupported**。
+- Plugin load 仍需要 DeepSeek Harness peer modules。
+- 自动 extraction 需要 generation model；显式 Memory 不需要。
 
-- `next()` 只调用一次；
-- downstream 非 enter 时不注入；
-- recall query 包含 batch，capture 只有 user-originated text；
-- mutation 触发 ask；
-- approval tool 未出现在 model surface；
-- Server down 时 Agent 继续。
+## 完成检查
 
-`test_dsh_http_chain.py` 验证 HTTP contract，不是完整真实 DSH host E2E。
+- `doctor dsh` 在 dump-config 里看到 id `powercontext-dsh`。
+- Server health、readiness、capabilities 已单独检查。
+- 新请求能召回你显式保存的 OpenAPI decision，Citation 出现在 enter 之后的 plugin message。
+- `next()` 只调用一次；非 enter 路径没有注入。
+- 自动 recall 失败时，普通编码任务仍继续。
+- 显式 Memory 或 Handoff 失败时，DSH 把错误告诉你。
+- Mutation 触发 `ask`；approve / reject 没有进入 model tools。
+- 你没有把 HTTP-chain 测试写成真实 host E2E。
 
 下一页是 [OpenCode](/zh/coding-agents/opencode)。

@@ -1,42 +1,149 @@
 ---
 title: "Codex"
-description: "用 UserPromptSubmit Hook、HTTP MCP 与 project-context Skill 完成自动 recall 和显式 Handoff。"
+description: "安装 Hook、MCP 与 project-context Skill，验证 additionalContext 召回，并确认显式写入失败可见。"
 ---
 
-Codex integration 有三条路径：短进程 Hook 自动 prepare/capture，MCP 执行显式操作，bundled Skill 告诉 Codex 何时使用它们。
+<Warning>
+Codex 当前没有正式最低 host version。真实 host-process E2E 是 **Not validated**。Permission 属于 **Host-gated**；无 UI 时是否明确拒绝 durable write，目前 **Not validated**。managed Skill export 对 target `codex` 是 **Supported**。
+</Warning>
 
-## 安装
+Codex 有三条路径连到同一个 Server：短进程 `UserPromptSubmit` Hook 自动 prepare/capture，HTTP MCP 做显式 Memory 与 Handoff，bundled `project-context` Skill 告诉 Codex 何时调用它们。Setup 不会启动 Server。
+
+完整安装步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure Codex how-to 和 Codex tutorial。本页只写 101 的验证合同，不搬那两章。
+
+## 安装并激活
+
+先在一个终端启动 Server：
+
+```bash
+powercontext server run
+```
+
+在另一个终端安装 marketplace 与 plugin：
 
 ```bash
 powercontext setup codex --source oceanbase/powercontext --ref master
-powercontext server run
+
+powercontext doctor
 powercontext doctor codex
 ```
 
-新 session 检查 `/hooks` 与 `/mcp`。当前没有正式最低 Codex version；真实 host-process E2E 为 **Not validated**。
+Setup 做三件事：把 PowerContext 仓库加进 Codex marketplace，安装并启用 `powercontext` plugin，并创建 PowerContext 用户数据目录。它可以安全重跑。它不会启动 Server，也不会打开 Codex session。
 
-## 自动路径
+`doctor codex` 只检查 Codex CLI 是否在 PATH，以及 `codex plugin list` 里 `powercontext` 是否 `installed` 且 `enabled`。它不联系 Server，不测 recall，也不启动 Codex。
 
-`UserPromptSubmit` 启动隔离 Python hook。它从 plugin `.mcp.json` 推导 API base，解析 Workstream/Git/path Scope，分别 prepare 和 capture prompt，并可 flush 到 capture position。
+装完后，在项目目录开一个**新** session：
 
-Recall 与 capture 独立 fail-open；redirect、unknown schema、oversize 与 deadline 都有安全处理。自动 capture 只记录 prompt，不记录 final response 或 Task Outcome。
+```bash
+codex
+```
 
-## MCP 与 Skill
+用 `/hooks` 查看 PowerContext `UserPromptSubmit` hook，提示信任时再信任。用 `/mcp` 确认 `powercontext` Server。已经打开的 session 不会自动加载刚装的 plugin。
 
-MCP 提供 explicit Memory、Work Contract、Handoff、acknowledgement、Outcome 与 Review operations。`project-context` Skill 指导 one-turn durable Handoff，但 commit 仍需用户明确要求。
+## 配置默认值
 
-“Preview and make no writes”不能通过 `handoff_current_work` 实现，因为后者会写 boundary Source。Temporary Handoff 可不 commit，但也不是零写。
+Hook 从 plugin `.mcp.json` 推导 API base，默认连到 `http://127.0.0.1:8000/mcp`。其余行为由 `POWERCONTEXT_CODEX_` 环境变量控制：
 
-Codex 与 Claude Code 可通过同一 Workstream binding 或 normalized repository identity 共享 Scope。
+| Key | 默认值 | 含义 |
+|---|---|---|
+| MCP `url` | `http://127.0.0.1:8000/mcp` | 写在 plugin `.mcp.json`，不要改成带凭证的 URL |
+| `POWERCONTEXT_CODEX_SCOPE_ID` | 未设置 | 显式 Scope；未设置则按 Workstream / Git / path 推导 |
+| `POWERCONTEXT_CODEX_AUTHORIZATION` | 未设置 | 完整 Bearer header；Hook 和 MCP 都读它 |
+| `POWERCONTEXT_CODEX_CAPTURE_PROMPTS` | `true` | 采集当前 user prompt 为 Source |
+| `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE` | `false` | 测试用：capture 后等待 flush |
+| `POWERCONTEXT_CODEX_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP timeout |
+| `POWERCONTEXT_CODEX_HTTP_BUDGET_SECONDS` | `4` | 一轮 prepare/capture 总预算 |
+| Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
+
+`POWERCONTEXT_CODEX_SERVER_URL` 会被忽略。`server_url` 只来自 plugin `.mcp.json`。不要把 token 写进 `.mcp.json`、Server URL 或静态 MCP header。当前工作不能落成 Source 时：
+
+```bash
+export POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false
+codex
+```
+
+## 最小验证
+
+先单独检查 Server：
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+再在 Codex 里显式保存学习路径那道题的答案：
+
+```text
+Use PowerContext to remember this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+这是 MCP `remember_memory`，不需要 generation model。Codex 应返回 exact Citation。
+
+退出后，在同一目录开新 session，问：
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+自动召回成功时，`UserPromptSubmit` 通过 hook stdout 的 `additionalContext` 注入有界 `PreparedContext`。内容带 Citation，并标成 untrusted historical evidence。它只服务当前 prompt，不会把 assistant final response 写成 Source。
+
+## Scope 解析
+
+Codex 按这个顺序解析 Scope：
+
+1. 非空的 `POWERCONTEXT_CODEX_SCOPE_ID`。
+2. Git-private Workstream binding：`.git/powercontext/codex-workspace.json`。
+3. 规范化后的 Git `remote.origin.url`，写成 `git:...`。
+4. 项目根目录的 `local:<sha256>`。
+
+Binding 在 Git 目录里，不进 worktree，也不会被 commit。Claude Code 读同一份文件。两边要共享 Memory，必须连同一个 Server，并解析出完全相同的 `scope_id`。
+
+## 自动路径与显式工具
+
+```text
+UserPromptSubmit
+→ resolve Scope
+→ prepare_context (max_bytes=8000)
+→ validate powercontext.prepared-context.v1
+→ additionalContext
+→ independently capture the prompt
+```
+
+Recall 与 capture 独立 fail-open。Redirect、unknown schema、oversize 和 deadline 都有安全处理。自动 capture 只记录 prompt，不记录 final response 或 Task Outcome。Flush 没追上时，bounded retries 结束后继续 turn，不谎报 Memory 已生成。
+
+MCP 提供显式 Memory、Work Contract、Handoff、acknowledgement、Outcome 和 Review。`project-context` Skill 把 `handoff this work` / `交接当前工作` 当成一次 durable Handoff 的明确授权；commit 仍需要这类祈使句。讨论 Handoff 设计，或说 “preview and make no writes”，不能调用 `handoff_current_work`，因为后者会写 boundary Source。
+
+Bundled Skill 与 `powercontext skill export --target codex` 写出的 managed Skill 是不同对象。不要混用。
 
 ## 负向检查
 
-- Server down：普通 prompt 继续，显式 write 报错。
+- 停掉 Server 后再问普通编码问题。Codex 应继续；Hook 可以 fail-open。
+- Server 仍停着时再显式 `remember` 或 `commit_handoff`。MCP 必须报错，不能假装成功。
 - Redirect：Authorization 不得转发。
-- Flush 未追上：bounded retries 后继续 turn，不谎报 Memory 已生成。
-- Handoff preparation 成功但 commit 失败：boundary Source 存在，无 durable milestone。
-- 旧 Citation mutation：返回 conflict。
+- 用旧 Citation 做 revise / retire：返回 conflict。
+- Handoff preparation 成功但 commit 失败：boundary Source 可能存在，durable milestone 不存在。
+- 无 UI 拒绝 durable write：当前 **Not validated**，不要照搬 Pi。
 
-Managed Skill export 支持 Codex；bundled Skill 与 exported managed Skill 是不同对象。
+## 当前限制
+
+- 真实 Codex host-process E2E 是 **Not validated**。仓库里的 Codex service-chain 测试不是完整宿主进程。
+- 没有正式最低 Codex version。
+- 无 UI 时的 permission deny 行为 **Not validated**。
+- 自动 extraction 需要 generation model；显式 Memory 不需要。
+- 本页不复述官方 one-line Handoff tutorial；那是官方 how-to 的职责。
+
+## 完成检查
+
+- `doctor codex` 看到 plugin installed 且 enabled。
+- 新 session 已用 `/hooks` 和 `/mcp` 确认激活。
+- Server health、readiness、capabilities 已单独检查。
+- 新 session 能召回你显式保存的 OpenAPI decision，Citation 出现在 `additionalContext`。
+- 自动 recall 失败时，普通编码任务仍继续。
+- 显式 Memory 或 Handoff 失败时，Codex 把错误告诉你。
+- 你没有把 bundled `project-context` 和 exported managed Skill 混为一谈。
+- 你没有把 **Not validated** 的 host E2E 写成已经测过。
 
 下一页是 [Claude Code](/zh/coding-agents/claude-code)。

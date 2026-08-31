@@ -1,23 +1,102 @@
 ---
 title: "Pi"
-description: "Inject context at before_agent_start, flush pending Sources at boundaries, and refuse durable writes without UI."
+description: "Inject context into systemPrompt at before_agent_start, flush pending Sources at boundaries, and refuse durable writes without UI."
 ---
 
 <Note>
-Package runtime requires Node `>=22.19`. Pi 0.82.x is development compatibility, not a declared minimum host version. Package-load E2E exists; the full recall host chain is **Not validated**.
+The package runtime requires Node `>=22.19`. Pi `0.82.x` is development compatibility, not a declared minimum host version. Package-load E2E exists; the full recall host chain is **Not validated**. Managed Skill export is **Unsupported**. Durable writes without UI are refused.
 </Note>
 
-## Install
+Pi is a native package, not an MCP plugin. `before_agent_start` resolves Scope, prepares context, captures the prompt, and appends recall to `systemPrompt`. Boundary events then run a bounded pending flush. Setup calls Pi's own package installer and does not start the Server.
+
+For the full install, use the Configure Pi how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
+
+## Install and activate
+
+Start the Server first:
+
+```bash
+powercontext server run
+```
+
+Then install the native package:
 
 ```bash
 powercontext setup pi --source oceanbase/powercontext --ref master
-powercontext server run
+
+powercontext doctor
 powercontext doctor pi
 ```
 
-Setup installs a native package containing an extension and bundled Skill. Doctor uses `pi list` and verifies the actual package path and manifest.
+Setup requires both `extensions/powercontext.ts` and `skills/project-context/SKILL.md` in the checkout, then runs `pi install`. It removes superseded user-scope PowerContext packages. It does not start the Server and does not open a Pi session.
 
-## Turn and boundary flush
+`doctor pi` checks that `pi` is on PATH and that `pi list` points at a real `powercontext-pi` installed path. It does not contact the Server or test recall.
+
+Start a **new** session in the project directory:
+
+```bash
+pi
+```
+
+Restart Pi after changing PowerContext environment variables.
+
+## Configuration defaults
+
+| Key | Default | Meaning |
+|---|---|---|
+| `POWERCONTEXT_PI_BASE_URL` | `http://127.0.0.1:8000` | Running Server |
+| `POWERCONTEXT_PI_SCOPE_ID` | unset | Explicit Scope; otherwise Git / path |
+| `POWERCONTEXT_PI_AUTHORIZATION` | unset | Complete Authorization header |
+| `POWERCONTEXT_PI_CAPTURE_PROMPTS` | `true` | Capture the current user prompt |
+| `POWERCONTEXT_PI_MAX_BYTES` | `8000` | Recall budget, clamped to `512–32768` |
+| `POWERCONTEXT_PI_REQUEST_TIMEOUT_MS` | `1000` | Per-request HTTP timeout |
+| `POWERCONTEXT_PI_HTTP_BUDGET_MS` | `4000` | Total prepare/capture budget for one turn |
+| `POWERCONTEXT_PI_FLUSH_ON_CAPTURE` | `false` | Test-only: wait for flush after capture |
+
+Do not put credentials in `POWERCONTEXT_PI_BASE_URL`. Use HTTPS outside loopback. Disable capture when the current work must not become Source evidence:
+
+```bash
+export POWERCONTEXT_PI_CAPTURE_PROMPTS=false
+pi
+```
+
+## Minimal verification
+
+```bash
+powercontext doctor
+powercontext ready
+powercontext capabilities
+```
+
+Save the decision in an interactive Pi session:
+
+```text
+Use PowerContext pc_remember to store this decision:
+after changing the OpenAPI contract, regenerate the client and inspect the diff.
+Return the Memory Citation. Do not store secrets.
+```
+
+`pc_remember` goes through `ui.confirm` first. After approval it should return a Memory Citation. You can do the same write with `/pc remember`, and use `/pc search` or `/pc doctor` for diagnostics.
+
+Open a new session and ask:
+
+```text
+What should happen after the OpenAPI contract changes?
+```
+
+When automatic recall succeeds, `systemPrompt` gains a trailing block that starts with `PowerContext host-supplied context` and includes a Citation. Pi does not synchronize the complete transcript.
+
+## Scope resolution
+
+Pi resolves Scope in this order:
+
+1. A nonempty `POWERCONTEXT_PI_SCOPE_ID`.
+2. The normalized Git `remote.origin.url`, written as `git:...`.
+3. A `local:<sha256>` identifier for the project root.
+
+Pi does not read the Codex / Claude Code Workstream binding. Cross-host sharing requires both sides to resolve the exact same `scope_id`.
+
+## Automatic path and explicit tools
 
 ```text
 before_agent_start
@@ -31,25 +110,47 @@ agent_end / session_before_compact / session_before_switch / session_shutdown
 → retry pending flush within bounded budget
 ```
 
-The flusher keeps the maximum pending position per Scope and clears only when `current_cursor >= position`. Boundary failure fails open.
+The flusher keeps the maximum pending position per Scope and clears it only when `current_cursor >= position`. Boundary failure fails open. Prompt Source identity derives from branch and turn identity. Secret-looking prompts and prompts over 200,000 UTF-8 bytes are not captured.
 
-Prompt Source identity derives from branch and turn identity. Secret-looking or over-byte-limit prompts are not captured.
+Core explicit tools:
 
-## Tools and confirmation
+| Tool / command | Purpose |
+|---|---|
+| `pc_search` / `/pc search` | Search Memory |
+| `pc_remember` / `/pc remember` | Write durable Memory |
+| `pc_handoff_commit` | Commit a Handoff only when the user explicitly asks |
+| `/pc doctor` | Diagnostics; not a substitute for `powercontext doctor pi` |
+| `/pc flush` | Flush pending Sources explicitly |
 
-Pi supplies Memory/Handoff tools and `/pc` diagnostics. Durable mutation requires interactive confirmation. Without UI it returns stable `confirmation_required` and performs no silent write.
+Durable mutation needs interactive confirmation. Without UI, Pi returns stable `confirmation_required` and performs no silent write. A rejected confirmation returns `cancelled`.
 
-`agent_end` triggers flush only; it does not record Task Outcome. `session_shutdown` is not a Claude Code Stop hook.
-
-Pi does not support managed Skill export. A bundled Skill does not change that fact.
+`agent_end` triggers flush only; it does not record Task Outcome. `session_shutdown` is not a Claude Code Stop hook. Pi does not support managed Skill export. A bundled Skill does not change that fact.
 
 ## Negative checks
 
-- Server down: recall, capture, and flush do not block the agent.
+- Stop the Server, then ask a normal coding question. Recall, capture, and flush must not block the agent.
+- With the Server still down, run `pc_remember`. Explicit failure must stay visible.
+- Mutation without UI: return `confirmation_required` and write nothing.
 - Secret or oversized prompt: recall may run, capture does not.
-- Immediate flush fails: boundary event retries.
-- Cursor never catches up: bounded budget ends without claiming Memory exists.
-- Mutation without UI: explicit denial.
-- Redirect and remote transport: verify Pi's transport tests rather than copying another host's behavior.
+- Immediate flush fails: a boundary event retries within a bounded budget; if the cursor never catches up, stop without claiming Memory exists.
+- Redirect and remote transport: verify Pi's transport tests rather than copying another host.
+
+## Current limits
+
+- The full recall host chain is **Not validated**. Package-load E2E only proves that Pi can list and load the package.
+- No formal minimum Pi version is declared; `0.82.x` is development compatibility only.
+- Managed Skill export is **Unsupported**.
+- Automatic extraction needs a generation model; explicit Memory does not.
+- Invalid local configuration must not prevent Pi from starting. Tools may be unavailable, but ordinary coding should continue.
+
+## Completion checklist
+
+- Node is `>=22.19`, and `doctor pi` sees `powercontext-pi`.
+- Server health, readiness, and capabilities were checked separately.
+- A new session can recall the OpenAPI decision you saved explicitly from `systemPrompt`, with a Citation.
+- Ordinary coding continues when automatic recall fails.
+- Explicit Memory or Handoff failure is visible in Pi.
+- A durable write without UI is refused instead of succeeding silently.
+- You did not treat the bundled Skill as a managed export.
 
 Continue with [Extend hooks](/en/coding-agents/extend-hooks).
