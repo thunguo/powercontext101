@@ -137,7 +137,7 @@ It does not support:
 - vector or hybrid search;
 - model-backed reranking.
 
-The first tutorial therefore starts with explicit Memory. It verifies persistence, Scope, and Citations before provider configuration becomes another variable.
+The first loop therefore starts with explicit Memory: write one Memory, find it with `search_memory`, and use `prepare_context` to obtain a cited `PreparedContext`. That verifies persistence, Scope, and Citations before provider configuration becomes another variable. Model extraction from Source and Handoff generation wait for later pages.
 
 ## Install the Client in a Python project
 
@@ -239,6 +239,7 @@ Before continuing, confirm that:
 - `powercontext capabilities` lists `auto, fts`;
 - the Dashboard opens or is intentionally disabled;
 - the example Python project can import `PowerContextClient`;
-- the stable Scope for this tutorial is `project:powercontext-101`.
+- the stable Scope for this tutorial is `project:powercontext-101`;
+- the first loop is: write a Memory → `search_memory` → `prepare_context` to obtain a cited `PreparedContext`.
 
-Continue with the [Python Client API tour](/en/basic-usage/api-tour).
+Continue with the [Python Client API tour](/en/basic-usage/api-tour) to finish that loop.

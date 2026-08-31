@@ -43,9 +43,9 @@ keywords:
     4. [安装并运行 Server](/zh/basic-usage/install-and-run)
     5. [常用 API 串讲](/zh/basic-usage/api-tour)
 
-    完成标志：你能写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
+    完成标志：你走完第一条闭环——写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
 
-    可以先跳过框架和宿主页。
+    可以先跳过框架、宿主，以及后面的 Source / Handoff 页。
   </Tab>
   <Tab title="我写 Python Agent">
     阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [常用 API 串讲](/zh/basic-usage/api-tour) → [框架集成](/zh/frameworks/overview)。
@@ -100,6 +100,6 @@ Bub 目前主要由 integration 目录里的 README 说明，101 不为它单独
     如果 Source、Memory 和 PreparedContext 还会混在一起，从这里开始。
   </Card>
   <Card title="启动本地 Server" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始运行">
-    如果对象边界已经清楚，直接完成无模型的第一个闭环。
+    如果对象边界已经清楚，直接完成第一条闭环：写入 Memory，搜索它，再得到带 Citation 的 `PreparedContext`。
   </Card>
 </Columns>

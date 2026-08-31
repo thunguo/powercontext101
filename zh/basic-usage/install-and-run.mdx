@@ -137,7 +137,7 @@ http://127.0.0.1:8000/
 - vector / hybrid search；
 - model-backed reranking。
 
-所以第一条教程从 explicit Memory 开始。这样可以先验证持久化、Scope 和 Citation，不必把 provider 配置也塞进第一次排错。
+所以第一条闭环从 explicit Memory 开始：写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。这样可以先验证持久化、Scope 和 Citation，不必把 provider 配置也塞进第一次排错。Source 抽取和 Handoff 生成需要模型，留到后面的页再做。
 
 ## 为 Python 项目安装 Client
 
@@ -239,6 +239,7 @@ Server 正常运行在 FTS-only 模式。它尚不满足 vector/hybrid 的前提
 - `powercontext capabilities` 显示 `auto, fts`；
 - Dashboard 能打开，或已明确禁用；
 - Python 示例项目能 import `PowerContextClient`；
-- 你知道本次教程使用的稳定 Scope 是 `project:powercontext-101`。
+- 你知道本次教程使用的稳定 Scope 是 `project:powercontext-101`；
+- 你知道第一条闭环是：写入 Memory → `search_memory` → `prepare_context` 得到带 Citation 的 `PreparedContext`。
 
-下一页用 [Python Client 串通常用 API](/zh/basic-usage/api-tour)。
+下一页用 [Python Client 串通常用 API](/zh/basic-usage/api-tour) 做完这条闭环。

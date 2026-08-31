@@ -58,7 +58,7 @@ Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先花�
 
 <Columns cols={2}>
   <Card title="跑通常用 API" icon="book-open" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始基础用法">
-    启动本地 Server，用 Python Client 完成 Memory、Source 和 Handoff 的第一条闭环。
+    启动本地 Server，用 Python Client 完成第一条闭环：写入 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
   </Card>
   <Card title="接入 Python Agent" icon="boxes" href="/zh/frameworks/overview" arrow="true" cta="比较框架">
     比较 LangGraph、LangChain 和 Pydantic AI 的接入位置、成熟度与能力差异。
