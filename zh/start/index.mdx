@@ -12,15 +12,15 @@ keywords:
 
 PowerContext 把共同推进的工作变成可理解、可交接、可延续的项目上下文。它是人机协作的上下文运行层，不只是记忆库。PowerContext 101 教你怎么用、怎么玩；安装步骤、接口契约和完整 how-to 请看[官方文档](https://oceanbase.github.io/powercontext/zh/docs/)。
 
-## 30 看懂 PowerContext
+## 30 秒看懂 PowerContext
 
 PowerContext 保存的是项目上下文，不是聊天记录本身。
 
 <Tooltip headline="Source" tip="原始工作证据。采集一条 prompt 只会留下 Source，不会自动变成 Memory。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip> 是证据。<Tooltip headline="Memory" tip="经过选择、可修订的长期项目知识。修订和停用都会保留历史。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 是经过选择、可修订的长期知识。<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给另一个会话、任务或模型。默认是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 默认是临时交接包，你明确要求后才提交成里程碑。
 
-模型可以提交 <Tooltip headline="Candidate" tip="Experience 或 managed Skill 的提案。pending 状态进入 Review Inbox，批准前不是 Artifact。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip>。<Tooltip headline="Review" tip="把提案写成不可变 Artifact Revision，或记录拒绝原因。两种决定都是终态。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Review</Tooltip> 通过后才形成不可变的 Artifact Revision。<Tooltip headline="Skill" tip="获批不会安装或执行。必须显式导出一个精确的 approved Revision。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip> 获批后仍要显式导出，它不会自行安装或执行。
+模型可以提交 <Tooltip headline="Candidate" tip="Experience 或 managed Skill 的提案。pending 状态进入 Review Inbox，批准前不是 Artifact。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip>。Candidate 是待审核的填，模型只能交提案，不能自己生效。Candidate 被 <Tooltip headline="Review" tip="把提案写成不可变 Artifact Revision，或记录拒绝原因。两种决定都是终态。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Review</Tooltip> 通过后才形成不可变的 Artifact Revision（审核通过后留下的不可变版本）。<Tooltip headline="Skill" tip="获批不会安装或执行。必须显式导出一个精确的 approved Revision。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip> 获批后仍要显式导出，它不会自行安装或执行。
 
-<Tooltip headline="PreparedContext" tip="一次 Agent turn 的有界临时视图。它不是新的长期记录。召回失败必须 fail-open。" cta="阅读 fail-open" href="/zh/mental-model/fail-open">PreparedContext</Tooltip> 是一次请求的有界视图，不是新的长期记录。
+<Tooltip headline="PreparedContext" tip="一次 Agent turn 的有界临时视图。它不是新的长期记录。召回失败必须 fail-open。" cta="阅读 fail-open" href="/zh/mental-model/fail-open">PreparedContext</Tooltip> 是本轮临时拼给模型看的有界上下文，不是长期的记录。
 
 ```mermaid
 flowchart LR
