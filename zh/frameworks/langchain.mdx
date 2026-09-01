@@ -150,7 +150,7 @@ Token 采用不含 `Bearer ` 的 bare token 约定。Adapter 不严格校验该�
 
 Automatic recall 与 capture 是相互独立的 fail-open paths。Scope 缺失、配置错误、request validation、authentication failure、timeout、Server failure，或无法序列化的 structured response，都不会替换 model result，也不会中止 host run。HTTP 401/403 会记录为配置问题，不会冒充 empty Memory。
 
-Middleware 不添加显式 PowerContext tools。如果应用自行把 Python Client mutation 包装成 tool，其 failure contract 和 permission 归应用负责；automatic fail-open 不会让这些 mutation 假装成功。
+Middleware 不添加显式 PowerContext tools。如果应用自行把 Python Client mutation 包装成 tool，其 失败契约 和 permission 归应用负责；automatic fail-open 不会让这些 mutation 假装成功。
 
 <Warning>
 Recall 可能包含旧 user 或 model text。它是 untrusted evidence，不是 instruction、identity proof 或 permission grant。Scope 只选择数据分区；需要隔离时，应从 authenticated tenant/project mapping 派生 Scope。

@@ -11,7 +11,7 @@ Memory 保存以后仍要知道的项目知识。Handoff 处理正在进行的�
 
 | 你要保存的内容 | 选择 |
 |---|---|
-| “运行 contract tests 前先重新生成 client” | Memory |
+| “运行 契约测试 前先重新生成 client” | Memory |
 | “client 已生成，但 tests 尚未运行，下一步执行命令 X” | Handoff |
 | “项目只支持 Python 3.11+” | Memory |
 | “这个会话已修改文件 A/B，文件 C 仍待检查” | Handoff |
@@ -47,7 +47,7 @@ Work Contract
 → Work continuity projection
 ```
 
-高层操作把 Work Contract、boundary、receipt 和 outcome 保存为 Source records，并复用低层 Handoff 模型。
+高层操作把 工作契约、boundary、receipt 和 outcome 保存为 Source records，并复用低层 Handoff 模型。
 
 ## Prepared Handoff 先于 commit
 
@@ -140,7 +140,7 @@ Projection 读取 malformed work Source 时会 fail-soft：无效记录计入 `i
 
 ## 用 OpenAPI 案例走一遍
 
-### 1. Work Contract
+### 1. 工作契约
 
 ```text
 Objective: complete the OpenAPI client update
@@ -178,7 +178,7 @@ handoff/HANDOFF_ID@1
 
 ### 6. Outcome
 
-contract tests 运行后记录 Task Outcome，并引用 acknowledgement receipt SourceRef。Work continuity 应显示 transfer accepted、outcome covered。
+契约测试 运行后记录 Task Outcome，并引用 acknowledgement receipt SourceRef。Work continuity 应显示 transfer accepted、outcome covered。
 
 ## 失败不会总是原子回滚
 

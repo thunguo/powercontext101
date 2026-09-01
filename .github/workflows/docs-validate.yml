@@ -21,5 +21,8 @@ jobs:
       - name: Install Mintlify CLI
         run: npm install --global mint
 
-      - name: Validate documentation
+      - name: Validate documentation policy
+        run: python3 scripts/validate_docs.py
+
+      - name: Validate Mintlify build
         run: mint validate

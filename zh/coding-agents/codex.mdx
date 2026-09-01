@@ -4,7 +4,7 @@ description: "组合 UserPromptSubmit Hook、HTTP MCP 与 project-context Skill�
 ---
 
 <Note>
-当前 integration 有 contract 与 HTTP service-chain coverage。正式最低 Codex version 尚未声明；完整的真实 Codex host-process E2E 仍是 **Not validated**。
+当前 integration 有 契约 与 HTTP service-chain coverage。正式最低 Codex version 尚未声明；完整的真实 Codex host-process E2E 仍是 **Not validated**。
 </Note>
 
 ## 成熟度与安装
@@ -21,7 +21,7 @@ powercontext server run
 powercontext doctor codex
 ```
 
-Setup 会让 Codex 添加 marketplace 与 plugin，然后验证 installed entry。与 Claude Code setup 不同，当前 Codex installer 不会打印 no-write preview plan，也没有 transactional rollback。这里的 setup preview/rollback contract 属于 **Unsupported**，不能当成所有宿主共享的能力。
+Setup 会让 Codex 添加 marketplace 与 plugin，然后验证 installed entry。与 Claude Code setup 不同，当前 Codex installer 不会打印 no-write preview plan，也没有 transactional rollback。这里的 setup preview/rollback 契约 属于 **Unsupported**，不能当成所有宿主共享的能力。
 
 ## 最小用法
 
@@ -75,7 +75,7 @@ Captured prompt 只是 Source evidence。超过 200,000 characters 的 prompt �
 
 ## MCP、Skill、Handoff 与 permission
 
-MCP 提供显式 Memory maintenance、Work Contract、Handoff、acknowledgement、Outcome 与 Review operations。`POWERCONTEXT_CODEX_AUTHORIZATION` 可以通过 `.mcp.json` 的 `env_http_headers` 提供完整 Authorization value；public local Server 可以不设置。Remote endpoint 必须使用 HTTPS。
+MCP 提供显式 Memory maintenance、工作契约、Handoff、acknowledgement、Outcome 与 Review operations。`POWERCONTEXT_CODEX_AUTHORIZATION` 可以通过 `.mcp.json` 的 `env_http_headers` 提供完整 Authorization value；public local Server 可以不设置。Remote endpoint 必须使用 HTTPS。
 
 Skill 为 `handoff this work` 定义 one-turn semantics。Codex 检查当前 conversation 与 repository，只调用一次 `handoff_current_work` 并使用 unique `source_id`，在同一 turn 将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到 exact Revision 后报告成功。Imperative 已经授权 Handoff 时，不会再索要第二次确认。
 
@@ -92,7 +92,7 @@ Preview boundary 很明确。Handoff 问题、设计讨论、draft request 或 `
 | **Unsupported** | 通过 `handoff_current_work` 做 zero-write preview | 只在 chat 展示 preview fields，不调用该 tool。 |
 | **Unsupported** | Codex setup no-write plan 与 transactional rollback | 运行前自行检查命令；partial failure 后可能需要手动清理。 |
 | **Not validated** | 正式最低 Codex version | 不要把 development 中测试过的版本写成支持下限。 |
-| **Not validated** | 完整真实 Codex host-process E2E | Contract 与 HTTP service-chain tests 不能证明完整 host lifecycle。 |
+| **Not validated** | 完整真实 Codex host-process E2E | 契约 与 HTTP service-chain tests 不能证明完整 host lifecycle。 |
 | **Not validated** | 真实宿主执行 one-turn Handoff 与 preview no-write policy | 这些是 bundled Skill 规则，底层 MCP primitives 已存在，但还没有完整 Codex behavioral acceptance test。 |
 | **Not validated** | exact Codex permission UI 与 enforcement | MCP annotations 只表达 intent；authorization behavior 由宿主负责。 |
 

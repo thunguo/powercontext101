@@ -89,7 +89,7 @@ explicit mutation → interactive confirmation; deny without UI
 | Managed Skill export | **Supported** | **Supported** | **Unsupported** | **Unsupported** | **Unsupported** |
 | Real-host E2E | **Not validated** | **Not validated** | **Not validated** | prepare/capture smoke **Supported**；full lifecycle **Not validated** | package load only；full chain **Not validated** |
 
-五种 integration 都带有宿主 guidance，但 bundled `project-context` Skill 不是 managed Skill export。Managed export 是另一条 PowerContext 操作，需要 projection 与 drift contract；当前只支持 Codex 和 Claude Code。
+五种 integration 都带有宿主 guidance，但 bundled `project-context` Skill 不是 managed Skill export。Managed export 是另一条 PowerContext 操作，需要 projection 与 drift 契约；当前只支持 Codex 和 Claude Code。
 
 ## Scope、注入、capture 与 flush
 
@@ -170,7 +170,7 @@ Automatic recall、capture 和可选 flush 属于辅助路径。预期内的 Ser
 - [ ] 部署说明没有混淆 Unsupported 与 **Not validated**。
 
 <Check>
-如果真实宿主还没有启动并处理过 prompt，就只能报告已完成的 contract、service-chain 或 doctor tier，不能称为 real-host E2E。
+如果真实宿主还没有启动并处理过 prompt，就只能报告已完成的 契约、service-chain 或 doctor tier，不能称为 real-host E2E。
 </Check>
 
 选择具体宿主 Setup 前，继续阅读 [Hooks 与插件](/zh/coding-agents/hooks-and-plugins)。

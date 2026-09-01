@@ -9,7 +9,7 @@ description: "安装 UserPromptSubmit + MCP + Skill plugin，并守住 v1 的 ca
 
 ## 成熟度与安装
 
-当前 integration 有 contract tests，以及 public/authenticated service-chain tests。它的自动路径刻意保持很窄：只运行 `UserPromptSubmit`。Setup 会安装 user-scope marketplace plugin，其中包含 Hook、HTTP MCP 配置与 bundled `project-context` Skill。
+当前 integration 有 契约测试，以及 public/authenticated service-chain tests。它的自动路径刻意保持很窄：只运行 `UserPromptSubmit`。Setup 会安装 user-scope marketplace plugin，其中包含 Hook、HTTP MCP 配置与 bundled `project-context` Skill。
 
 ```bash
 powercontext setup claude-code \
@@ -74,7 +74,7 @@ Capture 仍只是 Source evidence。最终是否生成或更新 Memory，由 Sou
 
 `.mcp.json` 连接 HTTP MCP Server。`headersHelper` 从环境读取完整的 `POWERCONTEXT_CLAUDE_AUTHORIZATION` value，只在它存在时输出 `Authorization` header。Token 不会进入 plugin config、prompt 或 diagnostics。远程 endpoint 必须使用 HTTPS。
 
-MCP 提供精确的 Memory maintenance、Work Contract、Prepared/committed Handoff、acknowledgement、Outcome 与 Review operations。Skill 把直接的 `handoff this work` imperative 视为一次 durable Handoff 的授权：检查 live state，只调用一次 `handoff_current_work`，在同一 turn 将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到 exact Revision 后报告成功。
+MCP 提供精确的 Memory maintenance、工作契约、Prepared/committed Handoff、acknowledgement、Outcome 与 Review operations。Skill 把直接的 `handoff this work` imperative 视为一次 durable Handoff 的授权：检查 live state，只调用一次 `handoff_current_work`，在同一 turn 将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到 exact Revision 后报告成功。
 
 问题、设计讨论或 preview request 都不构成 write 授权。做 preview 时，只在 chat 中展示拟议字段，不能产生 PowerContext write。不要用 `handoff_current_work` 实现 no-write preview：即使不调用 `commit_handoff`，它仍会记录 boundary Source。
 

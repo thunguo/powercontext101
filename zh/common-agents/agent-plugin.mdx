@@ -4,12 +4,12 @@ description: "加载便携的 project-context Skill 与 MCP 配置，用显式 M
 ---
 
 <Warning>
-没有 `powercontext setup agent-plugin` 或 `doctor agent-plugin`。这个 package 不实现自动 recall、capture 或 Runtime。仓库有 package contract 测试；真实 host-process E2E 是 **Not validated**。Permission 属于 **Host-gated**。managed Skill export 是 **Unsupported**。
+Agent Plugin 没有专用的 setup 或 doctor 命令。这个 package 不实现自动 recall、capture 或 Runtime。仓库有软件包契约测试；真实 host-process E2E 是 **Not validated**。Permission 属于 **Host-gated**。managed Skill export 是 **Unsupported**。
 </Warning>
 
 Agent Plugin 是一份便携包，给能加载 Agent Plugin Skill 和 MCP 配置的宿主使用。它指向正在运行的 PowerContext Server，不嵌入存储，不启动 Server，也不添加 MCP tools。Memory、Handoff 和持久化仍由 Server 上已有的 MCP tools 负责。
 
-完整加载步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure Agent Plugin how-to。本页只写 101 的验证合同。
+完整加载步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure Agent Plugin how-to。本页只写 101 的验证契约。
 
 ## 取得 package 并加载
 
@@ -79,7 +79,7 @@ powercontext ready
 powercontext capabilities
 ```
 
-没有对应的 `doctor agent-plugin`。加载成功只表示宿主看见了 Skill 和 MCP 条目，不证明 Server 可达，也不证明 recall。
+Agent Plugin 没有专用的 doctor 命令。加载成功只表示宿主看见了 Skill 和 MCP 条目，不证明 Server 可达，也不证明 recall。
 
 在已加载 package 的 chat 里显式保存学习路径那道题的答案：
 

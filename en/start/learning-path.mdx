@@ -49,7 +49,7 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
 
     **Longer path (optional, not a completion check)**
 
-    If the objects still blur, read [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill). After the first loop, continue only if you need [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), or [Experience / Skill Review](/en/basic-usage/experience-skill-review). To connect an MCP client to the same data, read [Connect with MCP](/en/basic-usage/mcp). To inspect the Memory in the UI, read [See the Memory you just wrote](/en/basic-usage/dashboard).
+    If the objects still blur, read [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill). After the first loop, continue only if you need [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), or [Experience / Skill Review](/en/basic-usage/experience-skill-review). To connect an MCP client to the same data, read [Connect with MCP](/en/basic-usage/mcp). To verify active and inactive counts for the same Scope, read [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard). Use Client, HTTP, or MCP for Memory text.
   </Tab>
   <Tab title="I write Python agents">
     Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [API tour](/en/basic-usage/api-tour) → [Framework integration](/en/frameworks/overview).
@@ -67,7 +67,7 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
 
     You are done when the plugin is installed and active, `powercontext doctor <host>` passes, and a new session can recall a Memory you stored explicitly.
 
-    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. WorkBuddy and the portable Agent Plugin also live in this chapter: run `setup workbuddy` separately for WorkBuddy; Agent Plugin has no setup command, so verify explicit MCP only. Installation, credentials, and durable writes still require your authorization.
+    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. WorkBuddy uses its separate `setup workbuddy` path. The portable Agent Plugin has no setup command; load its package directory and verify explicit MCP operations. Installation, credentials, and durable writes still require your authorization.
 
     **Longer path (optional, not a completion check)**
 

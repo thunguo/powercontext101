@@ -20,10 +20,10 @@ icon: wrench
     采集 Source 只表示“这件事发生过”。它不会自动变成长期 Memory。没有 generation model 时，Source 会保持 pending。用 `remember_memory` 写你已经确认的事实，或读 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
   </Step>
   <Step title="doctor 通过但召回失败" icon="stethoscope">
-    `powercontext doctor` 和 `doctor <host>` 是安装诊断。它们不证明 Server 可达，也不证明新会话已经召回。把 package / Server / 宿主检查分开，见[通用 Agent 总览](/zh/common-agents/overview) 和对应宿主页。
+    先确认你运行的是哪一个命令。`powercontext doctor` 会检查软件包、Server 存活状态和 readiness；`powercontext doctor <host>` 只检查该宿主 CLI 与有限的安装/激活状态，不会探测 Server，也不会发送真实 prompt。先用前者确认 Server，再按宿主页完成真实召回。见[通用 Agent 总览](/zh/common-agents/overview)。
   </Step>
   <Step title="Dashboard 是空的，数据其实在" icon="layout-dashboard">
-    未配置 Dashboard Scope 时页面就是空的。配上和 Client 相同的 `scope_id`，并确认同一个 database URL。步骤在[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard)。
+    未配置 Dashboard Scope 时页面就是空的。配上和 Client 相同的 `scope_id`，并确认同一个 database URL。步骤在[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。
   </Step>
   <Step title="Preview adapter 当前装不上" icon="triangle-alert">
     Pydantic AI Agent adapter 是 **Preview**。PyPI 和当前 Git subdirectory 安装都不可用。第一次接入走 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)，不要从 Preview 页开始。

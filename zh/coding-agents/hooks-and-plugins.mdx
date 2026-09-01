@@ -15,7 +15,7 @@ description: "把五种宿主事件模型映射到一份已验证的领域合同
 |---|---|---|
 | 共用领域合同与负向测试 vectors | **Supported** | 当前 policy、helper 与测试覆盖可复用行为 |
 | 统一的 `HostAdapter` SDK | **Unsupported** | 当前仓库没有这个抽象 |
-| Codex、Claude Code 与 DSH real-host E2E | **Not validated** | Contract 与 service-chain test 没有启动这些真实宿主 |
+| Codex、Claude Code 与 DSH real-host E2E | **Not validated** | 契约 与 service-chain test 没有启动这些真实宿主 |
 | OpenCode real host-process prepare/capture smoke | **Supported** | Version-gated real-host test 会观察 prepare/capture request |
 | OpenCode 完整 host lifecycle E2E | **Not validated** | 该 smoke 没有完整覆盖 transform injection、permission UI、Skill loading、cleanup 与 flush |
 | Pi 完整 recall host chain | **Not validated** | Package load 另有覆盖 |
@@ -35,7 +35,7 @@ powercontext server run
 powercontext doctor <host>
 ```
 
-## 最小 adapter contract
+## 最小 适配器契约
 
 ```text
 PromptEvent
@@ -182,7 +182,7 @@ Candidate approve/reject/revise 不应成为 silent model tool。DSH 与 OpenCod
 
 Managed export 会生成带 provenance 和 drift check 的 versioned projection。Codex 与 Claude Code 为 **Supported**；DSH、OpenCode 和 Pi 为 **Unsupported**。Export 后的 managed Skill 在真实 Codex 或 Claude Code 会话中的加载/执行仍是 **Not validated**。
 
-## Setup 与 doctor contract
+## Setup 与 doctor 契约
 
 First-class installer 应做到：
 
@@ -257,7 +257,7 @@ Real-host E2E 是独立 acceptance tier。必须启动真实宿主、发送 prom
 - [ ] Unsupported 与 **Not validated** 保持分开。
 
 <Check>
-Unit contract、service chain、Setup/doctor、real-host E2E 与 negative/security 五层都有 observable evidence 后，才能把第六种宿主加入 first-class catalog。
+单元级契约测试、service chain、Setup/doctor、real-host E2E 与 negative/security 五层都有 observable evidence 后，才能把第六种宿主加入 first-class catalog。
 </Check>
 
 继续阅读 [Codex](/zh/coding-agents/codex)、[Claude Code](/zh/coding-agents/claude-code)、[DSH](/zh/coding-agents/dsh)、[OpenCode](/zh/coding-agents/opencode) 或 [Pi](/zh/coding-agents/pi)。

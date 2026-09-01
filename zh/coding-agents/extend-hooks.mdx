@@ -1,10 +1,10 @@
 ---
 title: "用 Hooks 扩展"
-description: "先发现宿主能力，再定义可验证的 adapter contract，并在发布前取得 real-host 证据。"
+description: "先发现宿主能力，再定义可验证的 适配器契约，并在发布前取得 real-host 证据。"
 ---
 
 <Warning>
-当前没有统一的 `HostAdapter` SDK。本页的 contract 名称是设计 checklist，不是已有 class 或稳定 public API。
+当前没有统一的 `HostAdapter` SDK。本页的 契约 名称是设计 checklist，不是已有 class 或稳定 public API。
 </Warning>
 
 ## 从 capability discovery 开始
@@ -22,9 +22,9 @@ description: "先发现宿主能力，再定义可验证的 adapter contract，�
 
 同时查询 `GET /v1/capabilities`。它会返回 `memory_extraction`、`experience_generation`、`managed_skill_generation`、`external_skill_registry`、Handoff generation、search modes 和 context versions 等 Server capability。Host capability discovery 与 Server capability discovery 回答的问题不同，两者都需要。
 
-如果宿主没有稳定 prompt event、pre-dispatch injection point 或 permission surface，就直接写明。除非你实现了保证等价的另一套 contract，否则该 capability 是 **Unsupported**。如果宿主看起来提供了入口，但没有 real-host test 证明完整路径，则标为 **Not validated**。
+如果宿主没有稳定 prompt event、pre-dispatch injection point 或 permission surface，就直接写明。除非你实现了保证等价的另一套 契约，否则该 capability 是 **Unsupported**。如果宿主看起来提供了入口，但没有 real-host test 证明完整路径，则标为 **Not validated**。
 
-## 编写 adapter contract
+## 编写 适配器契约
 
 用以下 vocabulary 把关键决策摆到台面上：
 
@@ -43,7 +43,7 @@ Installer / Doctor
 
 这些是建议的角色。每项都要定义 input、output、failure policy、security boundary 和 observable assertion。
 
-| Role | 需要明确的 contract |
+| Role | 需要明确的 契约 |
 |---|---|
 | `PromptEvent` | 精确 host event、prompt normalization、lifecycle ordering 和稳定 turn identity。 |
 | `ScopeResolver` | Authorized override、Git identity、project fallback、normalization 与 cache lifetime。 |
@@ -87,7 +87,7 @@ onMutation(call)
 
 ## 复用现有实现
 
-只复用 contract 与宿主一致的代码：
+只复用 契约 与宿主一致的代码：
 
 - `powercontext.http` 下的 generated HTTP client 与 transport models；
 - canonical `PreparedContext` 和 capability models；
@@ -106,7 +106,7 @@ onMutation(call)
 
 新宿主必须一起定义这四个边界。
 
-Scope 应来自稳定、授权后的 project data。Git remote 要去除 credential。不要信任模型提供的 `scope_id`；除非 host contract 证明 session identity 与 repository identity 相同，也不要混用两者。
+Scope 应来自稳定、授权后的 project data。Git remote 要去除 credential。不要信任模型提供的 `scope_id`；除非 宿主契约 证明 session identity 与 repository identity 相同，也不要混用两者。
 
 Injection 应在 model dispatch 前使用宿主的 native transient channel，并把 `PreparedContext` 标为不可信的历史证据。只在 system guide 里告诉模型搜索 Memory，不能证明 recall 已注入。
 
@@ -118,7 +118,7 @@ Flush 要按 Scope 保存 Source `position`，且仅在 `current_cursor >= posit
 
 列出所有 mutating operation。明确宿主在 interactive 和 headless 模式下能否 ask、deny、cancel 或 pause，再测试实际行为。
 
-没有 permission API 的宿主不能继承 Pi 的 `confirmation_required` contract，也不能继承 OpenCode 的 `context.ask()` behavior。可选方案只有三种：在 adapter-controlled code 中 fail closed、只提供 read-only operation，或把 durable mutation 标为 **Unsupported**。“模型应该先问”不是 permission boundary。
+没有 permission API 的宿主不能继承 Pi 的 `confirmation_required` 契约，也不能继承 OpenCode 的 `context.ask()` behavior。可选方案只有三种：在 adapter-controlled code 中 fail closed、只提供 read-only operation，或把 durable mutation 标为 **Unsupported**。“模型应该先问”不是 permission boundary。
 
 Diagnostics 不得输出 prompt content、prepared context、可识别 private repository 的 Scope details、authorization values 或含 secret 的 payload。
 
@@ -140,7 +140,7 @@ Doctor 有三项工作：
 
 用以下 tier 描述证据。它们是本页的分类，不是当前 test framework 中的名称。
 
-1. **Contract/unit：** schema、Scope、size、secret、permission 与 failure-policy tests。
+1. **契约/unit：** schema、Scope、size、secret、permission 与 failure-policy tests。
 2. **Package/load：** build、install、import、manifest、command 或 plugin registration。
 3. **Service chain：** real PowerContext Server，加上直接 hook/module execution 与 Source/Memory lineage。
 4. **Real-host E2E：** 启动实际宿主，发送 prompt，观察 lifecycle、injection、capture、flush 与 permission behavior。
@@ -162,7 +162,7 @@ Package/load 和 service-chain tests 很有用，但不能证明 host API compat
 | Identity | Missing、stale 或 caller-supplied Scope/turn ID | 不发生 cross-project 或 stale-turn injection。 |
 | Capture | Disabled、secret-shaped 或 failed request | Recall 保持独立；不发送 forbidden Source。 |
 | Flush | Cursor lag、transient failure 或 timeout | Pending position 保留；重试在 budget 内结束。 |
-| Permission | Deny、cancel 或 no UI | 除非 declared host contract 允许，否则 mutation 不运行。 |
+| Permission | Deny、cancel 或 no UI | 除非 declared 宿主契约 允许，否则 mutation 不运行。 |
 | Capability | `memory_extraction=false` | Capture 仍只是 Source evidence；不声称 unsupported flush/extraction。 |
 | Lifecycle | Compact、switch、shutdown、interruption | 只使用匹配的 Scope 与 turn state。 |
 | Setup | Foreign file、failed refresh 或 failed activation | Existing state 保留，并报告 partial failure。 |
@@ -173,7 +173,7 @@ Package/load 和 service-chain tests 很有用，但不能证明 host API compat
 
 Managed Skill export 当前只支持 Codex 和 Claude Code。其他 plugin 安装 bundled `project-context` Skill，不会改变这个 matrix。
 
-新增 export target 时，需要实现 projection contract、target enum 与 OpenAPI surface、ownership rules、validation、rollback 和 drift tests。在这些工作完成前，该宿主的 managed export 为 **Unsupported**。如果 implementation 已存在，但未运行 real install/refresh test，则标为 **Not validated**。
+新增 export target 时，需要实现 projection 契约、target enum 与 OpenAPI surface、ownership rules、validation、rollback 和 drift tests。在这些工作完成前，该宿主的 managed export 为 **Unsupported**。如果 implementation 已存在，但未运行 real install/refresh test，则标为 **Not validated**。
 
 ## Unsupported 与 Not validated
 
@@ -187,7 +187,7 @@ Managed Skill export 当前只支持 Codex 和 Claude Code。其他 plugin 安�
 ## 完成 checklist
 
 - [ ] Host 与 Server capability discovery 分开记录。
-- [ ] 每个 proposed contract role 都有 input、output、failure policy 与 observable assertion。
+- [ ] 每个 proposed 契约 role 都有 input、output、failure policy 与 observable assertion。
 - [ ] Host version gate 或 compatibility evidence，以及 activation probe 已存在。
 - [ ] Scope 来自稳定、授权后的 identity，并去除 credential。
 - [ ] PreparedContext 已校验、临时注入，并标为 untrusted。

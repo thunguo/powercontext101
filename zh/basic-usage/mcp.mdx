@@ -38,7 +38,7 @@ http://127.0.0.1:8000/mcp
 |---|---|
 | `remember_memory`、`search_memory`、exact get / list / revise / retire | `prepare_context`。最终 `PreparedContext` 通常由 Hook 或 adapter 在请求时准备 |
 | `capture_content_source` | `flush_memory` |
-| Work Contract、Handoff、Task Outcome | Skill generate / export |
+| 工作契约、Handoff、Task Outcome | Skill generate / export |
 | Candidate list / get / approve / reject / revise | Experience operation |
 | 与 HTTP、Python Client 读写同一套数据 | 复现每个 integration 的自动 recall / capture / flush 生命周期 |
 
@@ -70,4 +70,4 @@ MCP 上的 `readOnlyHint` / `destructiveHint` 只给宿主做确认提示。它*
 - 停掉 Server 后再调用 `remember_memory`，失败可见。
 - 开了 Bearer 后，不带 header 的 `/mcp` 不能当已连接。
 
-编程宿主怎么注册 MCP，看 [Codex](/zh/coding-agents/codex) 或 [Claude Code](/zh/coding-agents/claude-code)。通用 Agent 里没有 setup 的路径，看 [Agent Plugin](/zh/common-agents/agent-plugin)。
+编程宿主怎么注册 MCP，看 [Codex](/zh/coding-agents/codex)、[Claude Code](/zh/coding-agents/claude-code) 或便携的 [Agent Plugin](/zh/common-agents/agent-plugin)。Agent Plugin 提供可复用的 Skill 与 MCP 配置，但不提供自动 recall、capture 或 Server 启动。

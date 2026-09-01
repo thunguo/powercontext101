@@ -20,10 +20,10 @@ This page only collects misuse already written in PowerContext 101. Each step na
     Capturing a Source records that something happened. It does not become durable Memory by itself. Without a generation model, the Source stays pending. Use `remember_memory` for a fact you already accept, or read [Source and Memory](/en/basic-usage/source-and-memory).
   </Step>
   <Step title="Doctor passed, recall failed" icon="stethoscope">
-    `powercontext doctor` and `doctor <host>` are installation diagnostics. They do not prove the Server is reachable or that a new session recalled anything. Separate package, Server, and host checks. See the [common agents overview](/en/common-agents/overview) and the host page you used.
+    Check which command passed. `powercontext doctor` checks the package plus Server liveness and readiness. `powercontext doctor <host>` checks only that host CLI and a bounded installation or activation surface; it neither probes the Server nor sends a real prompt. Verify the Server with the first command, then complete live recall on the host page. See the [common agents overview](/en/common-agents/overview).
   </Step>
   <Step title="The Dashboard is empty, but the data is there" icon="layout-dashboard">
-    An unconfigured Dashboard Scope shows an empty page. Configure the same `scope_id` as the Client and keep the same database URL. Steps are on [See the Memory you just wrote](/en/basic-usage/dashboard).
+    An unconfigured Dashboard Scope shows an empty page. Configure the same `scope_id` as the Client and keep the same database URL. Steps are on [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard).
   </Step>
   <Step title="The Preview adapter will not install" icon="triangle-alert">
     The Pydantic AI Agent adapter is **Preview**. Neither PyPI nor the current Git subdirectory install works. First integration is [LangGraph](/en/frameworks/langgraph) or [LangChain](/en/frameworks/langchain), not the Preview page.

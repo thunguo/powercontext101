@@ -1,6 +1,6 @@
 ---
 title: "Handoff 闭环"
-description: "创建 Work Contract，交接当前工作，确认 exact Handoff，并记录真实 Task Outcome。"
+description: "创建 工作契约，交接当前工作，确认 exact Handoff，并记录真实 Task Outcome。"
 ---
 
 这一页完成一条真正的工作交接：发送方记录委托边界和当前状态，接收方检查 exact Handoff，最后把结果链接回这次交接。
@@ -19,7 +19,7 @@ Work Contract
 → Task Outcome
 ```
 
-Work Contract、Handoff boundary、acknowledgement receipt 和 Task Outcome 都会留下 Source receipt。Committed Handoff 另有不可变 Artifact Revision。
+工作契约、Handoff boundary、acknowledgement receipt 和 Task Outcome 都会留下 Source receipt。Committed Handoff 另有不可变 Artifact Revision。
 
 ## 完整 Python 示例
 
@@ -215,11 +215,11 @@ uv run python handoff_loop.py
 
 ## 每一步的边界
 
-### Work Contract 是委托基线
+### 工作契约 是委托基线
 
 它记录 objective、in-scope work、exclusions、completion criteria、authorization notes 和 consequential questions。
 
-Contract 是 `untrusted_input` Source，不会扩大当前授权。`basis="verified"` 的 claim 必须带 exact evidence；`basis="declared"` 则不能带 evidence。
+契约 是 `untrusted_input` Source，不会扩大当前授权。`basis="verified"` 的 claim 必须带 exact evidence；`basis="declared"` 则不能带 evidence。
 
 ### `handoff_current_work` 会写 boundary Source
 
@@ -324,7 +324,7 @@ unknown
 
 ## 完成检查
 
-- Work Contract receipt 已保存；
+- 工作契约 receipt 已保存；
 - Prepared Handoff 可以临时 continue；
 - commit 返回 exact Handoff Revision；
 - latest discovery 转成 exact acknowledgement；

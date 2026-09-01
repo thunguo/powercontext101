@@ -171,7 +171,7 @@
             "icon": "terminal",
             "pages": [
               {
-                "group": "合同",
+                "group": "契约",
                 "pages": [
                   "zh/coding-agents/overview",
                   "zh/coding-agents/hooks-and-plugins",

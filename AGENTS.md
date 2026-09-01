@@ -45,10 +45,13 @@ Keep these product words in both Chinese and English pages. Do not replace them 
 - `Candidate`
 - `Review`
 - `fail-open`
-- `Work Contract`
 - `Task Outcome`
 
-Say `PowerContext 101` for this site. Say `official docs` / `官方文档` for https://oceanbase.github.io/powercontext/.
+English pages use `Work Contract`. On each Chinese page, write `工作契约（Work Contract）` on first reader-visible use and `工作契约` afterwards. Keep API identifiers, schemas, JSON fields, and code literals such as `create_work_contract`, `CreateWorkContractRequest`, `powercontext.work-contract.v1`, and `"contract"` unchanged.
+
+In Chinese prose, translate ordinary technical language when no exact identifier is involved: adapter → 适配器, plugin → 插件, recall → 召回, capture → 采集, commit → 提交, export → 导出, approve/reject/revise → 批准/拒绝/修订, current head → 当前头版本, stale → 过期, durable → 持久, boundary → 边界, receipt → 回执, lineage → 证据链, no-op → 无变更, fallback → 后备路径, provider → 模型提供方, real-host E2E → 真实宿主端到端验证, drift → 漂移. Do not force these translations inside code, API names, environment variables, or exact status values.
+
+Say `PowerContext 101` for this site. Say `official docs` / `官方文档` for https://powercontext.oceanbase.io/.
 
 ## Bilingual lockstep
 

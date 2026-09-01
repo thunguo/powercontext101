@@ -82,7 +82,7 @@ Automatic flush 可选，默认关闭。启用 `flushOnCapture` 后，positive c
 
 Model surface 包含 19 个 curated named HTTP tools，不是 MCP。它们覆盖 Memory、prepare/capture、low-level Handoff、Experience 与 Skill generation/read，以及 read-only Candidate list/get。
 
-Generic operation invocation、dangerous/admin operations 与 Candidate approve/reject/revise 在 model surface 上属于 **Unsupported**。High-level `create_work_contract`、`handoff_current_work`、`acknowledge_handoff` 与 `record_task_outcome` 也没有注册到该 surface，尽管相关 operation 存在于 generated HTTP contract 中。
+Generic operation invocation、dangerous/admin operations 与 Candidate approve/reject/revise 在 model surface 上属于 **Unsupported**。High-level `create_work_contract`、`handoff_current_work`、`acknowledge_handoff` 与 `record_task_outcome` 也没有注册到该 surface，尽管相关 operation 存在于 generated HTTP 契约 中。
 
 Read tools 会继续经过 `tools/pre-execute`。Memory write、显式 Source capture、Handoff activate/commit 与 Experience/Skill generation 这些 named mutation 会在执行前返回 `ask`。Permission UI 与 allow/deny decision 由 DSH 负责，因此这些 mutation 属于 **Host-gated**。Unit tests 已证明 `ask` classification；真实宿主中的 exact UI 与 denial path 为 **Not validated**。
 
@@ -122,7 +122,7 @@ Automatic prepare、validation、capture、optional flush 与 message wrapping �
 | **Not validated** | 真实 host policy 下的 exact permission UI 与 denial behavior | Plugin 返回 `ask`；交互与最终 decision 由 DSH 负责。 |
 | **Not validated** | dedicated real-host non-`enter` suppression 与 cursor-behind flush behavior | 对外声明 deployment 能力前，先运行负向实验。 |
 
-`test_dsh_http_chain.py` 验证关闭 MCP 后的 native public Client/Server HTTP contract。Cordis harness 覆盖 plugin 对 live Server 的 call-through。两者都没有启动真实 DSH host。
+`test_dsh_http_chain.py` 验证关闭 MCP 后的 native public Client/Server HTTP 契约。Cordis harness 覆盖 plugin 对 live Server 的 call-through。两者都没有启动真实 DSH host。
 
 
 ## 配置默认值

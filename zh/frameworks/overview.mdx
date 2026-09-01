@@ -7,7 +7,7 @@ description: "第一次接入先选 LangGraph 或 LangChain。Server inference �
 各路径的 packaging 状态不同。Pydantic AI Agent adapter 仍是 Preview，当前没有可用的独立安装方式。LangGraph 和 LangChain 只能从 source 安装，尚未发布到 PyPI。
 </Warning>
 
-PowerContext 有四条 Python 框架路径。它们共用 Server contract，但不是同一种抽象。第一次接入 Agent 时，先选 LangGraph 或 LangChain；这两条路径可以从 source 安装。尤其要分清：Server 内的 Pydantic AI inference 只配置 generation、embedding 和 reranking，并不是 Agent adapter。面向 Pydantic AI Agent 的 Preview adapter 需要时再读，不要当作第一页。
+PowerContext 有四条 Python 框架路径。它们共用 Server 契约，但不是同一种抽象。第一次接入 Agent 时，先选 LangGraph 或 LangChain；这两条路径可以从 source 安装。尤其要分清：Server 内的 Pydantic AI inference 只配置 generation、embedding 和 reranking，并不是 Agent adapter。面向 Pydantic AI Agent 的 Preview adapter 需要时再读，不要当作第一页。
 
 ## 四种边界，不是一套封装
 

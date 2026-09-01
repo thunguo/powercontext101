@@ -309,7 +309,7 @@ except InvalidResponseError as exc:
 
 ## MCP 与 HTTP 不是同一覆盖面
 
-MCP 是给 Agent 的精选工具面。HTTP 是完整 application contract。
+MCP 是给 Agent 的精选工具面。HTTP 是完整 application 契约。
 
 `POST /v1/context/prepare` 和 Python Client 的 `prepare_context` 不作为 MCP tool 暴露，因为最终 PreparedContext 通常由 Hook 或 framework adapter 在请求时自动准备。MCP 也不等于每个 integration 的自动 capture 和 flush 生命周期。
 

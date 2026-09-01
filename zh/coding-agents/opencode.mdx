@@ -101,7 +101,7 @@ Setup 可以刷新 owned install，但会保留 foreign path。Skill conflict pa
 
 Plugin 挂载 19 个 curated HTTP tools，覆盖 Memory 读取与 mutation、manual prepare/capture、Handoff activate/prepare/finalize/commit/continue、Experience 和 Skill generate/get，以及 read-only Candidate Review list/get。
 
-它不挂载 Candidate approve/reject/revise、Work Contract creation、Handoff acknowledgement、Task Outcome recording、external-Skill registry 或 Handoff-report operations。Human Candidate mutation 留在 model surface 之外，通过 Dashboard 或受人工控制的 direct API client 完成。
+它不挂载 Candidate approve/reject/revise、工作契约 creation、Handoff acknowledgement、Task Outcome recording、external-Skill registry 或 Handoff-report operations。Human Candidate mutation 留在 model surface 之外，通过 Dashboard 或受人工控制的 direct API client 完成。
 
 八类指定 mutation——remember、capture Source、revise/retire Memory、activate/commit Handoff、generate Experience、generate Skill——执行前，tool 会用 permission `powercontext` 和 operation ID 调用宿主 `context.ask()`。这个边界是 **Host-gated**。`pc_remember` 的 ask-and-success path 有测试。Ask 被拒绝时，control flow 会在 HTTP 前停止；但真实 UI allow/deny 和 direct denial test 为 **Not validated**。
 
@@ -125,14 +125,14 @@ Automatic prepare、capture、injection 和 optional flush 都 fail-open。Serve
 - 提交疑似包含 secret 或超过 200,000-byte 的 prompt；recall 可以运行，capture 不应运行。
 - 拒绝指定 mutation，确认没有 HTTP operation 执行。
 - 启用 flush，让 cursor 一直落后于 captured position，确认 bounded loop 不会声称 Memory 已存在。
-- 检查 model tools，确认 Candidate mutation、Work Contract、acknowledgement 和 Task Outcome operations 都不存在。
+- 检查 model tools，确认 Candidate mutation、工作契约、acknowledgement 和 Task Outcome operations 都不存在。
 
 ## Unsupported 与 Not validated
 
 | State | Current boundary |
 |---|---|
 | **Supported** | Declared OpenCode gate `>=1.18.21,<2`; owned plugin and bundled-Skill setup; automatic prepare and eligible prompt capture; exact-turn transform logic; curated 19-tool surface; ask-before-classified-mutation control flow; conditional real-host `opencode run` prepare/capture smoke. |
-| **Unsupported** | OpenCode `<1.18.21` or `>=2`; overwriting foreign same-name paths; managed Skill export to OpenCode; automatic final-response capture or Task Outcome; model-driven Candidate mutation; the unmounted Work Contract, acknowledgement, Outcome, external-Skill registry, and Handoff-report operations; transactional rollback spanning both installed artifacts. |
+| **Unsupported** | OpenCode `<1.18.21` or `>=2`; overwriting foreign same-name paths; managed Skill export to OpenCode; automatic final-response capture or Task Outcome; model-driven Candidate mutation; the unmounted 工作契约, acknowledgement, Outcome, external-Skill registry, and Handoff-report operations; transactional rollback spanning both installed artifacts. |
 | **Not validated** | Compatibility across every accepted release; real-host model dispatch, injection, transcript non-persistence, permission UI, bundled-Skill discovery, cache cleanup, and optional flush; direct upper-version and foreign-plugin tests; reordered concurrent turns; real-host secret and size filtering. |
 
 Conditional real-host E2E 用真实 `opencode run` 启动，使用 invalid model 和 empty PreparedContext，并观察 prepare/capture HTTP requests。它不能证明 model dispatch 或 transform injection。Doctor nonce probe 是另一项 activation check。

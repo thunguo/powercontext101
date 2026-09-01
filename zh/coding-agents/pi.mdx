@@ -101,7 +101,7 @@ Pi 精确注册 13 个 model tools。Read/non-durable tools 是 `pc_search`、`p
 
 Gated mutation 只有在 interactive confirmation 通过后才执行。无 UI 返回稳定 `confirmation_required`；用户拒绝返回 `cancelled`；UI failure 返回 `unavailable`。这些路径都不发送 write request。`/pc remember` 与 `/pc flush` 遵守同一边界。Explicit operation 会替换 caller Scope、拒绝含 secret 的 payload，并返回稳定、model-visible 的 error。
 
-No-UI contract 与 helper behavior 有 unit tests。真实宿主如何显示、拒绝或缺失 UI，仍没有 host-process test，因此为 **Not validated**。
+No-UI 契约 与 helper behavior 有 unit tests。真实宿主如何显示、拒绝或缺失 UI，仍没有 host-process test，因此为 **Not validated**。
 
 ## Transport
 
@@ -115,7 +115,7 @@ No-UI contract 与 helper behavior 有 unit tests。真实宿主如何显示、�
 |---|---|---|
 | **Version-gated** | Node runtime `>=22.19` | 不要在更旧 runtime 上安装 package。 |
 | **Unsupported** | published npm-name installation; managed Skill export or Pi external-Skill scan target; automatic assistant/transcript capture; automatic Task Outcome; Workstream picker/Git-private binding; MCP transport; starting or embedding the Server | 使用 source setup 和 native HTTP tools，并单独运行 Server。 |
-| **Unsupported on Pi-native surface** | Explicit Task Outcome, Work Contract, acknowledgement, Experience/Skill generation, Candidate Review, external-Skill, generic API, and Handoff-report operations | Generated operation descriptors 不会自动成为 Pi tools 或 commands；请改用其他 supported interface 或扩展宿主。 |
+| **Unsupported on Pi-native surface** | Explicit Task Outcome, 工作契约, acknowledgement, Experience/Skill generation, Candidate Review, external-Skill, generic API, and Handoff-report operations | Generated operation descriptors 不会自动成为 Pi tools 或 commands；请改用其他 supported interface 或扩展宿主。 |
 | **Not validated** | Formal Pi host range or compatibility beyond locked 0.82.1 | `^0.82.0` 只是 development intent，不是 support promise。 |
 | **Not validated** | Full real-Pi prepare/injection/model chain; bundled-Skill discovery; real-host confirmation behavior | Package install/load 与 `/pc` registration 不能证明这些路径。 |
 | **Not validated** | Callback execution for `agent_end`, switch, and shutdown; multibyte Source boundary; pending-flusher concurrency edges | 在 direct tests 出现前，只按 implementation evidence 描述。 |

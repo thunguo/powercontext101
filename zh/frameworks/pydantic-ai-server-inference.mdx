@@ -48,7 +48,7 @@ export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_BATCH_SIZE="10"
 uv run powercontext server run
 ```
 
-`EMBEDDING_MODEL`、`EMBEDDING_PROFILE_ID`、`EMBEDDING_DIMENSION` 必须全部配置或全部省略。配置不完整时，Server 会在启动前拒绝。Profile 属于持久化 vector contract；应先确定 ID、dimension 和 normalization，不要在原 profile 上随意改动。
+`EMBEDDING_MODEL`、`EMBEDDING_PROFILE_ID`、`EMBEDDING_DIMENSION` 必须全部配置或全部省略。配置不完整时，Server 会在启动前拒绝。Profile 属于持久化 向量配置契约；应先确定 ID、dimension 和 normalization，不要在原 profile 上随意改动。
 
 <Warning>
 Model string 只是配置，不代表 provider 已经可用。Readiness 会发送一次很小的真实请求，但本页不保证 provider account、credential、quota、regional endpoint、model dimension 或 latency 符合你的部署要求。
