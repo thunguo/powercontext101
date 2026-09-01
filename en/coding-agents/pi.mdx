@@ -1,44 +1,144 @@
 ---
 title: "Pi"
-description: "Inject context into systemPrompt at before_agent_start, flush pending Sources at boundaries, and refuse durable writes without UI."
+description: "Install the native package, inject context at before_agent_start, and flush captured Sources at lifecycle boundaries."
 ---
 
 <Note>
-The package runtime requires Node `>=22.19`. Pi `0.82.x` is development compatibility, not a declared minimum host version. Package-load E2E exists; the full recall host chain is **Not validated**. Managed Skill export is **Unsupported**. Durable writes without UI are refused.
+**Version-gated:** the package runtime requires Node `>=22.19`. Development declares Pi `^0.82.0`; the lockfile and real-CLI package-load E2E use Pi `0.82.1`. That is compatibility evidence, not a formal host-version range. Package load is **Supported** within that test boundary; the full real-host recall chain is **Not validated**.
 </Note>
 
-Pi is a native package, not an MCP plugin. `before_agent_start` resolves Scope, prepares context, captures the prompt, and appends recall to `systemPrompt`. Boundary events then run a bounded pending flush. Setup calls Pi's own package installer and does not start the Server.
+## Maturity and installation
 
-For the full install, use the Configure Pi how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
-
-## Install and activate
-
-Start the Server first:
-
-```bash
-powercontext server run
-```
-
-Then install the native package:
+Pi uses the source package `powercontext-pi` version `0.0.2`. It contains an extension and a bundled `project-context` Skill. The current setup path installs the package from the selected PowerContext Git ref or a local checkout; installation by published npm package name is currently **Unsupported**.
 
 ```bash
 powercontext setup pi --source oceanbase/powercontext --ref master
-
+powercontext server run
 powercontext doctor
 powercontext doctor pi
-```
-
-Setup requires both `extensions/powercontext.ts` and `skills/project-context/SKILL.md` in the checkout, then runs `pi install`. It removes superseded user-scope PowerContext packages. It does not start the Server and does not open a Pi session.
-
-`doctor pi` checks that `pi` is on PATH and that `pi list` points at a real `powercontext-pi` installed path. It does not contact the Server or test recall.
-
-Start a **new** session in the project directory:
-
-```bash
 pi
 ```
 
-Restart Pi after changing PowerContext environment variables.
+Setup verifies the package name, extension, and bundled `SKILL.md`, runs `pi install <package-directory>`, removes superseded user-scoped PowerContext registrations only after success, and then runs doctor.
+
+Remote checkout materialization uses staging and restores the previous checkout if the staging swap fails. A later `pi install` failure has no transactional checkout rollback. Source credentials and clone output are not printed.
+
+`powercontext doctor pi` checks the Pi executable, `pi list`, and an installed manifest named `powercontext-pi`. It does not check Server readiness, extension activation, bundled-Skill discovery, package or host version, or a model turn. The general `powercontext doctor` covers the Server separately.
+
+## Minimal usage
+
+Start a new Pi process after installation or environment changes. Then keep automatic and explicit paths separate:
+
+1. Submit a normal coding prompt. `before_agent_start` may recall temporary context and capture the trimmed prompt as a Source.
+2. Use the 13 native Memory and Handoff tools for exact reads or supported durable operations.
+3. Use `/pc`, `/pc doctor`, and `/pc search <query>` for diagnostics and explicit checks. `/pc doctor` calls the configured Server; it is different from `powercontext doctor pi`.
+
+Invalid local Pi configuration keeps the host running but registers no tools or `/pc`; its hooks become no-ops. The bundled Skill describes tool usage, but real Pi Skill discovery is **Not validated** because the package-load E2E runs with `--no-skills`.
+
+## Execution flow
+
+```text
+before_agent_start
+→ trim prompt; skip an empty prompt
+→ resolve and cache Scope by cwd
+→ prepare and strictly validate context
+→ capture eligible prompt Source and receive position
+→ optionally flush through position, or retain it as pending
+→ append ready untrusted context to systemPrompt
+
+agent_end
+→ start pending flush without waiting
+
+session_before_compact / session_before_switch / session_shutdown
+→ await pending flush within a bounded closing budget
+```
+
+Prepare and capture share one turn HTTP-budget signal but handle failure independently. Recall failure does not normally suppress capture. Capture failure does not erase valid recalled context. Automatic failures are fail-open and do not stop the Pi turn.
+
+`agent_end` only starts flush and returns. No callback captures the assistant response or records Task Outcome. Pi's `session_shutdown` event is not a Claude Code `Stop` Hook.
+
+## Scope
+
+Pi derives Scope before each scoped Server operation:
+
+1. Use non-empty `POWERCONTEXT_PI_SCOPE_ID`, hashing values over 256 characters.
+2. Otherwise resolve the Git top-level and normalize `remote.origin.url` to a `git:` Scope.
+3. Fall back to `local:sha256(<absolute-project-root>)`.
+
+Git normalization removes credentials and trailing `.git` noise. It accepts common HTTP, HTTPS, SSH, Git, and SCP-style remotes. Resolved promises are cached by cwd; failed resolutions are evicted. A tool caller cannot replace the derived `scope_id` with its own value.
+
+Pi has no Codex- or Claude-style Workstream picker or Git-private Scope binding. That path is **Unsupported**.
+
+## Injection
+
+PreparedContext is accepted only when it has exactly `schema`, `status`, `content`, and `content_bytes`; uses `powercontext.prepared-context.v1`; obeys empty/ready rules; reports the exact UTF-8 byte count; and stays within the configured content bound.
+
+The extension appends ready content to Pi's existing `systemPrompt` under a host-supplied, untrusted-historical-evidence label. Empty or invalid content is not injected. This is transient augmentation, not a transcript synchronization or a new Source, Memory, or Artifact.
+
+## Capture
+
+Automatic capture is on by default. Source identity hashes Scope, normalized session identity, derived turn number, and the trimmed prompt. Metadata is exactly `origin`, event, `cwd`, `session_id`, and `turn_id`. The turn number comes from the current branch's user-message count; the branch itself is not stored.
+
+Capture skips content when disabled, when the UTF-8 prompt exceeds 200,000 bytes, or when the prompt matches a private key, credential assignment, Bearer value, or known token shape. The dedicated multibyte boundary case is **Not validated** because the current oversized test uses ASCII.
+
+A capture becomes pending only when the response contains an integer `position >= 1`. Source acceptance, processing position, flush completion, Candidate generation, Review, and committed Memory remain separate stages.
+
+## Flush
+
+The pending flusher retains the greatest unprocessed position per Scope. A lower position cannot reduce it. It clears an entry only after `current_cursor >= position`. Concurrent flush calls share one in-flight promise, and a higher position recorded during a flush cannot be cleared by the older completion.
+
+Defaults are: immediate flush off, at most four calls, a 4,000 ms turn HTTP budget, and a lifecycle closing budget capped at 1,000 ms. With `POWERCONTEXT_PI_FLUSH_ON_CAPTURE=true`, capture retries immediate transient errors; exhaustion records the position for a later boundary.
+
+At a lifecycle boundary, a thrown Server/transport error stops that Scope's current loop but leaves it pending for a future event. Cursor-behind responses retry up to the call limit. The flusher continues with other Scopes and never claims that Memory exists.
+
+Compaction and immediate-failure-to-compaction retry have direct tests. Multiple Scopes, in-flight coalescing, a permanently lagging cursor, and a higher position arriving during flush are **Not validated** by direct Pi tests.
+
+## Tools, commands, and permission
+
+Pi registers exactly 13 model tools. Read/non-durable tools are `pc_search`, `pc_memory_list`, `pc_memory_get`, `pc_prepare_context`, `pc_handoff_prepare`, `pc_handoff_finalize`, and `pc_handoff_continue`. Confirmation-gated mutations are `pc_remember`, `pc_memory_revise`, `pc_memory_retire`, `pc_capture_source`, `pc_handoff_activate`, and `pc_handoff_commit`.
+
+`/pc` supports no-argument diagnostics plus `doctor`, `search`, `remember`, `flush`, and `stats`. It has no generic operation command, Candidate Review command, Handoff command, or Task Outcome command.
+
+A gated mutation proceeds only after interactive confirmation. No UI returns stable `confirmation_required`; user denial returns `cancelled`; UI failure returns `unavailable`. None of those paths sends the write request. `/pc remember` and `/pc flush` use the same boundary. Explicit operations replace caller Scope, reject secret-bearing payloads, and return stable model-visible errors.
+
+The no-UI contract and helper behavior are unit-tested. Actual real-host display, denial, and missing-UI behavior are **Not validated** by a host-process test.
+
+## Transport
+
+The default Server is `http://127.0.0.1:8000`. Plain HTTP is allowed only for localhost and loopback addresses; remote Servers require HTTPS. Base URLs with credentials, query, fragments, or non-HTTP schemes are rejected.
+
+`POWERCONTEXT_PI_AUTHORIZATION` is sent as the complete Authorization value. Redirects are handled manually and rejected, so credentials are not forwarded. Responses are capped at 1 MiB, and successful bodies must contain valid JSON. Per-request timeout and the shared turn budget are separate limits.
+
+## Unsupported vs Not validated
+
+| State | Capability | Practical consequence |
+|---|---|---|
+| **Version-gated** | Node runtime `>=22.19` | Do not install the package on an older runtime. |
+| **Unsupported** | published npm-name installation; managed Skill export or Pi external-Skill scan target; automatic assistant/transcript capture; automatic Task Outcome; Workstream picker/Git-private binding; MCP transport; starting or embedding the Server | Use source setup and native HTTP tools, and run the Server separately. |
+| **Unsupported on Pi-native surface** | Explicit Task Outcome, Work Contract, acknowledgement, Experience/Skill generation, Candidate Review, external-Skill, generic API, and Handoff-report operations | Generated operation descriptors do not make these Pi tools or commands. Use another supported interface or extend the host. |
+| **Not validated** | Formal Pi host range or compatibility beyond locked 0.82.1 | Treat `^0.82.0` as development intent, not a support promise. |
+| **Not validated** | Full real-Pi prepare/injection/model chain; bundled-Skill discovery; real-host confirmation behavior | Package install/load and `/pc` registration do not prove these paths. |
+| **Not validated** | Callback execution for `agent_end`, switch, and shutdown; multibyte Source boundary; pending-flusher concurrency edges | Keep these claims at implementation evidence until direct tests exist. |
+
+The real package E2E installs the directory with locked Pi 0.82.1, starts offline RPC with no session and no Skills, and checks that `/pc` is registered. It does not create a session, call a model or Server, exercise recall, or load the bundled Skill.
+
+## Negative experiments
+
+Run these before treating a Pi deployment as complete:
+
+- Break local configuration and confirm Pi keeps running with no PowerContext tools, command, or hook effects.
+- Stop the Server and confirm the turn continues without injected context.
+- Make prepare fail while capture succeeds; reverse the failures and retain valid recalled context.
+- Submit a blank, secret-shaped, disabled-capture, or over-limit prompt and verify the expected no-op or no-capture path.
+- Make immediate flush fail, trigger compaction, and confirm the pending position is retried.
+- Record lower and higher positions during flush; only `current_cursor >= highest-position` may clear the entry.
+- Keep the cursor behind position and confirm bounded work ends without claiming Memory exists.
+- Run a mutation without UI and confirm `confirmation_required` with no HTTP write; decline through UI and expect `cancelled`.
+- Pass a different `scope_id` to a tool and confirm the derived Scope replaces it.
+- Return a redirect or oversized/non-JSON response and confirm the client rejects it.
+- Use plaintext on a non-loopback host and confirm configuration is rejected; use HTTPS remotely.
+- Inspect tools and commands and confirm Task Outcome, Candidate Review, Experience/Skill generation, and generic API surfaces are absent.
+
 
 ## Configuration defaults
 
@@ -60,100 +160,6 @@ export POWERCONTEXT_PI_CAPTURE_PROMPTS=false
 pi
 ```
 
-## Minimal verification
-
-```bash
-powercontext doctor
-powercontext ready
-powercontext capabilities
-```
-
-Save the decision in an interactive Pi session:
-
-```text
-Use PowerContext pc_remember to store this decision:
-after changing the OpenAPI contract, regenerate the client and inspect the diff.
-Return the Memory Citation. Do not store secrets.
-```
-
-`pc_remember` goes through `ui.confirm` first. After approval it should return a Memory Citation. You can do the same write with `/pc remember`, and use `/pc search` or `/pc doctor` for diagnostics.
-
-Open a new session and ask:
-
-```text
-What should happen after the OpenAPI contract changes?
-```
-
-When automatic recall succeeds, `systemPrompt` gains a trailing block that starts with `PowerContext host-supplied context` and includes a Citation. Pi does not synchronize the complete transcript.
-
-## Scope resolution
-
-Pi resolves Scope in this order:
-
-1. A nonempty `POWERCONTEXT_PI_SCOPE_ID`.
-2. The normalized Git `remote.origin.url`, written as `git:...`.
-3. A `local:<sha256>` identifier for the project root.
-
-Pi does not read the Codex / Claude Code Workstream binding. Cross-host sharing requires both sides to resolve the exact same `scope_id`.
-
-## Automatic path and explicit tools
-
-```text
-before_agent_start
-→ resolve Scope
-→ prepare
-→ capture prompt Source
-→ immediate flush or record pending position
-→ augment systemPrompt
-
-agent_end / session_before_compact / session_before_switch / session_shutdown
-→ retry pending flush within bounded budget
-```
-
-The flusher keeps the maximum pending position per Scope and clears it only when `current_cursor >= position`. Boundary failure fails open. Prompt Source identity derives from branch and turn identity. Secret-looking prompts and prompts over 200,000 UTF-8 bytes are not captured.
-
-Core explicit tools:
-
-| Tool / command | Purpose |
-|---|---|
-| `pc_search` / `/pc search` | Search Memory |
-| `pc_remember` / `/pc remember` | Write durable Memory |
-| `pc_handoff_commit` | Commit a Handoff only when the user explicitly asks |
-| `/pc doctor` | Diagnostics; not a substitute for `powercontext doctor pi` |
-| `/pc flush` | Flush pending Sources explicitly |
-
-Durable mutation needs interactive confirmation. Without UI, Pi returns stable `confirmation_required` and performs no silent write. A rejected confirmation returns `cancelled`.
-
-Reproduce the no-UI path: call `pc_remember` or `/pc remember keep API async` when the Pi tool or command context has `hasUI` set to `false`. You should get:
-
-```json
-{
-  "ok": false,
-  "code": "confirmation_required",
-  "message": "PowerContext refuses explicit durable writes without interactive confirmation."
-}
-```
-
-The Server must not receive a remember request. With a UI, a rejected confirm returns `cancelled`. Do not invent an unverified CLI flag for “no UI mode”.
-
-`agent_end` triggers flush only; it does not record Task Outcome. `session_shutdown` is not a Claude Code Stop hook. Pi does not support managed Skill export. A bundled Skill does not change that fact.
-
-## Negative checks
-
-- Stop the Server, then ask a normal coding question. Recall, capture, and flush must not block the agent.
-- With the Server still down, run `pc_remember`. Explicit failure must stay visible.
-- Mutation without UI: return `confirmation_required` and write nothing.
-- Secret or oversized prompt: recall may run, capture does not.
-- Immediate flush fails: a boundary event retries within a bounded budget; if the cursor never catches up, stop without claiming Memory exists.
-- Redirect and remote transport: verify Pi's transport tests rather than copying another host.
-
-## Current limits
-
-- The full recall host chain is **Not validated**. Package-load E2E only proves that Pi can list and load the package.
-- No formal minimum Pi version is declared; `0.82.x` is development compatibility only.
-- Managed Skill export is **Unsupported**.
-- Automatic extraction needs a generation model; explicit Memory does not.
-- Invalid local configuration must not prevent Pi from starting. Tools may be unavailable, but ordinary coding should continue.
 
 ## Finish the shared check on this host
 
@@ -167,12 +173,21 @@ The Server must not receive a remember request. With a UI, a rejected confirm re
 
 ## Completion checklist
 
-- Node is `>=22.19`, and `doctor pi` sees `powercontext-pi`.
-- Server health, readiness, and capabilities were checked separately.
-- A new session can recall the OpenAPI decision you saved explicitly from `systemPrompt`, with a Citation.
-- Ordinary coding continues when automatic recall fails.
-- Explicit Memory or Handoff failure is visible in Pi.
-- A durable write without UI is refused instead of succeeding silently.
-- You did not treat the bundled Skill as a managed export.
+- [ ] PowerContext and the Pi package come from the same reviewed Git ref; Node is `>=22.19`.
+- [ ] Pi 0.82.1 is recorded as compatibility evidence, not a formal minimum or complete 0.82.x promise.
+- [ ] Both `powercontext doctor` and `powercontext doctor pi` pass for their separate boundaries.
+- [ ] `pi list` points to a package manifest named `powercontext-pi`, and a new Pi process exposes `/pc`.
+- [ ] `/pc doctor` reaches the intended Server.
+- [ ] Scope is the explicit override, sanitized Git identity, or local-root hash; caller Scope cannot replace it.
+- [ ] Valid PreparedContext is strictly checked and appended to the existing `systemPrompt` as untrusted evidence.
+- [ ] Capture stores the trimmed prompt with `cwd`, `session_id`, and derived `turn_id`, but no project or branch field.
+- [ ] Secret and over-200,000-byte prompts are not captured.
+- [ ] Pending work clears only at `current_cursor >= position` and stays within the call and closing budgets.
+- [ ] Every gated tool and `/pc` mutation confirms or returns a stable no-write error.
+- [ ] Remote transport uses HTTPS, rejects redirects, and enforces JSON and response-size bounds.
+- [ ] Source, position, flush, Candidate, Review, and Memory remain distinct stages.
+- [ ] Package-load evidence stays separate from bundled-Skill discovery and a full real-host turn.
+- [ ] Pi-native Task Outcome and the other absent surfaces remain **Unsupported**.
+- [ ] Bundled Skill presence does not imply managed Skill export.
 
 Continue with [Extend hooks](/en/coding-agents/extend-hooks).

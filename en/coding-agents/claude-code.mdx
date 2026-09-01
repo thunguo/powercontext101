@@ -1,30 +1,15 @@
 ---
 title: "Claude Code"
-description: "Install UserPromptSubmit, MCP, and the Skill, verify additionalContext recall, and keep the v1 no-transcript boundary explicit."
+description: "Install the UserPromptSubmit + MCP + Skill plugin, then work within the v1 capture and permission boundaries."
 ---
 
-<Warning>
-Claude Code 2.1.133 is known compatibility context, not a declared minimum version. A real host-process E2E is **Not validated**. Permission is **Host-gated**; explicit denial of durable writes without UI is currently **Not validated**. Managed Skill export is **Supported** for target `claude_code`.
-</Warning>
+<Note>
+This page documents the v1 integration. Claude Code 2.1.133 is tested compatibility evidence, not a declared minimum version. Explicit denial of a durable mutation when no permission UI is available is **Not validated**.
+</Note>
 
-Claude Code v1 runs automatically only on `UserPromptSubmit`. It prepares one bounded context, captures the current user prompt independently, and returns temporary `additionalContext`. The setup command is `powercontext setup claude-code` (hyphen). The Skill export target is `claude_code` (underscore). Do not mix them.
+## Maturity and installation
 
-For the full install, use the Configure Claude Code how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
-
-## Install and activate
-
-Confirm both CLIs are available in the same environment:
-
-```bash
-powercontext --version
-claude --version
-```
-
-Start the Server, then install the user-scope plugin from another terminal:
-
-```bash
-powercontext server run
-```
+The integration has contract tests and public/authenticated service-chain tests. Its automatic path is deliberately narrow: only `UserPromptSubmit` runs. Setup installs a user-scope marketplace plugin containing the Hook, HTTP MCP configuration, and bundled `project-context` Skill.
 
 ```bash
 powercontext setup claude-code \
@@ -32,35 +17,92 @@ powercontext setup claude-code \
   --ref master \
   --server-url http://127.0.0.1:8000
 
-powercontext doctor
+powercontext server run
 powercontext doctor claude-code
 ```
 
-Before it changes anything, setup reports the settings file, plugin cache, data directory, and rollback commands. Then it:
+Setup prints its mutation plan before changing anything. It snapshots the existing Claude Code settings, preserves pre-existing marketplace and plugin objects, and restores the snapshot if installation or verification fails.
 
-1. registers marketplace `powercontext` at user scope;
-2. installs and enables `powercontext@powercontext`;
-3. atomically merges `server_url` and `capture_prompts` into user `pluginConfigs` while preserving unrelated settings.
+## Minimal usage
 
-Those files live under `CLAUDE_CONFIG_DIR`, or `~/.claude` when that variable is unset:
+Start a new Claude Code session. Check `/hooks` for `UserPromptSubmit` and `/mcp` for the connected PowerContext Server. Then use the two paths separately:
+
+1. Ask an ordinary coding question. The Hook may recall context and captures only your prompt as a Source.
+2. Ask the agent to search or maintain Memory through MCP when you need an exact operation.
+3. Say `handoff this work` only when you want a durable Handoff prepared and committed in that turn.
+
+The bundled Skill supplies these usage rules. The Hook does not turn every prompt into Memory, and MCP writes are never a substitute for explicit user intent.
+
+## Execution flow
 
 ```text
-settings.json
-plugins/cache/powercontext/powercontext/<version>
-plugins/data/powercontext-powercontext
+UserPromptSubmit
+→ prompt (compatibility fallback: user_prompt)
+→ resolve shared project Scope
+→ prepare and capture independently
+→ optional flush
+→ additionalContext
 ```
 
-On failure, setup restores the settings snapshot and rolls back only objects created by that run. It does not start the Server.
+There is no second automatic event in v1. In particular, the plugin does not inspect a transcript when the turn ends.
 
-`doctor claude-code` only checks that `claude` is on PATH and that the PowerContext plugin is enabled. It does not contact the Server or test recall.
+## Scope
 
-After setup, start a **new** session:
+Before its first Memory operation, the Skill runs the project Scope resolver. Resolution uses this order:
 
-```bash
-claude
-```
+1. `POWERCONTEXT_CLAUDE_SCOPE_ID`, when set;
+2. the Git-private Workstream binding shared with Codex;
+3. normalized Git remote identity, then normalized project path.
 
-Use `/hooks` to confirm `UserPromptSubmit` and `/mcp` to confirm the `powercontext` Server is connected.
+A Workstream binding lives below the checkout's Git directory and is not committed. When several Workstreams remain consequential, the agent must ask you to select one instead of guessing. After selection, it binds the returned `scope_id`, resolves again, and requires an exact match before writing a Handoff.
+
+## Injection
+
+The Hook validates the prepared-context schema and returns temporary context through `hookSpecificOutput.additionalContext`. That context affects the current turn; it is not transcript capture and does not become durable merely because Claude saw it.
+
+Recall fails open. An unavailable Server, invalid response, unknown schema, oversized body, redirect, or expired wall-clock budget produces no injection and does not block the host task. Diagnostics omit the prompt, Scope, prepared content, and authorization value.
+
+## Capture and flush
+
+Automatic capture writes the current user prompt to `/v1/sources/content` with a deterministic `claude-code-user-prompt:` Source ID. It does not capture Claude's final response and does not record a Task Outcome.
+
+Recall and capture are independent. A recall failure does not prevent capture; a capture failure does not erase valid `additionalContext`. Disable capture with `POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false`. Optional `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE=true` retries `/v1/memory/flush` until `current_cursor >= position`, bounded by `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` and the shared HTTP deadline.
+
+Capture is still only Source evidence. The Source window Trigger and candidate pipeline decide whether it eventually produces or updates Memory.
+
+## MCP, Skill, and permission
+
+`.mcp.json` connects the HTTP MCP Server. Its `headersHelper` reads the complete `POWERCONTEXT_CLAUDE_AUTHORIZATION` value from the environment and emits an `Authorization` header only when set. The token stays out of plugin configuration, prompts, and diagnostics. Use HTTPS for a remote endpoint.
+
+MCP exposes exact Memory maintenance, Work Contract, Prepared/committed Handoff, acknowledgement, Outcome, and Review operations. The Skill treats a direct `handoff this work` imperative as authorization for one durable Handoff: inspect live state, call `handoff_current_work` once, pass the returned `handoff` unchanged to `commit_handoff` in the same turn, then report success only after an exact Revision returns.
+
+A question, design discussion, or preview request does not authorize a write. For a preview, render the proposed fields in chat and make no PowerContext write. Do not call `handoff_current_work` for a no-write preview: it records a boundary Source even when you skip `commit_handoff`.
+
+Claude Code's host-side behavior when a durable MCP mutation needs approval but no permission UI exists is **Not validated**. Do not claim Pi's stable `confirmation_required` behavior here.
+
+## Unsupported vs Not validated
+
+| State | Capability | Practical consequence |
+|---|---|---|
+| **Unsupported** | v1 `Stop` Hook | No automatic work runs at session stop. |
+| **Unsupported** | transcript or assistant final-response capture | Persist a final result with an explicit MCP operation. |
+| **Unsupported** | automatic Task Outcome | Call `record_task_outcome` at a real completion or interruption boundary. |
+| **Not validated** | formal minimum Claude Code version | 2.1.133 is compatibility evidence, not a lower bound. |
+| **Not validated** | no-UI denial of durable mutation | Keep the uncertainty visible; do not promise a host denial contract. |
+
+## Negative experiments
+
+Run these before treating the integration as complete:
+
+- Stop the Server, submit a normal prompt, and confirm Claude Code continues.
+- Make recall fail while capture succeeds; then reverse the failures and retain valid `additionalContext`.
+- Return an unknown PreparedContext schema and confirm nothing is injected.
+- Redirect the Hook request and confirm Authorization is not forwarded.
+- Exceed the response-size or deadline budget and confirm the turn remains bounded.
+- Enable flush, keep `current_cursor` behind the Source position, and confirm retries stop without claiming Memory exists.
+- Let Handoff preparation succeed and commit fail; report the boundary Source and the missing durable milestone.
+- Request a preview and confirm no PowerContext write occurs.
+
 
 ## Configuration defaults
 
@@ -105,84 +147,6 @@ export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
 claude
 ```
 
-## Minimal verification
-
-```bash
-powercontext doctor
-powercontext ready
-powercontext capabilities
-```
-
-Save the decision explicitly in Claude Code:
-
-```text
-Use PowerContext to remember this decision:
-after changing the OpenAPI contract, regenerate the client and inspect the diff.
-Return the Memory Citation. Do not store secrets.
-```
-
-MCP `remember_memory` does not need a generation model. A successful write should return an exact Citation.
-
-Open a new session and ask:
-
-```text
-What should happen after the OpenAPI contract changes?
-```
-
-When automatic recall succeeds, `additionalContext` includes a Citation and is labeled untrusted historical evidence. A prompt Source may exist. The v1 plugin does not capture the assistant final response automatically.
-
-## Scope resolution
-
-Claude Code uses the same order as Codex:
-
-1. A nonempty `POWERCONTEXT_CLAUDE_SCOPE_ID`.
-2. A Git-private Workstream binding at `.git/powercontext/codex-workspace.json`.
-3. The normalized Git `remote.origin.url`.
-4. A `local:<sha256>` identifier for the project directory.
-
-With a binding, both hosts resolve the exact same Workstream Scope. Without one, they still share the normalized remote. Matching directories are not enough; check the final `scope_id` first.
-
-## Automatic path and explicit tools
-
-```text
-UserPromptSubmit
-→ prompt (compatibility fallback: user_prompt)
-→ resolve shared project Scope
-→ recall and capture independently
-→ optional flush
-→ additionalContext
-```
-
-The current v1 plugin explicitly has no:
-
-- Stop hook;
-- transcript reading;
-- automatic assistant final-response capture;
-- automatic Task Outcome.
-
-Do not infer these from other Claude Code events.
-
-Recall failure does not block capture; capture failure does not erase valid `additionalContext`. The hook rejects redirects, bounds response size and wall-clock time, and emits diagnostics without prompt, Scope, content, or token.
-
-MCP performs exact Memory maintenance, Prepared/committed Handoff, acknowledgement, Outcome, and Review. Persisting a final result requires an explicit operation. The `project-context` Skill guides a one-turn Handoff, but commit still needs an explicit imperative. If a plugin README says Review is not exposed, trust the current Server MCP projection.
-
-`powercontext skill export --target claude_code` is the managed Skill export. The bundled Skill is not that export.
-
-## Negative checks
-
-- Stop the Server, then do ordinary coding. Claude Code should continue.
-- With the Server still down, make an explicit MCP write. Failure must stay visible.
-- Empty, 401, 404, 503, or unknown schema: inject nothing and record a content-free outcome.
-- Denial of durable writes without UI is currently **Not validated**. Do not copy Pi's guarantee.
-- Mutation with an old Citation returns a conflict.
-
-## Current limits
-
-- A real Claude Code host-process E2E is **Not validated**.
-- 2.1.133 is known compatibility context, not a version gate.
-- v1 does not read the transcript and does not finish work on Stop.
-- Automatic extraction needs a generation model; explicit Memory does not.
-- `setup claude-code` and export target `claude_code` are different names.
 
 ## Finish the shared check on this host
 
@@ -196,13 +160,14 @@ MCP performs exact Memory maintenance, Prepared/committed Handoff, acknowledgeme
 
 ## Completion checklist
 
-- `doctor claude-code` sees the plugin enabled.
-- `/hooks` shows `UserPromptSubmit`, and `/mcp` shows the Server connected.
-- A new session can recall the OpenAPI decision you saved explicitly, and the Citation appears in `additionalContext`.
-- A prompt Source exists; an assistant final response does not.
-- Ordinary coding continues when automatic recall fails.
-- Explicit Memory or Handoff failure is visible in Claude Code.
-- When sharing with Codex, both sides resolve the exact same `scope_id`.
-- You did not mix `claude-code` with `claude_code`, or treat the bundled Skill as an export.
+- [ ] `powercontext doctor claude-code` reports plugin installation/enabled state; separate `powercontext doctor` checks Server liveness/readiness.
+- [ ] `/hooks` shows only the v1 `UserPromptSubmit` automatic path.
+- [ ] `/mcp` shows the PowerContext Server connected without exposing credentials.
+- [ ] Ordinary prompts receive valid `additionalContext` when recall succeeds.
+- [ ] Prompt Source exists; assistant final response and automatic Task Outcome do not.
+- [ ] Claude Code and Codex resolve the same repository or Workstream Scope.
+- [ ] Preview produces no write; an imperative Handoff returns an exact committed Revision.
+- [ ] Server and explicit MCP write failures remain distinguishable.
+- [ ] Unsupported and **Not validated** claims above remain visible in release notes and tests.
 
-To export a reviewed Skill to Claude Code, return to [Let the agent extend itself](/en/common-agents/agent-self-extension). Continue with [DeepSeek Harness](/en/coding-agents/dsh).
+Continue with [DeepSeek Harness](/en/coding-agents/dsh).

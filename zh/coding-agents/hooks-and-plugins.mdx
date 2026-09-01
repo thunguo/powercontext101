@@ -1,11 +1,41 @@
 ---
 title: "Hooks 与插件"
-description: "把宿主事件映射到 Scope、临时注入、Source capture、权限和有界诊断。"
+description: "把五种宿主事件模型映射到一份已验证的领域合同，同时不虚构统一 HostAdapter SDK。"
 ---
 
-一个可靠 adapter 不等于“在 prompt 前调一次 API”。它要适配宿主事件、避免 stale context、保护凭证，并把 automatic helper 与 explicit mutation 分开。
+<Warning>
+共用一份合同，不代表五种宿主可以互换。事件时机、turn identity、注入方式、transcript 行为、permission UI 和 activation 仍由宿主决定。
+</Warning>
 
-## Adapter contract
+可靠的 adapter 要防止 stale context、避免凭证进入 content，在 automatic failure 时保住宿主任务，并让 explicit mutation failure 对调用方可见。只在 prompt 前调一次 API 远远不够。
+
+## 成熟度与安装状态
+
+| 范围 | 状态 | 证据边界 |
+|---|---|---|
+| 共用领域合同与负向测试 vectors | **Supported** | 当前 policy、helper 与测试覆盖可复用行为 |
+| 统一的 `HostAdapter` SDK | **Unsupported** | 当前仓库没有这个抽象 |
+| Codex、Claude Code 与 DSH real-host E2E | **Not validated** | Contract 与 service-chain test 没有启动这些真实宿主 |
+| OpenCode real host-process prepare/capture smoke | **Supported** | Version-gated real-host test 会观察 prepare/capture request |
+| OpenCode 完整 host lifecycle E2E | **Not validated** | 该 smoke 没有完整覆盖 transform injection、permission UI、Skill loading、cleanup 与 flush |
+| Pi 完整 recall host chain | **Not validated** | Package load 另有覆盖 |
+
+<Note>
+`doctor` 属于 Setup/activation acceptance tier。它不能替代真实启动宿主、发送 prompt、观察注入、capture 与 permission behavior。
+</Note>
+
+安装一个 adapter，并让 Server 单独运行：
+
+```bash
+powercontext setup <host> \
+  --source oceanbase/powercontext \
+  --ref master
+
+powercontext server run
+powercontext doctor <host>
+```
+
+## 最小 adapter contract
 
 ```text
 PromptEvent
@@ -19,32 +49,89 @@ PromptEvent
 → content-free Diagnostics
 ```
 
-## 五种事件模型
+每个阶段都要定义 input、output、failure policy 与 observable assertion，并标记它属于 automatic 还是 explicit。
 
-| Host | 准备时机 | 注入通道 |
-|---|---|---|
-| Codex | short-process `UserPromptSubmit` | hook stdout additional context |
-| Claude Code | `UserPromptSubmit` | JSON `additionalContext` |
-| DSH | `agent/pre-step` middleware | downstream decision 后 plugin message |
-| OpenCode | `chat.message` 准备，message transform 注入 | `(sessionID,messageID)` exact-turn cache |
-| Pi | `before_agent_start` | returned `systemPrompt` augmentation |
+| 阶段 | 必须定义的合同 |
+|---|---|
+| `PromptEvent` | 稳定的 event timing 与 turn/session identity |
+| `ScopeResolver` | 已授权的 workspace/project mapping 与有界 `scope_id` |
+| `PreparedContextProvider` | Schema、response-size 和 deadline bound，以及 fail-open result |
+| `TransientInjector` | 只作用当前 turn 的通道，并拒绝 stale turn |
+| `SourceCapture` | 精确 capture 范围、secret policy、character/byte limit 与 failure behavior |
+| `FlushCoordinator` | 有界 cursor target，且不能虚报 Memory complete |
+| `ToolSurface` | 经过裁剪的 explicit operation；Candidate approval 仍走受控面 |
+| `PermissionGate` | 宿主自己的 allow/ask/deny 与 no-UI behavior |
+| `Diagnostics` | 不含 content 或凭证的有界状态 |
+| `Installer / Doctor` | Version、ownership、rollback、activation 与诚实的证据等级 |
 
-不能把一种宿主的 Stop、transcript 或 permission 假设复制到另一种。
+## 五种不同的事件模型
 
-## 安全合同
+```text
+Codex / Claude Code
+UserPromptSubmit → prepare + prompt capture → transient context
+explicit work → MCP + Skill
 
-Automatic path 应测试：
+DSH
+agent/pre-step → prepare + user-originated batch capture
+→ await downstream decision → plugin message
+explicit work → curated HTTP tools
 
-- Server down 时原任务继续；
-- 401/403 与 empty 可区分；
-- unknown schema 不注入；
-- oversized response / timeout 有界；
-- redirect 不泄漏 Authorization（只在实现明确拒绝的宿主这样承诺）；
-- capture failure 不删除 valid recall；
-- stale turn context 不进入新 turn；
-- diagnostics 不含 prompt、Scope、content 或 token。
+OpenCode
+chat.message → prepare + capture → cache by (sessionID,messageID)
+experimental.chat.messages.transform → exact latest-turn match → inject
+explicit mutation → context.ask
 
-显式 mutation 则要求失败可见，并经过宿主 permission。Candidate approval 不应作为普通 model tool 静默开放。
+Pi
+before_agent_start → prepare + prompt capture → immediate flush or pending position
+→ augment systemPrompt
+boundary events → retry pending flush within a bounded budget
+explicit mutation → interactive confirmation; deny without UI
+```
+
+| 宿主 | 准备事件 | 注入通道 | Identity 与 stale-state 规则 |
+|---|---|---|---|
+| Codex | short-process `UserPromptSubmit` | hook stdout additional context | 每次处理一个 submitted prompt；process lifetime 有界 |
+| Claude Code | short-process `UserPromptSubmit` | JSON `hookSpecificOutput.additionalContext` | v1 没有 `Stop` capture path |
+| DSH | `agent/pre-step` middleware | downstream `enter` 后才追加 plugin message | `next()` 只调用一次；non-enter decision 不注入 |
+| OpenCode | `chat.message` 准备；`experimental.chat.messages.transform` 注入 | `(sessionID,messageID)` exact-turn cache | 匹配 latest user turn；session 删除时清 state |
+| Pi | `before_agent_start` | returned `systemPrompt` augmentation | Boundary event 按 Scope 重试最大 pending Source position |
+
+不能把一种宿主的 Stop event、transcript、message mutation 或 permission UI 假设复制到另一种。
+
+## Scope 与注入
+
+Scope 选择数据分区。它不是凭证，也不是 authorization decision。需要隔离时，应从已认证的 tenant/project mapping 派生 Scope。
+
+Resolver 的 precedence chain 要写清楚。Git/workspace identity 的 normalization 不能带凭证，public value 必须有界，diagnostics 不能泄漏 raw Scope。还要加入 cross-Scope test，确认相同 prompt 不会共享 transient state。
+
+PreparedContext 是不可信的历史证据。先验证精确的 v1 schema 与 UTF-8 `content_bytes`，再通过当前宿主的 ephemeral channel 注入。当前 system/user instruction 始终优先，recalled text 也不能授予 tool permission。
+
+OpenCode 的 stale-turn 处理最直观，因为 prepare 与 inject 发生在不同 event。Cache key 必须精确匹配 latest user turn。ID gate 可以阻止 wrong-turn injection，但 concurrent out-of-order preparation 仍可能让较新的 injection 丢失；该 race 为 **Not validated**。每种宿主都要保证一个 prompt 的 context 不会进入后续 prompt。
+
+## Automatic 安全合同
+
+Automatic recall、capture 与可选 flush 属于辅助路径。预期内的 Server-call、validation、size 与 deadline failure 通常 fail-open：省略 PowerContext contribution，并保留宿主原任务或 downstream result。
+
+| 结果 | 必须执行的行为 |
+|---|---|
+| Server unavailable 或 timeout | 不注入并继续；wall-clock work 保持有界 |
+| 401/403 | 返回有界 auth/configuration status；不能称为 empty Memory |
+| 成功但 empty | 不添加 injected block，正常继续 |
+| Unknown PreparedContext schema | 拒绝该 block 并继续 |
+| Oversized response | 在配置边界停止并继续 |
+| Redirect | 实现承诺拒绝时才声明拒绝；绝不能转发 Authorization |
+| Valid recall 后 capture failure | 路径分别 guard 时保留 valid transient context |
+| Eligible capture 前 recall failure | 路径分别 guard 时 capture 仍可继续 |
+| Stale turn/session identity | 丢弃 prepared block |
+| Flush timeout 或 cursor 落后 | 停止重试，不能声称 Memory 已存在 |
+
+Claude Code、DSH、OpenCode 与 Pi 会分别 guard recall 和 capture。Codex 对预期 failure 也这样处理，但 unexpected recall exception 可能跳过本次 capture。这个较弱的边界必须保留在文档里。
+
+五种实现都会解析精确的 `powercontext.prepared-context.v1` shape、验证 UTF-8 byte count、把通用 response body 限制在 1 MiB，并在 transport code 拒绝 redirect。不过测试深度不同。Codex 有 slow-body deadline regression，OpenCode 的 direct response-size test 最完整。并非每种宿主都有等价的 body-overrun 或完整 shared-budget test，因此统一行为是 **Not validated**。
+
+DSH 是 transport 例外：当前 configuration 没有执行另外四种 integration 使用的 secure base-URL 与 bearer-header validation。不能从共同合同推导出 DSH 也有相同的 HTTPS/loopback guarantee。
+
+Diagnostics 必须排除 prompt、raw Scope、PreparedContext、Source content、response body 与 authorization token。
 
 ## Capture 不等于 Memory
 
@@ -56,31 +143,121 @@ prompt capture
 → Memory commit or no-op
 ```
 
-Adapter 文档必须写明捕获范围：只 user prompt、完整 visible turn，还是根本不 capture。也要写 secret 与 size policy。
+文档必须说明 adapter 捕获一个 user prompt、选定的 user-originated block、完整 visible turn，还是完全不 capture。Secret filtering 与 character/byte bound 也要写明。
+
+Capture 创建 Source evidence。Flush 推进处理到某个 Source position。Extraction 可能产生 Candidate，也可能 no-op。只有后续 commit 才会创建或更新 Memory。
+
+- Codex 与 Claude Code 捕获 submitted prompt，使用 200,000-character bound，没有 automatic secret-pattern filter。
+- DSH 用全部 batch text recall，但只捕获 user-originated block；secret-like text 不 capture。
+- OpenCode 捕获 eligible prompt，并执行 secret-like 与 UTF-8 byte filter。
+- Pi 执行 secret 与 UTF-8 byte filter，然后立即 flush 或记录 pending position。
+- DSH、OpenCode 和 Pi 的 secret filter 只影响 persistence，不阻止 recall transmission。
+- 五种宿主都不会捕获 final assistant response，也不会自动记录 Task Outcome。
+
+## Flush coordination
+
+Flusher 需要 target Source position、有界 call count 或 deadline，以及 `current_cursor >= position` 之类的完成检查。在比较前清除 pending state 会丢工作；无限重试则会阻塞宿主。
+
+Codex、Claude Code、DSH 与 OpenCode 支持可选 immediate flush。Pi 还会按 Scope 保留最大 pending position，并在 `agent_end`、`session_before_compact`、`session_before_switch` 与 `session_shutdown` 重试。Pi 的 compaction retry 与 immediate-failure retention 有 committed test；其他 lifecycle boundary 与 closing deadline 的验证深度不同。
+
+DSH 与 OpenCode 没有 Pi 的 pending flusher。它们的 immediate flush path 也没有相同深度的完成/failure test，不能写成 boundary-flush support。
+
+## Explicit mutation 与 permission
+
+Explicit operation 不继承 automatic fail-open。Memory write、Handoff commit、Review decision、Task Outcome 或 Skill export 都必须返回成功或可见失败。
+
+| 宿主 | Permission boundary |
+|---|---|
+| Codex | **Host-gated** MCP/tool policy；没有 plugin-owned interceptor；no-UI denial **Not validated** |
+| Claude Code | **Host-gated** MCP policy；没有 hook-owned interceptor；no-UI denial **Not validated** |
+| DSH | Named mutation 返回 pre-execute `ask` |
+| OpenCode | Mutating generated operation 调用 `context.ask` |
+| Pi | Interactive confirmation；无 UI 时返回 `confirmation_required`，且不写入 |
+
+Candidate approve/reject/revise 不应成为 silent model tool。DSH 与 OpenCode 会刻意把 approval 排除在 model surface 外。MCP tool visibility 不是 authorization，允许尝试操作也不证明操作成功。
+
+## Bundled Skill 与 managed export
+
+五种 integration 都会随包提供或注册 bundled host guidance。它可以告诉宿主何时使用 MCP/native tools，但不能证明 managed Skill export。
+
+Managed export 会生成带 provenance 和 drift check 的 versioned projection。Codex 与 Claude Code 为 **Supported**；DSH、OpenCode 和 Pi 为 **Unsupported**。Export 后的 managed Skill 在真实 Codex 或 Claude Code 会话中的加载/执行仍是 **Not validated**。
 
 ## Setup 与 doctor contract
 
-新宿主安装器至少应：
+First-class installer 应做到：
 
-- 检查版本；
-- 幂等安装，并保留非 owned 配置；
-- 标记 ownership，拒绝覆盖 foreign files；
-- 支持 rollback 或明确 partial-failure 状态；
-- 区分 plugin installed、host activated、Server running；
-- 提供 bounded doctor 和真实 host activation probe。
+- gate 已知宿主版本，并如实标记 compatibility evidence；
+- 幂等安装，同时保留 foreign configuration；
+- 记录 ownership，拒绝同名 foreign file；
+- rollback，或报告清楚的 partial-failure state；
+- 区分 installed、activated、Server-ready 与 real-host E2E；
+- 提供 bounded `doctor`，并另设 real-host activation probe。
 
-## 当前没有统一 HostAdapter SDK
+Doctor 深度也不同。Codex 与 Claude Code 检查 enabled plugin state；DSH 从 dumped configuration 读取精确 plugin ID；Pi 检查 package manifest/path；OpenCode 还会启动短生命周期的 `opencode serve` 并验证 activation nonce。这些检查都不能证明 live recall/capture/permission chain。
 
-仓库已有可复用 helper，但尚无一个统一 `HostAdapter` abstraction：
+## 负向实验
 
-- `powercontext.transport` 与 loopback vectors；
-- Codex/Claude prepared-context parser；
-- Scope normalization 的各宿主实现；
+声称 adapter 完成前，执行这些检查：
+
+1. Server down：原宿主任务继续。
+2. Wrong auth：401/403 与 empty Memory 保持可区分。
+3. Unknown schema：不注入。
+4. Oversize 与 deadline：有界退出。
+5. Redirect：Authorization 不被转发。
+6. Recall/capture split：两个方向都测试，包括 unexpected Codex recall failure。
+7. Stale turn：mismatched、deleted 或 out-of-order identity 不能注入错误 context。
+8. No UI 或 permission denied：不执行 durable mutation。
+9. Flush lag：有界重试，不虚报完成。
+10. Diagnostics：不含 content、Scope 或凭证。
+
+Real-host E2E 是独立 acceptance tier。必须启动真实宿主、发送 prompt，并观察 event、injection、capture 与 permission behavior。HTTP-only service chain 或 package-load smoke 很有价值，但两者是不同证据。
+
+## 复用当前实现
+
+仓库已有可复用部分，但它们不是一个 SDK：
+
+- transport policy 与 loopback/redirect vectors；
+- Codex 与 Claude Code PreparedContext parser；
+- 各宿主 Scope normalization tests；
 - Pi pending Source flusher；
 - DSH generated operation table；
-- Codex/Claude Skill projection；
-- `hosts.py` setup/doctor catalog。
+- Codex 与 Claude Code Skill projection；
+- `cli/hosts.py` 内的 Setup 与 doctor catalog。
 
-扩展时复用合同和测试，不要假装已有统一 SDK。
+扩展时复用合同、policy、helper 与 test vector。不要为了让文档看起来整齐，就虚构一个统一 `HostAdapter` class。
 
-下一步按宿主阅读：[Codex](/zh/coding-agents/codex)、[Claude Code](/zh/coding-agents/claude-code)、[DSH](/zh/coding-agents/dsh)、[OpenCode](/zh/coding-agents/opencode)或 [Pi](/zh/coding-agents/pi)。
+## 当前不支持或未验证
+
+| 项目 | 状态 |
+|---|---|
+| 统一 `HostAdapter` SDK | 作为当前仓库抽象为 **Unsupported** |
+| Automatic final-response/transcript capture | **Unsupported** |
+| Automatic Task Outcome recording | **Unsupported** |
+| DSH、OpenCode 与 Pi 的 managed Skill export | **Unsupported** |
+| Codex、Claude Code 与 DSH real-host E2E | **Not validated** |
+| Pi 完整 recall host chain | **Not validated** |
+| Codex 与 Claude Code no-UI durable-mutation denial | **Not validated** |
+| OpenCode out-of-order prepare race behavior | **Not validated** |
+| 统一的 DSH secure base-URL/bearer validation | 当前 DSH configuration boundary 为 **Unsupported** |
+| 每种宿主都有相同深度的 schema/size/deadline/flush negative test | **Not validated** |
+
+## 完成检查
+
+- [ ] Event、identity、injection channel 与 stale-state rule 符合所选宿主。
+- [ ] Scope 来自稳定的授权 identity，并有 cross-Scope 负向测试。
+- [ ] PreparedContext 保持有界、临时且不可信。
+- [ ] Recall、capture、flush、Candidate extraction 与 Memory commit 仍是独立观察。
+- [ ] Automatic fail-open claim 与实际 exception boundary 一致。
+- [ ] Explicit mutation failure 与 permission denial 保持可见。
+- [ ] Redirect、schema、size、deadline、stale-turn、no-UI 与 flush-lag test 覆盖所有承诺行为。
+- [ ] Diagnostics 不含 prompt、Scope、context、Source content、response body 或 token。
+- [ ] Setup 保留 foreign file，并区分 installed、active、Server-ready 与 E2E。
+- [ ] `doctor` 没有被写成 real-host E2E。
+- [ ] Bundled Skill 没有被写成 managed Skill export。
+- [ ] Unsupported 与 **Not validated** 保持分开。
+
+<Check>
+Unit contract、service chain、Setup/doctor、real-host E2E 与 negative/security 五层都有 observable evidence 后，才能把第六种宿主加入 first-class catalog。
+</Check>
+
+继续阅读 [Codex](/zh/coding-agents/codex)、[Claude Code](/zh/coding-agents/claude-code)、[DSH](/zh/coding-agents/dsh)、[OpenCode](/zh/coding-agents/opencode) 或 [Pi](/zh/coding-agents/pi)。

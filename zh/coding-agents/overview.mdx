@@ -1,11 +1,42 @@
 ---
 title: "编程 Agent 总览"
-description: "比较 Codex、Claude Code、DSH、OpenCode 与 Pi 的事件、注入、采集、权限和验证等级。"
+description: "比较五种编程 Agent 宿主的成熟度、Setup、事件、注入、capture、flush、权限和验证边界。"
 ---
 
-五个编程宿主连接同一个 PowerContext Server，但没有共用一套 Hook API。共同点是领域合同：解析 Scope、prepare 临时上下文、独立 capture Source，并让显式持久写入经过宿主权限。
+<Warning>
+各宿主的验证深度不同。OpenCode 的真实 host-process prepare/capture E2E smoke 在该边界为 **Supported**，完整 host lifecycle 仍为 **Not validated**。Codex、Claude Code 和 DSH 的 real-host E2E 均为 **Not validated**。Pi 只有 package-load 覆盖，完整 recall host chain 仍是 **Not validated**。
+</Warning>
 
-WorkBuddy 和便携 Agent Plugin 不在这一章。它们的验证合同在[通用 Agent](/zh/common-agents/overview)。
+五种宿主都连接一份单独运行的 PowerContext Server。它们共用领域合同，但不共用一套 Hook API，仓库里也没有统一的 `HostAdapter` SDK。
+
+## 成熟度与安装状态
+
+| 宿主 | Automatic path | Explicit path | 安装/版本状态 | Real-host 验证 |
+|---|---|---|---|---|
+| Codex | `UserPromptSubmit` | MCP + Skill | 未声明正式最低宿主版本 | **Not validated** |
+| Claude Code | `UserPromptSubmit` | MCP + Skill | v1；Claude Code 2.1.133 只是兼容性证据，不是最低版本 | **Not validated** |
+| DSH | `agent/pre-step` | curated HTTP tools | 需要已构建的 `lib/index.js`；正式最低版本 **Not validated** | **Not validated** |
+| OpenCode | two-stage exact-turn cache + transform | curated HTTP tools | **Version-gated**：`>=1.18.21,<2` | prepare/capture smoke **Supported**；full lifecycle **Not validated** |
+| Pi | `before_agent_start` + pending flusher | native tools + `/pc` | Node `>=22.19`；Pi 0.82.x 只是兼容性证据，不是最低版本 | package load only；full chain **Not validated** |
+
+<Note>
+**Not validated** 不等于 **Unsupported**。Not validated 表示这条路径可能可用，但缺少这里声明的验证证据；Unsupported 表示 integration 没有提供该操作。
+</Note>
+
+Setup 只安装宿主文件或 package，不会启动 Server。`doctor` 检查有限的安装与激活边界，不证明真实 prompt、recall、capture、permission UI、跨会话行为或 real-host E2E。
+
+## 最小用法
+
+```bash
+powercontext setup <host> \
+  --source oceanbase/powercontext \
+  --ref master
+
+powercontext server run
+powercontext doctor <host>
+```
+
+打开一轮新的宿主会话，发送一个普通编程 prompt。只有在你确实要搜索或修改 Memory、创建 Handoff、执行 Review 或 export Skill 时，才使用显式工具面。
 
 ## 共同执行流
 
@@ -13,52 +44,133 @@ WorkBuddy 和便携 Agent Plugin 不在这一章。它们的验证合同在[通�
 host event
 → resolve Scope
 → prepare bounded untrusted context
+→ optionally capture prompt Source / immediate flush
 → inject through host-specific channel
 → run model
-→ optionally capture Source / flush
+→ Pi only: retry pending flush at lifecycle boundaries
 → explicit tools under host permission
+```
+
+这套共同形状里实际包含五种事件模型：
+
+```text
+Codex / Claude Code
+UserPromptSubmit → prepare + prompt capture → transient context
+explicit work → MCP + Skill
+
+DSH
+agent/pre-step → prepare + user-originated batch capture
+→ await downstream decision → plugin message
+explicit work → curated HTTP tools
+
+OpenCode
+chat.message → prepare + capture → cache by (sessionID,messageID)
+experimental.chat.messages.transform → exact latest-turn match → inject
+explicit mutation → context.ask
+
+Pi
+before_agent_start → prepare + prompt capture → immediate flush or pending position
+→ augment systemPrompt
+boundary events → retry pending flush within a bounded budget
+explicit mutation → interactive confirmation; deny without UI
 ```
 
 ## 能力矩阵
 
 | 能力 | Codex | Claude Code | DSH | OpenCode | Pi |
 |---|---|---|---|---|---|
-| 自动事件 | `UserPromptSubmit` | `UserPromptSubmit` | `agent/pre-step` | `chat.message` + transform | `before_agent_start` |
-| 注入 | additional context | `additionalContext` | plugin message | exact-turn message transform | system prompt |
-| Prompt capture | 有 | 有 | user-originated batch | 有，过滤 secret-like prompt | 有，过滤 secret/size |
+| Automatic event | `UserPromptSubmit` | `UserPromptSubmit` | `agent/pre-step` | `chat.message` + message transform | `before_agent_start` |
+| 注入 | hook stdout additional context | JSON `additionalContext` | downstream `enter` 后 plugin message | `(sessionID,messageID)` exact-turn cache | returned `systemPrompt` augmentation |
+| Prompt capture | user prompt；character bound | user prompt；character bound | user-originated batch；secret-like filter | eligible prompt；secret-like/byte filters | eligible prompt；secret/byte filters |
 | Final response capture | 无 | 无 | 无 | 无 | 无 |
-| 显式接口 | MCP | MCP | native HTTP tools | native HTTP tools | native tools + `/pc` |
+| 显式接口 | MCP | MCP | curated HTTP tools | curated HTTP tools | native tools + `/pc` |
 | Handoff | MCP + Skill | MCP + Skill | curated HTTP tools | curated HTTP tools | native tools |
-| Permission | Host-gated | Host-gated | pre-execute `ask` | `context.ask` | interactive confirm；无 UI 拒绝 |
-| Managed Skill export | Supported | Supported | Unsupported | Unsupported | Unsupported |
-| Real-host E2E | Not validated | Not validated | Not validated | Supported | package load only；full chain Not validated |
+| Permission | **Host-gated** | **Host-gated** | pre-execute `ask` | `context.ask` | interactive confirmation；无 UI 拒绝 |
+| Managed Skill export | **Supported** | **Supported** | **Unsupported** | **Unsupported** | **Unsupported** |
+| Real-host E2E | **Not validated** | **Not validated** | **Not validated** | prepare/capture smoke **Supported**；full lifecycle **Not validated** | package load only；full chain **Not validated** |
 
-Bundled `project-context` Skill 只是 integration 自带说明，不代表 managed Skill export。
+五种 integration 都带有宿主 guidance，但 bundled `project-context` Skill 不是 managed Skill export。Managed export 是另一条 PowerContext 操作，需要 projection 与 drift contract；当前只支持 Codex 和 Claude Code。
 
-## Setup 与 doctor
+## Scope、注入、capture 与 flush
 
-```bash
-powercontext setup <host> \
-  --source oceanbase/powercontext \
-  --ref master
+Scope 选择数据分区，但不是认证。应从稳定且已授权的 workspace/project identity 派生 Scope，并通过负向测试确认两个 Scope 不会复用彼此的 transient context。
 
-powercontext doctor <host>
+PreparedContext 必须有界、临时且不可信。它只能进入当前 turn 的注入通道，不能复制到 transcript、checkpoint 或 durable Source。Stale turn key 绝不能把旧 context 注入后续 turn。
+
+Capture 与 Memory 是两个阶段：
+
+```text
+prompt capture
+→ Source position
+→ optional flush / scheduler
+→ extraction candidate
+→ Memory commit or no-op
 ```
 
-Setup 不启动 Server。Doctor 检查安装/激活的有限边界，不等于 E2E，也不证明真实 recall、permission UI 或跨会话行为。每个宿主页会写明它具体检查什么。
+Codex 与 Claude Code 各捕获一个 user prompt。DSH 可以用 batch 内全部 text 帮助 recall，但 capture 只保留 user-originated text。DSH、OpenCode 和 Pi 会跳过 secret-like capture；该 filter 不会阻止 recall transmission。Pi 与 OpenCode 使用 UTF-8 byte bound，Codex 与 Claude Code 使用 character-count capture bound。五种宿主都不会自动捕获 final assistant response。
 
-## 自动与显式路径
+Flush 只是推进 captured Source position 的处理进度。Timeout 或 cursor 落后时，不能证明 Memory 已存在。Codex、Claude Code、DSH 与 OpenCode 支持可选 immediate flush。Pi 还会记录 pending position，并在 lifecycle boundary 重试。只有 Pi 使用这套 deferred boundary-flush model。
 
-Automatic recall/capture 属于辅助路径，Server failure 时通常 fail-open。显式 Memory、Handoff、Review 或 export 不能假装成功。
+## Automatic 与 explicit path
 
-不同宿主的 permission 也不能互相类推：Pi 明确在无 UI 时拒绝 durable write；DSH 和 OpenCode 交给宿主 permission API；Codex/Claude Code 的无 UI 拒绝行为当前 **Not validated**。
+Automatic recall、capture 和可选 flush 属于辅助路径。预期内的 Server、validation、size、deadline 或 capture failure 通常 fail-open，让宿主任务继续。Claude Code、DSH、OpenCode 与 Pi 会分别 guard recall 和 capture。Codex 对预期 failure 也保持独立，但 unexpected recall exception 可能让本次 capture 被跳过；文档不能承诺比代码更强的隔离。
 
-## 选择路径
+显式持久操作不同。Memory write、Handoff commit、Review decision 和 Skill export 必须暴露失败，并经过宿主 permission。Pi 的 no-UI denial 已验证。Codex 与 Claude Code 在无 UI 时拒绝 durable mutation 的行为是 **Not validated**，不要套用 Pi 的合同。
 
-- 需要 Hook + MCP + project Skill：Codex 或 Claude Code。
-- 需要 pre-step 与可裁剪 HTTP tools：DSH。
-- 需要 exact-turn transient cache 与真实 host E2E：OpenCode。
-- 需要 boundary flush 和 no-UI fail-closed：Pi。
-- 需要 WorkBuddy 或便携 Agent Plugin：去[通用 Agent](/zh/common-agents/overview)。
+## 负向实验
 
-先读 [Hooks 与插件](/zh/coding-agents/hooks-and-plugins)，再进入对应宿主页。
+按所选宿主执行适用的检查：
+
+- 停止 Server，确认普通 prompt 仍会到达 model。
+- 返回 401/403，确认它与成功但 empty 的结果可以区分。
+- 返回 unknown PreparedContext schema，确认不会注入。
+- 超出 response-size 或 deadline budget，确认 turn 仍有界。
+- Redirect authenticated request；只有宿主实现明确 enforce 时，才能声称它会拒绝。
+- 让 recall 失败而 capture 成功，再反过来测试；Codex 还要覆盖 unexpected recall exception。
+- 复用、乱序完成或删除 turn/session key，确认 stale context 被拒绝，或 race 不会注入错误 turn。
+- 拒绝 explicit mutation；宿主定义 headless/no-UI 行为时，也要覆盖该场景。
+- 让 flush cursor 持续落后于 Source position，确认 bounded retry 停止且不会声称 Memory 已存在。
+- 检查 diagnostics，确认不含 prompt、Scope、PreparedContext、response body 或 token。
+
+## 当前不支持或未验证
+
+| 项目 | 状态 |
+|---|---|
+| Automatic path 的 final assistant-response 或 transcript capture | **Unsupported** |
+| Automatic Task Outcome recording | **Unsupported** |
+| DSH、OpenCode 或 Pi 的 managed Skill export | **Unsupported** |
+| Codex real host-process E2E 与正式最低宿主版本 | **Not validated** |
+| Claude Code real host-process E2E、正式最低版本和 no-UI mutation denial | **Not validated** |
+| DSH real-host E2E 与正式最低宿主版本 | **Not validated** |
+| OpenCode out-of-order prepare race behavior | **Not validated**；exact-turn matching 可阻止 wrong-turn injection，但可能丢失较新的 injection |
+| Pi 完整 recall host chain、正式最低 Pi 版本和全部 lifecycle-flush boundary | **Not validated** |
+| Managed exported Skill 在 Codex 或 Claude Code 中的加载/执行 | **Not validated** |
+| 统一的 `HostAdapter` SDK | 作为当前仓库抽象为 **Unsupported** |
+
+## 选择宿主
+
+| 需求 | 下一页 |
+|---|---|
+| short `UserPromptSubmit`、MCP 与 project Skill | [Codex](/zh/coding-agents/codex) 或 [Claude Code](/zh/coding-agents/claude-code) |
+| pre-step middleware 与 curated HTTP tools | [DSH](/zh/coding-agents/dsh) |
+| two-stage exact-turn cache 与 `context.ask` | [OpenCode](/zh/coding-agents/opencode) |
+| `before_agent_start`、pending flusher 与 no-UI denial | [Pi](/zh/coding-agents/pi) |
+
+## 完成检查
+
+- [ ] Server 单独运行；Setup 和 `doctor` 没有被写成 E2E 证据。
+- [ ] 宿主版本或兼容性声明与成熟度表一致。
+- [ ] 一个普通 prompt 已证明预期 event 与 transient injection path。
+- [ ] Scope 来自稳定的授权 identity，并通过 cross-Scope 负向测试。
+- [ ] Capture 内容、secret policy 和 character/byte bound 已记录并实际观察。
+- [ ] Flush 与 Memory commit 已按两个阶段验证。
+- [ ] Automatic failure 只在当前代码与测试证明的范围内 fail-open。
+- [ ] Permission 与 no-UI behavior 只按所选宿主的合同测试。
+- [ ] Bundled Skill 没有被写成 managed Skill export。
+- [ ] 部署说明没有混淆 Unsupported 与 **Not validated**。
+
+<Check>
+如果真实宿主还没有启动并处理过 prompt，就只能报告已完成的 contract、service-chain 或 doctor tier，不能称为 real-host E2E。
+</Check>
+
+选择具体宿主 Setup 前，继续阅读 [Hooks 与插件](/zh/coding-agents/hooks-and-plugins)。

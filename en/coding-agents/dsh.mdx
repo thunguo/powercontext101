@@ -1,38 +1,129 @@
 ---
 title: "DeepSeek Harness"
-description: "Inject a plugin message from agent/pre-step, use pc_* HTTP tools for explicit writes, and leave mutations to host ask."
+description: "Connect PowerContext through agent/pre-step middleware and native pc_* HTTP tools."
 ---
 
 <Warning>
-DSH has no formal minimum host version. `test_dsh_http_chain.py` verifies the HTTP contract, not a full real host-process E2E; the status is **Not validated**. Mutations return `ask` from `tools/pre-execute` and are **Host-gated**. Managed Skill export is **Unsupported**.
+This is an early native integration. The plugin package is `0.0.2`, but DSH has no formal minimum host version. A complete real `dsh web` host-process/model E2E is **Not validated**.
 </Warning>
 
-The DSH integration is not an MCP plugin. It recalls and captures in `agent/pre-step`, registers curated `pc_*` HTTP tools, and exposes human `/pc` commands. Setup runs `dsh plugin --profile web add` and does not start the Server.
+DSH uses native host hooks. It is not an MCP plugin. Automatic recall and capture run at `agent/pre-step`; curated `pc_*` tools call the PowerContext HTTP API directly.
 
-For the full install, use the Configure DeepSeek Harness how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
-
-## Install and activate
-
-Confirm the web profile exists, then start the Server:
-
-```bash
-powercontext server run
-```
-
-Install the built plugin:
+## Install and maturity
 
 ```bash
 powercontext setup dsh --source oceanbase/powercontext --ref master
-
-powercontext doctor
+powercontext server run
 powercontext doctor dsh
 ```
 
-Setup requires a built `integrations/dsh/plugins/powercontext/lib/index.js`. It passes that directory to `dsh plugin --profile web add` and creates the PowerContext user data directory. A usable checkout for the same ref is reused; a broken checkout is replaced. Setup does not start the Server.
+Setup requires `dsh` on `PATH` and the built plugin entrypoint at `lib/index.js`. It installs the plugin directory with `dsh plugin --profile web add`. Doctor reads `dsh --profile web --dump-config` and looks for the exact plugin ID `powercontext-dsh`. The plugin requires Node.js 20 or newer.
 
-`doctor dsh` checks that `dsh` is on PATH and looks for the exact plugin id `powercontext-dsh` in `--profile web --dump-config`. The package name alone is not enough. It does not contact the Server or test recall.
+That check proves configuration, not a live turn. It does not prove that `dsh web` loads the plugin, fires the hooks, or renders a permission prompt. The Node.js requirement and a development Cordis dependency are not a formal minimum DSH host version.
 
-After setup, open a new `dsh web` session.
+## Minimal usage
+
+Start the host after the Server:
+
+```bash
+dsh web
+
+# Run inside DSH
+/pc doctor
+/pc search authentication decisions
+/pc remember Prefer contract tests before refactors
+/pc flush
+/pc review
+```
+
+You normally do not call recall yourself. Send a prompt as usual. Use `/pc` to inspect Scope and endpoint, and `/pc doctor` to separate plugin configuration from Server health. Human commands also cover search, remember, flush, and Candidate review. The Agent receives the curated `pc_*` tools.
+
+## Execution flow
+
+```text
+agent/pre-step
+→ collect text from every message into the recall query
+→ collect user-originated text into capture content
+→ resolve workspace Scope
+→ prepare context and capture Source independently
+→ await next() exactly once
+→ inspect the downstream decision
+→ if kind is enter and context is ready, append one plugin message
+→ otherwise return the downstream result unchanged
+```
+
+The full message batch can improve recall because it includes host and plugin context. Capture is narrower: only text whose `source.kind === "user"` becomes a Source. A plugin-only batch is never captured as user input.
+
+The `next()` result decides whether injection is valid. Recall happens before `next()`, but the plugin appends context only when downstream returns `kind: "enter"`. Rejection, missing context, validation failure, or wrapping failure leaves the downstream result alone. `next()` is never retried to recover from injection failure.
+
+## Scope
+
+Scope resolution uses this order:
+
+1. `POWERCONTEXT_DSH_SCOPE_ID` or plugin `scopeId`;
+2. normalized Git remote identity for the session workspace;
+3. a stable SHA-256 identity derived from the workspace path.
+
+DSH does not implement the Git-private Workstream binding or picker used by Codex and Claude Code. The plugin deliberately does not fall back to its process directory. Without session `cwd` or an explicit Scope, automatic work skips, `/pc` reports an unscoped state, and a tool returns a stable `unscoped` result without an HTTP call. This prevents unrelated DSH sessions from sharing Memory by accident.
+
+A model tool caller cannot override Scope. The plugin replaces any caller-supplied `scope_id` with the runtime-resolved value. Derive an explicit Scope from trusted deployment configuration, not model input.
+
+## Injection, capture, and flush
+
+PreparedContext must pass the exact v1 schema, status, integer byte-count, UTF-8 byte-count, and configured size checks before injection. The default ceiling is 8,000 bytes; configuration accepts 512 through 32,768 bytes. The injected message is marked as host-supplied, untrusted historical evidence. It exists only for that model entry and is not captured again as user content.
+
+Capture writes a deterministic `dsh-user-prompt:` Source with DSH session and turn provenance. Recall failure does not block capture, and capture failure does not discard valid PreparedContext. Text over 200,000 characters is skipped. Set `POWERCONTEXT_DSH_CAPTURE_PROMPTS=false` to disable capture.
+
+Capture also skips text containing the narrow markers `sk-`, `api_key`, or `BEGIN PRIVATE`. This is a guardrail, not comprehensive secret detection. Disable capture when a prompt must not be persisted.
+
+Automatic flush is optional and off by default. With `flushOnCapture` enabled, a positive capture position starts at most `flushMaxCalls` attempts and stops early when `current_cursor >= position`. `/pc flush` is the explicit human path. If the cursor never catches up, the loop exhausts its bound without proving that the Source was processed. Do not infer Memory from a successful capture log: processing may produce a Candidate, and Review may commit Memory or choose a no-op.
+
+## Native tools and permission
+
+The model surface contains 19 curated named HTTP tools, not MCP. They cover Memory, prepare/capture, low-level Handoff, Experience and Skill generation and reads, plus read-only Candidate listing and retrieval.
+
+Generic operation invocation, dangerous/admin operations, and Candidate approve/reject/revise are **Unsupported** on the model surface. High-level `create_work_contract`, `handoff_current_work`, `acknowledge_handoff`, and `record_task_outcome` are also not registered there, even though related operations exist in the generated HTTP contract.
+
+Read tools continue through `tools/pre-execute`. Named mutations return `ask` before Memory writes, explicit Source capture, Handoff activation or commit, and Experience or Skill generation. DSH owns the permission UI and allow/deny decision, so these mutations are **Host-gated**. Unit tests prove the `ask` classification; the exact real-host UI and denial path are **Not validated**.
+
+Candidate review stays human-controlled. `/pc review approve` and `/pc review reject` require the Candidate expected version. Candidate revise is not implemented by `/pc`. Generating an Experience or Skill Candidate is a separate Host-gated mutation; it is not approval.
+
+## Failure behavior
+
+Automatic prepare, validation, capture, optional flush, and message wrapping fail open. The HTTP client bounds responses at 1 MiB, rejects redirects, cancels timed-out requests, and normalizes transport failure to a stable unavailable result. The overall pre-step budget defaults to four seconds; individual requests default to one second. These failures must not replace the downstream Agent result.
+
+Explicit durable operations are different. Permission denial and Server error remain visible instead of being reported as success. Missing `cwd` is an unscoped state, not an empty Memory result.
+
+## Negative experiments
+
+Run these checks when upgrading DSH or the plugin:
+
+- Stop the Server, then send a normal prompt. The Agent should continue without injected context; an explicit write should report failure.
+- Submit a batch containing user and plugin text. Recall should see both; capture should contain only user-originated text. A plugin-only batch should create no prompt Source.
+- Make downstream return a non-`enter` decision. No plugin message should be appended. This branch exists in code, but a dedicated real-host acceptance test is **Not validated**.
+- Remove session `cwd` without configuring Scope. Confirm no HTTP request uses the plugin process directory and that commands and tools report unscoped behavior.
+- Return an unknown PreparedContext field, inconsistent byte count, oversized body, redirect, or slow response. Nothing should be injected, and the downstream decision should survive.
+- Submit capture text containing `sk-`, `api_key`, or `BEGIN PRIVATE`. It should be skipped. Test a different credential shape to confirm that the filter is intentionally narrow.
+- Keep the flush cursor behind the Source position until the call bound is exhausted. The turn should continue without a false processing or Memory claim.
+- Invoke a read and a named mutation. The read should delegate; the mutation should return `ask` before writing. Test the actual permission UI separately.
+- Inspect the model tools. Candidate approve, reject, and revise, generic invocation, and dangerous/admin operations should be absent.
+
+## Unsupported vs Not validated
+
+| State | Capability | Practical consequence |
+|---|---|---|
+| **Unsupported** | MCP transport in this plugin | Use the native HTTP client and `pc_*` surfaces. |
+| **Unsupported** | automatic assistant final-response capture and automatic Task Outcome | Persist a real completion boundary explicitly through an available controlled surface. |
+| **Unsupported** | Codex/Claude-style Git-private Workstream binding and picker | DSH resolves configured Scope, Git remote, or workspace-path identity. |
+| **Unsupported** | generic, destructive, or admin model tools; model-driven Candidate decisions | Use curated tools and human `/pc review` approve/reject paths. |
+| **Unsupported** | proven cursor-through completion after bounded automatic flush | Treat it as a bounded best-effort wait, not proof of Memory generation. |
+| **Not validated** | formal minimum DSH version or compatibility with a named release | Do not turn a development dependency or local CLI version into a support floor. |
+| **Not validated** | complete real `dsh web` host-process/model E2E | Package E2E and HTTP call-through do not prove the complete host lifecycle. |
+| **Not validated** | exact permission UI and denial behavior under real host policies | The plugin returns `ask`; DSH owns the interaction and final decision. |
+| **Not validated** | dedicated real-host non-`enter` suppression and cursor-behind flush behavior | Run the negative experiments before making deployment claims. |
+
+`test_dsh_http_chain.py` verifies the native public Client/Server HTTP contract with MCP disabled. The Cordis harness covers plugin call-through against a live Server. Neither starts a real DSH host.
+
 
 ## Configuration defaults
 
@@ -56,102 +147,6 @@ export POWERCONTEXT_DSH_CAPTURE_PROMPTS=false
 dsh web
 ```
 
-## Minimal verification
-
-```bash
-powercontext doctor
-powercontext ready
-powercontext capabilities
-```
-
-Save the decision in DSH:
-
-```text
-Use PowerContext pc_remember to store this decision:
-after changing the OpenAPI contract, regenerate the client and inspect the diff.
-Return the Memory Citation. Do not store secrets.
-```
-
-Follow this minimum sequence. Do not stop at a bullet list:
-
-1. Ask the model to call `pc_remember`. For a named mutation, `tools/pre-execute` always returns:
-
-```json
-{
-  "kind": "ask",
-  "reason": "PowerContext tool \"pc_remember\" changes durable project context."
-}
-```
-
-2. Approve once in the host permission UI. You should get a Memory Citation. A denial must write nothing.
-3. Review is not a model tool. List pending Candidates with:
-
-```text
-/pc review
-```
-
-Approval is a human command:
-
-```text
-/pc review approve <candidate_id> <expected_version>
-```
-
-`/pc remember` and `/pc review` do not go through `tools/pre-execute`. They are slash commands the human already started.
-
-Ask a new request or open a new session:
-
-```text
-What should happen after the OpenAPI contract changes?
-```
-
-When automatic recall succeeds, the plugin appends a plugin message only after downstream decides to `enter` the model. That message starts with `PowerContext host-supplied context` and includes a Citation. A non-enter downstream result must not be replaced.
-
-## Scope resolution
-
-DSH resolves Scope in this order:
-
-1. A nonempty `POWERCONTEXT_DSH_SCOPE_ID`.
-2. The normalized Git remote on the session workspace cwd, written as `git:...`.
-3. A `local:<sha256>` identifier for that same workspace.
-
-Without a workspace cwd, the automatic path skips work and explicit tools return a stable unscoped state: `No project workspace on this session. Set scopeId or open a workspace.` The plugin does not fall back to the Harness process directory.
-
-DSH does not read the Codex / Claude Code Workstream binding.
-
-## Automatic path and explicit tools
-
-```text
-agent/pre-step
-→ all text blocks form recall query
-→ user-originated blocks form capture content
-→ resolve workspace Scope
-→ prepare and capture independently
-→ await next() exactly once
-→ only when downstream enters model, append plugin message
-```
-
-The full batch improves recall, while Source capture remains user-only. `next()` must run exactly once. Server, validation, or wrapping failure does not replace the downstream result.
-
-The explicit surface covers Memory, Handoff, Experience / Skill generation, and read-only Candidate operations. Dangerous and admin operations are not registered. Named mutation returns `ask` from `tools/pre-execute`, leaving the decision to host permission UI. Candidate approve / reject / revise is not an ordinary model tool; use human `/pc review` or another controlled surface.
-
-The bundled Skill is guidance only. DSH is not a managed Skill export target.
-
-## Negative checks
-
-- Stop the Server, then ask a normal coding question. The agent should continue.
-- With the Server still down, run `pc_remember`. Failure must stay visible and must not look like an empty success.
-- Permission deny: the mutation must not run.
-- Missing cwd: the automatic path skips or returns unscoped and must not guess the process directory.
-- Downstream is not `enter`: no plugin message is injected.
-- Approval tools must stay off the model surface.
-
-## Current limits
-
-- A real DSH host-process E2E is **Not validated**. The HTTP-chain test is not a full host.
-- No formal minimum DSH version is declared.
-- Managed Skill export is **Unsupported**.
-- Plugin load still requires DeepSeek Harness peer modules.
-- Automatic extraction needs a generation model; explicit Memory does not.
 
 ## Finish the shared check on this host
 
@@ -165,13 +160,17 @@ The bundled Skill is guidance only. DSH is not a managed Skill export target.
 
 ## Completion checklist
 
-- `doctor dsh` sees id `powercontext-dsh` in dump-config.
-- Server health, readiness, and capabilities were checked separately.
-- A new request can recall the OpenAPI decision you saved explicitly, and the Citation appears in the plugin message after enter.
-- `next()` runs exactly once; a non-enter path receives no injection.
-- Ordinary coding continues when automatic recall fails.
-- Explicit Memory or Handoff failure is visible in DSH.
-- Mutation triggers `ask`; approve / reject never entered the model tools.
-- You did not describe the HTTP-chain test as a real host E2E.
+- [ ] `powercontext doctor dsh` finds exact plugin ID `powercontext-dsh`.
+- [ ] Built `lib/index.js` is installed in the intended `web` profile, and Node.js is 20 or newer.
+- [ ] `/pc` reports the intended endpoint and runtime-resolved Scope; `/pc doctor` reaches the Server.
+- [ ] Missing `cwd` makes no HTTP call and returns stable unscoped results.
+- [ ] Recall uses the full message batch while capture remains user-only.
+- [ ] `next()` runs once, and injection occurs only after `kind: "enter"` and exact schema/byte checks.
+- [ ] Capture policy accounts for the narrow secret-marker filter and 200,000-character limit.
+- [ ] Automatic flush is bounded and is not described as successful processing without cursor evidence.
+- [ ] Named mutations produce a host `ask`; reads delegate; denial remains visible.
+- [ ] The model has read-only Candidate access and no generic, dangerous, admin, or Candidate-decision tools.
+- [ ] Server-down, redirect, invalid-schema, oversized-response, non-`enter`, and cursor-behind cases have suitable negative coverage.
+- [ ] **Unsupported**, **Not validated**, and **Host-gated** claims remain separate.
 
 Continue with [OpenCode](/en/coding-agents/opencode).

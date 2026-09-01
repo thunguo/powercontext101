@@ -1,15 +1,32 @@
 ---
 title: "Extend with hooks"
-description: "Write a verifiable adapter contract first, then reuse existing transport, Scope, capture, flush, and doctor rules."
+description: "Discover host capabilities, define a verifiable adapter contract, and require real-host evidence before shipping."
 ---
 
-Before adding a sixth host, discover what the host can actually provide. Without a stable prompt event, pre-dispatch injection point, or permission API, copying another adapter will not preserve its guarantees.
+<Warning>
+There is no unified `HostAdapter` SDK. The contract names on this page are a design checklist, not current classes or stable public APIs.
+</Warning>
 
-## Capability discovery
+## Start with capability discovery
 
-Record prompt event, turn/session identity, workspace, transient injection channel, tool registration, permission/UI, package and Skill installation, headless lifecycle, and version probe.
+Do not begin by copying the nearest integration. First record what the new host can actually expose:
 
-## Adapter contract
+- a stable prompt event and its ordering;
+- turn, message, session, workspace, and project identity;
+- a transient pre-dispatch injection channel;
+- tool and command registration;
+- permission requests, confirmation UI, and headless behavior;
+- package, plugin, and bundled Skill installation;
+- end, compaction, switch, shutdown, and interruption events;
+- a CLI/version probe and an activation probe.
+
+Query `GET /v1/capabilities` as well. It reports Server features such as `memory_extraction`, `experience_generation`, `managed_skill_generation`, `external_skill_registry`, Handoff generation, search modes, and context versions. Host capability discovery and Server capability discovery answer different questions; you need both.
+
+If the host has no stable prompt event, no pre-dispatch injection point, or no permission surface, say so. That capability is **Unsupported** unless you implement another contract with equivalent guarantees. If the host appears to expose it but no real-host test proves the path, mark it **Not validated**.
+
+## Write the adapter contract
+
+Use this vocabulary to force the important decisions into the open:
 
 ```text
 PromptEvent
@@ -24,56 +41,163 @@ Diagnostics
 Installer / Doctor
 ```
 
-Define input, output, failure policy, and observable assertions for each. Automatic helpers may fail open; explicit mutation may not.
+These are proposed roles. Define the input, output, failure policy, security boundary, and observable assertion for each one.
+
+| Role | Contract to settle |
+|---|---|
+| `PromptEvent` | Exact host event, prompt normalization, lifecycle ordering, and stable turn identity. |
+| `ScopeResolver` | Authorized override, Git identity, project fallback, normalization, and cache lifetime. |
+| `PreparedContextProvider` | `/v1/context/prepare`, accepted schema versions, response-size budget, and fail-open result. |
+| `TransientInjector` | Where context enters, how it is labeled untrusted, and proof that it is not persisted by injection. |
+| `SourceCapture` | Captured content, deterministic Source identity, metadata, secret policy, UTF-8 byte limit, and returned `position`. |
+| `FlushCoordinator` | Pending state per Scope, boundary events, retry/deadline budget, and `current_cursor >= position` clearing rule. |
+| `ToolSurface` | Exact operation allowlist, generated schema source, tool result shape, and unsupported operations. |
+| `PermissionGate` | Read versus mutation, approval UX, denial, cancellation, and behavior when no UI exists. |
+| `Diagnostics` | Activation, version, package ownership, Server state, and content-free error reporting. |
+| `Installer / Doctor` | Idempotency, ownership, rollback, activation probe, and partial-failure status. |
+
+Automatic recall, capture, and optional flush may fail-open. Explicit durable writes, Review, Handoff commit, and Skill export must report failure. Do not use one policy for both groups.
+
+## Minimal usage
+
+Start with one prompt path, one boundary path, and one explicit mutation. Keep every unsupported capability out of the first slice.
+
+## Execution flow
+
+Keep host glue thin. It should resolve identity, call verified helpers, and translate the result into the host's native event shape.
+
+```text
+onPrompt(event)
+→ normalize PromptEvent
+→ resolve Scope
+→ prepare context and capture Source independently
+→ retain returned position for bounded flush
+→ inject PreparedContext through the host's transient channel
+
+onBoundary(event)
+→ flush pending position for the same Scope
+
+onMutation(call)
+→ validate Scope and payload
+→ request host permission
+→ execute only after approval
+```
+
+If the host cannot implement one of these arrows, remove the claim. Do not hide the gap behind a generic adapter name.
 
 ## Reuse current implementation
 
-- `powercontext.transport` and loopback vectors;
-- Codex/Claude prepared-context schema validation;
-- host-specific Scope normalization tests;
-- Pi pending flusher;
-- DSH OpenAPI-derived operation table;
-- Codex/Claude Skill projections;
-- setup/doctor catalog in `cli/hosts.py`.
+Reuse code only where its contract already matches the host:
 
-There is no unified HostAdapter SDK today. Do not invent one for cleaner documentation.
+- the generated HTTP client and transport models under `powercontext.http`;
+- canonical `PreparedContext` and capability models;
+- Python capture rendering and redaction helpers;
+- shared loopback transport vectors;
+- Codex and Claude Code prepared-context validation patterns;
+- host-specific Scope normalization tests;
+- Pi's pending-position flusher pattern;
+- DSH and other generated operation tables;
+- Codex and Claude Code managed Skill projections;
+- the first-class setup/doctor catalog and common `Diagnostic` value model.
+
+Several helpers are repeated rather than shared today. Scope resolution, PreparedContext validation, deadline and redirect policy, secret detection, Source ID construction, and bounded flush logic still live in separate host packages. Similar file names do not make them a supported SDK.
+
+## Scope, injection, capture, and flush
+
+A new host must define these four boundaries together.
+
+For Scope, derive identity from stable, authorized project data. Strip credentials from Git remotes. Do not trust a model-supplied `scope_id`, and do not reuse session identity as repository identity unless the host contract proves they are the same.
+
+For injection, use a native transient channel before model dispatch. Mark `PreparedContext` as untrusted historical evidence. A system guide that merely tells the model to search Memory is not proof that recall was injected.
+
+For capture, state exactly which side of the turn is recorded. Filter secret-shaped content before transport and enforce limits in UTF-8 bytes. Keep recall and capture independent so one failure does not erase the other's valid result.
+
+For flush, retain the Source `position` by Scope and clear it only when `current_cursor >= position`. Every retry loop needs a call limit and a wall-clock budget. When the host lacks a reliable boundary event, automatic flush is **Unsupported**; when the event exists but has not been exercised in the real host, it is **Not validated**.
+
+## Permission and explicit writes
+
+List every mutating operation. Decide whether the host can ask, deny, cancel, or pause in both interactive and headless modes. Then test the exact behavior.
+
+A host with no permission API cannot inherit Pi's `confirmation_required` contract or OpenCode's `context.ask()` behavior. Either fail closed in adapter-controlled code, expose the operation as read-only, or mark durable mutation **Unsupported**. “The model should ask first” is not a permission boundary.
+
+Diagnostics must omit prompt content, prepared context, Scope details that can identify a private repository, authorization values, and secret-bearing payloads.
+
+## Setup and doctor
+
+Add the host to setup only after installation and activation have separate checks.
+
+Setup should be idempotent, preserve foreign same-name files, record ownership for files it manages, use staging for remote refresh, and restore the previous state on failure. A multi-host setup must isolate failures and report each selected row as installed, failed, or skipped.
+
+Doctor has three jobs:
+
+1. find the host executable and report its version evidence;
+2. verify the installed package or configuration belongs to PowerContext;
+3. probe activation through the host when the host offers a safe, model-free probe.
+
+Do not treat `powercontext doctor` as an integration scan. The general command checks the package and Server; host checks belong in `powercontext doctor <host>` and the read-only `powercontext doctor integrations` matrix.
 
 ## Acceptance tiers
 
-1. Unit contract: schema, Scope, size, secret, permission.
-2. Service chain: real Server, Source/Memory lineage, fail-open.
-3. Setup/doctor: idempotency, ownership, rollback, activation.
-4. Real-host E2E: launch host, send prompt, observe injection/capture/permission.
-5. Negative/security: Server down, wrong auth, redirect, unknown schema, oversize, stale turn, no UI, flush timeout.
+Use these tiers to describe evidence. They are a page-level classification, not names from the current test framework.
 
-Managed Skill export currently supports Codex and Claude Code only. Adding export for a new host requires a projection contract and drift tests; a bundled Skill is not enough.
+1. **Contract/unit:** schema, Scope, size, secret, permission, and failure-policy tests.
+2. **Package/load:** build, install, import, manifest, command, or plugin registration.
+3. **Service chain:** a real PowerContext Server with direct hook/module execution and Source/Memory lineage.
+4. **Real-host E2E:** launch the actual host, send a prompt, and observe lifecycle, injection, capture, flush, and permission behavior.
+5. **Live provider journey:** run the actual host with its provider/model and retain acceptance evidence.
 
-## How to start a sixth host
+Package/load and service-chain tests are useful, but they do not prove host API compatibility or event ordering. A first-class host requires real-host E2E for every capability you label Supported. Provider behavior needs the fifth tier when it affects the claim.
 
-Do not begin by copying `POST /v1/context/prepare`. Write in this order:
+## Negative matrix
 
-1. Discover host capability first: prompt event, injection channel, permission / UI, and version probe. If one of those is missing, mark **Unsupported** or **Not validated** and do not start an installer.
-2. Compare at least two existing hosts. Read [Hooks and plugins](/en/coding-agents/hooks-and-plugins), then compare [OpenCode](/en/coding-agents/opencode) (real host-process E2E is **Supported** and **Version-gated** `>=1.18.21,<2`) with [Codex](/en/coding-agents/codex) (hook plus MCP; real host E2E is **Not validated**).
-3. Write tests before the adapter. Name these existing modules:
-   - unit contract: `tests/test_transport.py`, `tests/codex_plugin/test_recall.py`, `tests/claude_code_plugin/test_hook.py`
-   - service-chain: `tests/e2e/test_codex_service_chain.py`, `tests/e2e/test_dsh_http_chain.py`
-   - setup / doctor: `tests/test_setup_select.py`, `tests/test_doctor_integrations.py`, and the matching `tests/test_*_cli.py`
-   - real-host E2E: treat `tests/e2e/test_opencode_plugin_host.py` as the current bar; an HTTP-only chain is not enough
-   - negative security: Server down, wrong auth, redirect, unknown schema, oversize, stale turn, no UI
-4. Add the name to `FIRST_CLASS_HOSTS` in `cli/hosts.py` only after the version gate, idempotent setup, activation probe, and real-host E2E exist. A standalone `setup` command, such as WorkBuddy, does not enter that catalog by itself.
+At minimum, test these cases:
 
-There is no unified HostAdapter SDK. Do not invent one to make the docs look symmetrical.
+| Area | Experiment | Required observation |
+|---|---|---|
+| Availability | Server down or request timeout | Automatic path is bounded and fail-open. |
+| Authentication | Wrong token | No credential, prompt, context, or private Scope leaks. |
+| Transport | Redirect or plaintext non-loopback endpoint | Redirect is not followed; unsafe transport is rejected. |
+| Schema | Unknown or incomplete PreparedContext | Nothing is injected. |
+| Size | Oversized response or prompt | Work stops at the configured byte budget. |
+| Identity | Missing, stale, or caller-supplied Scope/turn ID | No cross-project or stale-turn injection. |
+| Capture | Disabled, secret-shaped, or failed request | Recall remains independent; no forbidden Source is sent. |
+| Flush | Cursor lag, transient failure, or timeout | Pending position survives; retries end within budget. |
+| Permission | Deny, cancel, or no UI | Mutation does not run unless the declared host contract permits it. |
+| Capability | `memory_extraction=false` | Capture remains Source evidence; unsupported flush/extraction is not claimed. |
+| Lifecycle | Compact, switch, shutdown, interruption | Only the matching Scope and turn state are used. |
+| Setup | Foreign file, failed refresh, or failed activation | Existing state survives and partial failure is reported. |
 
-## Delivery checklist
+Add host-specific privacy cases such as private versus group sessions when the host has those concepts.
 
-- Host version gate and activation probe exist.
-- Scope comes from stable authorized identity.
-- PreparedContext is transient and untrusted.
-- Capture states content, size, and secret policy.
-- Explicit writes define permission and no-UI behavior.
-- Diagnostics leak no content or credentials.
-- Setup preserves foreign config and reports rollback or partial failure.
-- Real-host E2E exists; an HTTP-only chain is insufficient.
-- Unsupported and Not validated remain separate.
+## Managed Skill export
+
+Managed Skill export currently supports only Codex and Claude Code. A bundled `project-context` Skill installed with another plugin does not change that matrix.
+
+To add a new export target, implement a projection contract, target enum and OpenAPI surface, ownership rules, validation, rollback, and drift tests. Until that work exists, managed export for the host is **Unsupported**. If implementation exists but no real install/refresh test has run, use **Not validated** instead.
+
+## Unsupported vs Not validated
+
+| State | Use it when | Example |
+|---|---|---|
+| **Unsupported** | Code rejects, omits, or cannot safely implement the capability. | No host permission API and no adapter-controlled fail-closed mutation path. |
+| **Not validated** | The path may work, but current evidence stops below the claimed host/provider boundary. | A hook passes unit and service-chain tests but no test launches the real host. |
+
+Do not merge these labels into “limited support.” One is a product boundary; the other is an evidence gap.
+
+## Completion checklist
+
+- [ ] Host and Server capability discovery are recorded separately.
+- [ ] Every proposed contract role has inputs, outputs, failure policy, and observable assertions.
+- [ ] Host version gate or compatibility evidence and an activation probe exist.
+- [ ] Scope comes from stable authorized identity and strips credentials.
+- [ ] PreparedContext is validated, transient, and labeled untrusted.
+- [ ] Capture defines content, Source identity, UTF-8 size limit, and secret policy.
+- [ ] Flush retains position by Scope and clears only at `current_cursor >= position`.
+- [ ] Explicit writes have tested allow, deny, cancel, and no-UI behavior.
+- [ ] Diagnostics expose no content or credentials.
+- [ ] Setup preserves foreign config and reports rollback or partial failure.
+- [ ] Managed Skill export is **Unsupported** unless a complete projection target exists.
+- [ ] Real-host E2E covers every Supported lifecycle and permission claim.
+- [ ] **Unsupported** and **Not validated** remain separate in docs, tests, and release notes.
 
 Only then add the host to the first-class catalog.

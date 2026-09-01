@@ -1,44 +1,115 @@
 ---
 title: "Codex"
-description: "Install the hook, MCP, and project-context Skill, verify additionalContext recall, and keep explicit write failures visible."
+description: "Combine the UserPromptSubmit Hook, HTTP MCP, and project-context Skill for automatic recall and explicit Handoff."
 ---
 
-<Warning>
-Codex has no formal minimum host version. A real host-process E2E is **Not validated**. Permission is **Host-gated**; explicit denial of durable writes without UI is currently **Not validated**. Managed Skill export is **Supported** for target `codex`.
-</Warning>
+<Note>
+The integration has contract and HTTP service-chain coverage. No formal minimum Codex version is declared, and a full real Codex host-process E2E is **Not validated**.
+</Note>
 
-Codex reaches the same Server on three paths: a short-process `UserPromptSubmit` hook prepares and captures automatically, HTTP MCP performs explicit Memory and Handoff operations, and the bundled `project-context` Skill tells Codex when to call them. Setup does not start the Server.
+## Maturity and installation
 
-For the full install, use the Configure Codex how-to and Codex tutorial in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract and does not copy those chapters.
+A complete Codex installation needs all three plugin parts:
 
-## Install and activate
-
-Start the Server in one terminal:
-
-```bash
-powercontext server run
-```
-
-Install the marketplace and plugin from another terminal:
+- the `UserPromptSubmit` Hook for automatic recall, prompt capture, and optional flush;
+- the HTTP MCP Server for explicit operations;
+- the bundled `project-context` Skill for Scope, Handoff, and write-intent rules.
 
 ```bash
 powercontext setup codex --source oceanbase/powercontext --ref master
-
-powercontext doctor
+powercontext server run
 powercontext doctor codex
 ```
 
-Setup does three things: it adds the PowerContext repository as a Codex marketplace, installs and enables the `powercontext` plugin, and creates the PowerContext user data directory. It is safe to rerun. It does not start the Server and does not open a Codex session.
+Setup asks Codex to add the marketplace and plugin, then verifies the installed entry. Unlike Claude Code setup, the current Codex installer does not print a no-write preview plan and does not implement transactional rollback. Treat that setup preview/rollback contract as **Unsupported** here, not as a shared host feature.
 
-`doctor codex` only checks that the Codex CLI is on PATH and that `codex plugin list` shows `powercontext` as `installed` and `enabled`. It does not contact the Server, test recall, or launch Codex.
+## Minimal usage
 
-After setup, start a **new** session in the project directory:
+Open a new Codex session. Inspect `/hooks` for `UserPromptSubmit` and `/mcp` for the PowerContext Server. Then try the three paths:
 
-```bash
-codex
+1. Ask a normal repository question. The Hook may inject recalled context and captures only that prompt as a Source.
+2. Ask Codex to search or maintain Memory. The bundled Skill directs it to the MCP tools.
+3. Say `handoff this work` when you want Codex to prepare and commit one durable Handoff in the same turn.
+
+A plugin with only the Hook can recall, but it lacks the explicit operation surface and usage policy. MCP without the Skill exposes operations without the host-specific rules. The supported integration is Hook + MCP + Skill.
+
+## Execution flow
+
+```text
+UserPromptSubmit
+→ isolated uv/Python hook
+→ derive API base from plugin .mcp.json
+→ resolve shared project Scope
+→ expected recall failures fail open, then capture prompt
+→ optional flush through captured Source position
+→ hook stdout additionalContext
 ```
 
-Use `/hooks` to inspect the PowerContext `UserPromptSubmit` hook and trust it when prompted. Use `/mcp` to confirm the `powercontext` Server. A session that was already open does not load a newly installed plugin.
+The Hook is a short process. It does not retain a conversation object between turns and does not capture Codex's final response.
+
+## Scope and Workstream binding
+
+The Scope resolver checks, in order:
+
+1. `POWERCONTEXT_CODEX_SCOPE_ID`, when set;
+2. a Git-private Workstream binding;
+3. normalized Git remote identity, then normalized project path.
+
+The binding is stored under the checkout's Git directory, so it follows the local checkout without entering a commit. Codex and Claude Code use the same binding and remote normalization. This is how they can read and update one project Memory instead of creating parallel Scopes.
+
+Before a durable Handoff or a `latest` Continue with no exact Workstream, the Skill calls `select_handoff_workstream` when available. Multiple candidates require user selection. Codex binds the returned `scope_id`, resolves again, and requires an exact match before a Handoff write. The picker itself is read-only.
+
+## Injection and API-base derivation
+
+The Hook reads the `powercontext` HTTP MCP URL from the installed plugin's `.mcp.json`, requires a safe unambiguous `/mcp` URL, and derives the HTTP API base by removing that path. This keeps automatic HTTP calls and MCP on one endpoint. There is no independent Hook URL that may drift away from MCP configuration.
+
+Prepared context is schema-checked and size-bounded before it reaches Hook stdout as `additionalContext`. An empty result yields no content. Unknown schema, redirect, oversized response, authentication failure, Server error, or wall-clock deadline all fail open with content-free diagnostics. Authorization is never forwarded across a redirect.
+
+## Capture and flush
+
+Automatic capture writes only the current prompt to `/v1/sources/content` with a deterministic `codex-user-prompt:` Source ID and provenance. It does not capture the assistant final response or create a Task Outcome.
+
+Expected recall failures are isolated so capture can still run. An unexpected recall exception can reach the outer fail-open handler and skip capture for that invocation, so do not claim unconditional independence. Disable capture with `POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false`. Enable optional flush with `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE=true`; `POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` bounds attempts. The Hook clears the wait only after `current_cursor >= position`. If the cursor never catches up, the turn continues without claiming that Memory was generated.
+
+A captured prompt is Source evidence. Prompts longer than 200,000 characters are skipped. Codex capture does not apply DSH's narrow secret-marker filter, so disable it when prompts must not be persisted. Scheduler/flush processing may produce a Candidate, and Review may commit Memory or choose a no-op.
+
+## MCP, Skill, Handoff, and permission
+
+MCP exposes explicit Memory maintenance, Work Contract, Handoff, acknowledgement, Outcome, and Review operations. `POWERCONTEXT_CODEX_AUTHORIZATION` may supply the complete Authorization value through `.mcp.json` `env_http_headers`; it is optional for a public local Server. Use HTTPS for remote endpoints.
+
+The Skill gives `handoff this work` one-turn semantics. Codex inspects the current conversation and repository, calls `handoff_current_work` once with a unique `source_id`, passes the returned `handoff` unchanged to `commit_handoff` in the same turn, and reports success only after an exact Revision returns. It does not ask for a second confirmation when the imperative already authorizes the Handoff.
+
+That rule has a sharp preview boundary. A Handoff question, design discussion, draft request, or `preview and make no writes` request authorizes no write. Codex renders the proposed fields in chat and must not call `handoff_current_work`, because preparation itself records a boundary Source. A Prepared Handoff can remain uncommitted, but it is not a zero-write preview.
+
+Explicit durable mutations must report failure. MCP tool annotations describe read/write, destructive, and idempotent intent, but visibility is not an authorization boundary. Host permission UI and enforcement remain **Host-gated** and **Not validated**; do not borrow a stronger no-UI guarantee from another adapter.
+
+## Unsupported vs Not validated
+
+| State | Capability | Practical consequence |
+|---|---|---|
+| **Unsupported** | automatic assistant final-response capture | Persist a final result explicitly through MCP. |
+| **Unsupported** | automatic Task Outcome | Call `record_task_outcome` at a real boundary. |
+| **Unsupported** | zero-write preview through `handoff_current_work` | Render preview fields in chat and do not call the tool. |
+| **Unsupported** | Codex setup no-write plan and transactional rollback | Review the command before running it; cleanup may be manual after partial failure. |
+| **Not validated** | formal minimum Codex version | Do not turn a tested development version into a support floor. |
+| **Not validated** | full real Codex host-process E2E | Contract and HTTP service-chain tests do not prove the complete host lifecycle. |
+| **Not validated** | real-host enforcement of one-turn Handoff and preview no-write policy | These are bundled Skill rules backed by real MCP primitives, not a completed Codex behavioral acceptance test. |
+| **Not validated** | exact Codex permission UI and enforcement | MCP annotations express intent; the host owns authorization behavior. |
+
+Managed Skill export supports Codex, but an exported managed Skill and the bundled plugin Skill are different objects. Installing one does not substitute for the other.
+
+## Negative experiments
+
+- Stop the Server and submit a normal prompt. Codex should continue; an explicit write should report failure.
+- Trigger an expected recall failure and confirm capture still runs. Inject an unexpected recall exception separately and confirm the whole Hook still fails open; capture may be skipped for that invocation.
+- Change the MCP URL to an unsafe, ambiguous, or non-`/mcp` value. Settings should reject it rather than guessing an API base.
+- Redirect a Hook request. Authorization must not reach the target.
+- Return an unknown schema or oversized response. Nothing should be injected.
+- Let flush exhaust its attempt/deadline budget while the cursor stays behind. The turn should continue without a false Memory claim.
+- Let Handoff preparation succeed and commit fail. Report the boundary Source and absence of a durable milestone; do not create a second boundary merely to retry.
+- Request `preview and make no writes`. Confirm no PowerContext call writes a Source or Handoff.
+- Revise or retire Memory with an old Citation. Expect conflict, refresh the head, and do not overwrite blindly.
+
 
 ## Configuration defaults
 
@@ -87,78 +158,6 @@ export POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false
 codex
 ```
 
-## Minimal verification
-
-Check the Server separately first:
-
-```bash
-powercontext doctor
-powercontext ready
-powercontext capabilities
-```
-
-Then save the learning-path answer explicitly in Codex:
-
-```text
-Use PowerContext to remember this decision:
-after changing the OpenAPI contract, regenerate the client and inspect the diff.
-Return the Memory Citation. Do not store secrets.
-```
-
-This is MCP `remember_memory` and does not need a generation model. Codex should return an exact Citation.
-
-Exit, open a new session in the same directory, and ask:
-
-```text
-What should happen after the OpenAPI contract changes?
-```
-
-When automatic recall succeeds, `UserPromptSubmit` injects a bounded `PreparedContext` through hook-stdout `additionalContext`. The content includes a Citation and is labeled untrusted historical evidence. It serves the current prompt only and does not capture the assistant final response as Source.
-
-## Scope resolution
-
-Codex resolves Scope in this order:
-
-1. A nonempty `POWERCONTEXT_CODEX_SCOPE_ID`.
-2. A Git-private Workstream binding at `.git/powercontext/codex-workspace.json`.
-3. The normalized Git `remote.origin.url`, written as `git:...`.
-4. A `local:<sha256>` identifier for the project root.
-
-The binding lives in the Git directory. It is outside the worktree and is not committed. Claude Code reads the same file. Shared Memory requires the same Server and the exact same `scope_id` on both sides.
-
-## Automatic path and explicit tools
-
-```text
-UserPromptSubmit
-→ resolve Scope
-→ prepare_context (max_bytes=8000)
-→ validate powercontext.prepared-context.v1
-→ additionalContext
-→ independently capture the prompt
-```
-
-Recall and capture fail open independently. Redirect, unknown schema, oversize, and deadline paths are bounded. Automatic capture stores the prompt only, not the final response or a Task Outcome. If flush never catches up, bounded retries end and the turn continues without claiming Memory exists.
-
-MCP exposes explicit Memory, Work Contract, Handoff, acknowledgement, Outcome, and Review. If a plugin README says Review is not exposed, trust the current Server MCP projection. The `project-context` Skill treats `handoff this work` / `交接当前工作` as explicit authorization for one durable Handoff; commit still requires that kind of imperative. Discussing Handoff design, or asking to “preview and make no writes,” must not call `handoff_current_work`, because that operation writes a boundary Source.
-
-The bundled Skill and a managed Skill written by `powercontext skill export --target codex` are different objects. Do not mix them.
-
-## Negative checks
-
-- Stop the Server, then ask a normal coding question. Codex should continue; the hook may fail open.
-- With the Server still down, call explicit `remember` or `commit_handoff`. MCP must report an error and must not pretend success.
-- Redirect: Authorization is not forwarded.
-- Revise or retire with an old Citation: the result is a conflict.
-- Handoff preparation succeeds but commit fails: a boundary Source may exist, a durable milestone does not.
-- Denial of durable writes without UI is currently **Not validated**. Do not copy Pi's guarantee.
-
-## Current limits
-
-- A real Codex host-process E2E is **Not validated**. The Codex service-chain tests in the repository are not a full host process.
-- No formal minimum Codex version is declared.
-- No-UI permission denial is **Not validated**.
-- Automatic extraction needs a generation model; explicit Memory does not.
-- This page does not repeat the official one-line Handoff tutorial; that belongs in official how-to.
 
 ## Finish the shared check on this host
 
@@ -172,13 +171,16 @@ The bundled Skill and a managed Skill written by `powercontext skill export --ta
 
 ## Completion checklist
 
-- `doctor codex` sees the plugin installed and enabled.
-- A new session confirmed activation with `/hooks` and `/mcp`.
-- Server health, readiness, and capabilities were checked separately.
-- A new session can recall the OpenAPI decision you saved explicitly, and the Citation appears in `additionalContext`.
-- Ordinary coding continues when automatic recall fails.
-- Explicit Memory or Handoff failure is visible in Codex.
-- You did not confuse the bundled `project-context` Skill with an exported managed Skill.
-- You did not describe the **Not validated** host E2E as already tested.
+- [ ] `powercontext doctor codex` finds the installed, enabled plugin; separate `powercontext doctor` checks Server liveness/readiness.
+- [ ] `/hooks` shows `UserPromptSubmit`; `/mcp` shows the PowerContext Server.
+- [ ] The bundled `project-context` Skill is present alongside Hook and MCP.
+- [ ] The Hook derives the API base from the same `.mcp.json` URL used by MCP.
+- [ ] Codex and Claude Code resolve one repository/Workstream Scope.
+- [ ] Automatic Source contains the user prompt only, never the assistant final response; prompts that must remain private have capture disabled.
+- [ ] Optional flush is bounded and proves `current_cursor >= position` before success.
+- [ ] `preview and make no writes` produces no write.
+- [ ] An imperative Handoff completes in one turn and returns an exact committed Revision.
+- [ ] Explicit write failure remains visible while automatic recall/capture failures remain fail-open.
+- [ ] **Unsupported**, **Not validated**, and **Host-gated** claims above remain separate, including real-host Handoff, preview, and permission validation.
 
-To export a reviewed Skill to Codex, return to [Let the agent extend itself](/en/common-agents/agent-self-extension). Continue with [Claude Code](/en/coding-agents/claude-code).
+Continue with [Claude Code](/en/coding-agents/claude-code).

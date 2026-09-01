@@ -1,44 +1,144 @@
 ---
 title: "Pi"
-description: "在 before_agent_start 注入 systemPrompt，用 pending flush 处理边界，并在无 UI 时拒绝持久写。"
+description: "安装 native package，在 before_agent_start 注入上下文，并在 lifecycle boundary flush 已 capture 的 Source。"
 ---
 
 <Note>
-Package runtime 要求 Node `>=22.19`。Pi `0.82.x` 是 development compatibility，不是正式最低 host version。Package-load E2E 有覆盖；完整 recall host chain 是 **Not validated**。managed Skill export 是 **Unsupported**。无 UI 时 durable write 明确拒绝。
+**Version-gated：** Package runtime 要求 Node `>=22.19`。Development 声明 Pi `^0.82.0`；lockfile 与 real-CLI package-load E2E 使用 Pi `0.82.1`。这是 compatibility evidence，不是正式 host-version range。Package load 在该测试边界内为 **Supported**；完整 real-host recall chain 为 **Not validated**。
 </Note>
 
-Pi 是 native package，不是 MCP plugin。`before_agent_start` 解析 Scope、prepare、capture prompt，并把召回结果追加到 `systemPrompt`。边界事件再做 bounded pending flush。Setup 调用 Pi 自己的 package installer，不会启动 Server。
+## 成熟度与安装
 
-完整安装看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure Pi how-to。本页只写 101 的验证合同。
-
-## 安装并激活
-
-先启动 Server：
-
-```bash
-powercontext server run
-```
-
-再安装 native package：
+Pi 使用 source package `powercontext-pi` version `0.0.2`，其中包含 extension 和 bundled `project-context` Skill。当前 setup path 从指定 PowerContext Git ref 或 local checkout 安装；按已发布 npm package name 安装目前为 **Unsupported**。
 
 ```bash
 powercontext setup pi --source oceanbase/powercontext --ref master
-
+powercontext server run
 powercontext doctor
 powercontext doctor pi
-```
-
-Setup 要求 checkout 里同时有 `extensions/powercontext.ts` 和 `skills/project-context/SKILL.md`，然后运行 `pi install`。它会清掉已被取代的 user-scope PowerContext package，但不会启动 Server，也不会打开 Pi session。
-
-`doctor pi` 检查 `pi` 是否在 PATH，并用 `pi list` 确认列出的 installed path 真的是 `powercontext-pi`。它不联系 Server，不测 recall。
-
-在项目目录开一个**新** session：
-
-```bash
 pi
 ```
 
-改过环境变量后要重启 Pi。
+Setup 校验 package name、extension 和 bundled `SKILL.md`，执行 `pi install <package-directory>`，只在成功后删除 superseded user-scoped PowerContext registrations，然后运行 doctor。
+
+Remote checkout materialization 使用 staging；staging swap 失败时会恢复 previous checkout。之后若 `pi install` 失败，没有 transactional checkout rollback。Source credential 与 clone output 不会打印。
+
+`powercontext doctor pi` 检查 Pi executable、`pi list`，以及名为 `powercontext-pi` 的 installed manifest。它不检查 Server readiness、extension activation、bundled-Skill discovery、package/host version 或模型 turn。通用 `powercontext doctor` 单独覆盖 Server。
+
+## 最小用法
+
+安装或修改环境后，启动新的 Pi process。Automatic path 与 explicit path 要分开：
+
+1. 提交普通 coding prompt。`before_agent_start` 可以 recall 临时 context，并把 trimmed prompt capture 为 Source。
+2. 需要精确读取或受支持的 durable operation 时，使用 13 个 native Memory/Handoff tools。
+3. 用 `/pc`、`/pc doctor` 和 `/pc search <query>` 做 diagnostics 与显式检查。`/pc doctor` 调用 configured Server，与 `powercontext doctor pi` 不是同一检查。
+
+Invalid local Pi configuration 不会让 host 退出，但不会注册 tools 或 `/pc`，hooks 也全部 no-op。Bundled Skill 说明 tool 用法；real Pi Skill discovery 为 **Not validated**，因为 package-load E2E 使用 `--no-skills`。
+
+## 执行流程
+
+```text
+before_agent_start
+→ trim prompt; skip an empty prompt
+→ resolve and cache Scope by cwd
+→ prepare and strictly validate context
+→ capture eligible prompt Source and receive position
+→ optionally flush through position, or retain it as pending
+→ append ready untrusted context to systemPrompt
+
+agent_end
+→ start pending flush without waiting
+
+session_before_compact / session_before_switch / session_shutdown
+→ await pending flush within a bounded closing budget
+```
+
+Prepare 与 capture 共用一个 turn HTTP-budget signal，但各自处理 failure。Recall failure 通常不影响 capture；capture failure 也不会清除有效 recalled context。Automatic failure 都 fail-open，不会停止 Pi turn。
+
+`agent_end` 只启动 flush 后返回。没有 callback capture assistant response 或记录 Task Outcome。Pi 的 `session_shutdown` event 不是 Claude Code `Stop` Hook。
+
+## Scope
+
+Pi 会先派生 Scope，再执行 scoped Server operation：
+
+1. 使用非空 `POWERCONTEXT_PI_SCOPE_ID`；超过 256 characters 时 hash。
+2. 否则解析 Git top-level，并把 `remote.origin.url` 规范化成 `git:` Scope。
+3. 最后回退到 `local:sha256(<absolute-project-root>)`。
+
+Git normalization 删除 credential 和末尾 `.git` noise，接受常见 HTTP、HTTPS、SSH、Git 与 SCP-style remotes。Resolved promise 按 cwd 缓存；失败的 resolution 会被移除。Tool caller 不能用自带值替换派生出的 `scope_id`。
+
+Pi 没有 Codex/Claude 风格的 Workstream picker 或 Git-private Scope binding，这条路径为 **Unsupported**。
+
+## 注入
+
+PreparedContext 只有满足以下条件才会接受：字段正好是 `schema`、`status`、`content`、`content_bytes`；schema 为 `powercontext.prepared-context.v1`；符合 empty/ready rules；UTF-8 byte count 完全一致；内容不超过 configured bound。
+
+Extension 把 ready content 追加到 Pi 现有 `systemPrompt`，并标成 host-supplied、untrusted historical evidence。Empty 或 invalid content 不注入。这是临时 augmentation，不是 transcript synchronization，也不会直接创建 Source、Memory 或 Artifact。
+
+## Capture
+
+Automatic capture 默认开启。Source identity 对 Scope、normalized session identity、derived turn number 和 trimmed prompt 做 hash。Metadata 只有 `origin`、event、`cwd`、`session_id` 与 `turn_id`。Turn number 来自当前 branch 的 user-message count；branch 本身不会存储。
+
+Capture 在以下情况跳过：功能关闭；prompt 的 UTF-8 大小超过 200,000 bytes；命中 private key、credential assignment、Bearer value 或已知 token shape。Dedicated multibyte boundary case 为 **Not validated**，因为当前 oversized test 使用 ASCII。
+
+只有 capture response 包含 integer `position >= 1` 时，才会记为 pending。Source acceptance、processing position、flush completion、Candidate generation、Review 与 committed Memory 是不同阶段。
+
+## Flush
+
+Pending flusher 按 Scope 保留尚未处理的最大 position，较小 position 不能降低它。只有 `current_cursor >= position` 时才清除 entry。Concurrent flush calls 共用一个 in-flight promise；flush 期间新出现的更大 position 也不会被较早的 completion 清除。
+
+默认值是：immediate flush 关闭、最多四次调用、turn HTTP budget 为 4,000 ms、lifecycle closing budget 上限为 1,000 ms。设置 `POWERCONTEXT_PI_FLUSH_ON_CAPTURE=true` 后，capture 会重试 immediate transient error；重试耗尽后把 position 留给后续 boundary。
+
+Lifecycle boundary 遇到 Server/transport throw 时，会停止该 Scope 的当前 loop，但保留 pending，等待未来 event。Cursor-behind response 会重试到 call limit。Flusher 继续处理其他 Scopes，也不会声称 Memory 已存在。
+
+Compaction 与 immediate-failure-to-compaction retry 有直接测试。Multiple Scopes、in-flight coalescing、永久落后的 cursor，以及 flush 期间出现更高 position，都没有 direct Pi tests，因此为 **Not validated**。
+
+## Tools、commands 与 permission
+
+Pi 精确注册 13 个 model tools。Read/non-durable tools 是 `pc_search`、`pc_memory_list`、`pc_memory_get`、`pc_prepare_context`、`pc_handoff_prepare`、`pc_handoff_finalize`、`pc_handoff_continue`。需要 confirmation 的 mutations 是 `pc_remember`、`pc_memory_revise`、`pc_memory_retire`、`pc_capture_source`、`pc_handoff_activate`、`pc_handoff_commit`。
+
+`/pc` 支持无参数 diagnostics，以及 `doctor`、`search`、`remember`、`flush`、`stats`。它没有 generic operation、Candidate Review、Handoff 或 Task Outcome command。
+
+Gated mutation 只有在 interactive confirmation 通过后才执行。无 UI 返回稳定 `confirmation_required`；用户拒绝返回 `cancelled`；UI failure 返回 `unavailable`。这些路径都不发送 write request。`/pc remember` 与 `/pc flush` 遵守同一边界。Explicit operation 会替换 caller Scope、拒绝含 secret 的 payload，并返回稳定、model-visible 的 error。
+
+No-UI contract 与 helper behavior 有 unit tests。真实宿主如何显示、拒绝或缺失 UI，仍没有 host-process test，因此为 **Not validated**。
+
+## Transport
+
+默认 Server 是 `http://127.0.0.1:8000`。Plain HTTP 只允许 localhost 与 loopback address；remote Server 必须使用 HTTPS。带 credential、query、fragment 或非 HTTP scheme 的 base URL 会被拒绝。
+
+`POWERCONTEXT_PI_AUTHORIZATION` 会作为完整 Authorization value 发送。Redirect 使用 manual handling 并被拒绝，因此 credential 不会转发。Response 上限为 1 MiB；成功 response body 必须是 valid JSON。Per-request timeout 与 shared turn budget 是不同限制。
+
+## Unsupported 与 Not validated
+
+| State | Capability | Practical consequence |
+|---|---|---|
+| **Version-gated** | Node runtime `>=22.19` | 不要在更旧 runtime 上安装 package。 |
+| **Unsupported** | published npm-name installation; managed Skill export or Pi external-Skill scan target; automatic assistant/transcript capture; automatic Task Outcome; Workstream picker/Git-private binding; MCP transport; starting or embedding the Server | 使用 source setup 和 native HTTP tools，并单独运行 Server。 |
+| **Unsupported on Pi-native surface** | Explicit Task Outcome, Work Contract, acknowledgement, Experience/Skill generation, Candidate Review, external-Skill, generic API, and Handoff-report operations | Generated operation descriptors 不会自动成为 Pi tools 或 commands；请改用其他 supported interface 或扩展宿主。 |
+| **Not validated** | Formal Pi host range or compatibility beyond locked 0.82.1 | `^0.82.0` 只是 development intent，不是 support promise。 |
+| **Not validated** | Full real-Pi prepare/injection/model chain; bundled-Skill discovery; real-host confirmation behavior | Package install/load 与 `/pc` registration 不能证明这些路径。 |
+| **Not validated** | Callback execution for `agent_end`, switch, and shutdown; multibyte Source boundary; pending-flusher concurrency edges | 在 direct tests 出现前，只按 implementation evidence 描述。 |
+
+Real package E2E 用 locked Pi 0.82.1 安装目录，在 no session/no Skills 的 offline RPC 中启动，并确认 `/pc` 已注册。它不创建 session，不调用 model 或 Server，也不覆盖 recall 或 bundled Skill loading。
+
+## 负向实验
+
+把 Pi deployment 视为完成前，运行这些实验：
+
+- 破坏 local configuration，确认 Pi 继续运行，但没有 PowerContext tools、command 或 hook effect。
+- 停止 Server，确认 turn 在没有 injected context 时继续。
+- 让 prepare 失败而 capture 成功；再反向测试，并保留有效 recalled context。
+- 提交 blank、secret-shaped、disabled-capture 或 over-limit prompt，确认对应 no-op/no-capture path。
+- 让 immediate flush 失败，再触发 compaction，确认 pending position 会重试。
+- Flush 期间记录较小和较大 position；只有 `current_cursor >= highest-position` 才能清除 entry。
+- 让 cursor 一直落后于 position，确认 bounded work 结束后不会声称 Memory 已存在。
+- 无 UI 时执行 mutation，确认 `confirmation_required` 且没有 HTTP write；在 UI 中拒绝时应返回 `cancelled`。
+- 向 tool 传入不同 `scope_id`，确认派生 Scope 会覆盖它。
+- 返回 redirect、oversized 或 non-JSON response，确认 client 拒绝。
+- 对 non-loopback host 使用 plaintext，确认 configuration 拒绝；remote 使用 HTTPS。
+- 检查 tools/commands，确认 Task Outcome、Candidate Review、Experience/Skill generation 和 generic API surface 都不存在。
+
 
 ## 配置默认值
 
@@ -60,100 +160,6 @@ export POWERCONTEXT_PI_CAPTURE_PROMPTS=false
 pi
 ```
 
-## 最小验证
-
-```bash
-powercontext doctor
-powercontext ready
-powercontext capabilities
-```
-
-在交互式 Pi session 里显式保存：
-
-```text
-Use PowerContext pc_remember to store this decision:
-after changing the OpenAPI contract, regenerate the client and inspect the diff.
-Return the Memory Citation. Do not store secrets.
-```
-
-`pc_remember` 会先走 `ui.confirm`。批准后应返回 Memory Citation。你也可以用 `/pc remember` 做同一件事，用 `/pc search` 或 `/pc doctor` 做诊断。
-
-换一个新 session，问：
-
-```text
-What should happen after the OpenAPI contract changes?
-```
-
-自动召回成功时，`systemPrompt` 末尾会出现以 `PowerContext host-supplied context` 开头的段落，内容带 Citation。Pi 不会同步完整 transcript。
-
-## Scope 解析
-
-Pi 按这个顺序解析 Scope：
-
-1. 非空的 `POWERCONTEXT_PI_SCOPE_ID`。
-2. 规范化后的 Git `remote.origin.url`，写成 `git:...`。
-3. 项目根目录的 `local:<sha256>`。
-
-Pi 不读取 Codex / Claude Code 的 Workstream binding。要跨宿主共享，先让两边解析出完全相同的 `scope_id`。
-
-## 自动路径与显式工具
-
-```text
-before_agent_start
-→ resolve Scope
-→ prepare
-→ capture prompt Source
-→ immediate flush or record pending position
-→ augment systemPrompt
-
-agent_end / session_before_compact / session_before_switch / session_shutdown
-→ retry pending flush within bounded budget
-```
-
-Flusher 按 Scope 保留最大 pending position，只有 `current_cursor >= position` 才清除。Boundary failure fail-open。Prompt Source ID 由 branch / turn identity 派生。Secret-looking 或超过 200,000 UTF-8 bytes 的 prompt 不 capture。
-
-核心显式工具：
-
-| Tool / command | 用途 |
-|---|---|
-| `pc_search` / `/pc search` | 搜索 Memory |
-| `pc_remember` / `/pc remember` | 显式写入 Memory |
-| `pc_handoff_commit` | 仅在用户明确要求时 commit Handoff |
-| `/pc doctor` | 诊断，不代替 `powercontext doctor pi` |
-| `/pc flush` | 显式 flush pending Sources |
-
-Durable mutation 需要 interactive confirmation。没有 UI 时返回稳定 `confirmation_required`，不会静默写入。拒绝确认则返回 `cancelled`。
-
-无 UI 复现：在 Pi tool / command context 的 `hasUI` 为 `false` 时调用 `pc_remember` 或 `/pc remember keep API async`。应得到：
-
-```json
-{
-  "ok": false,
-  "code": "confirmation_required",
-  "message": "PowerContext refuses explicit durable writes without interactive confirmation."
-}
-```
-
-这时 Server 收不到 remember 请求。有 UI 但点拒绝，应得到 `cancelled`。不要用未经验证的 CLI 开关去猜“无 UI 模式”。
-
-`agent_end` 只触发 flush，不自动记录 Task Outcome。`session_shutdown` 也不是 Claude Code Stop Hook。Pi 不支持 managed Skill export；bundled Skill 不改变这个事实。
-
-## 负向检查
-
-- 停掉 Server 后再问普通编码问题。Recall / capture / flush 不得阻断 Agent。
-- Server 仍停着时再跑 `pc_remember`。显式失败必须可见。
-- 无 UI mutation：返回 `confirmation_required`，不得写入。
-- Secret 或 oversized prompt：可以 recall，但不 capture。
-- Immediate flush 失败：boundary event 在 bounded budget 内重试；cursor 永远追不上时停止，不谎报 Memory 已生成。
-- Redirect / remote transport：按 Pi transport tests 验证，不跨宿主类推。
-
-## 当前限制
-
-- 完整 recall host chain 是 **Not validated**。Package-load E2E 只证明 package 能被 Pi 列出和加载。
-- 没有正式最低 Pi version；`0.82.x` 只是开发兼容背景。
-- managed Skill export 是 **Unsupported**。
-- 自动 extraction 需要 generation model；显式 Memory 不需要。
-- 无效本地配置不得阻止 Pi 启动；此时 tools 可能不可用，普通编码仍应继续。
 
 ## 在这个宿主上做完统一题
 
@@ -167,12 +173,21 @@ Durable mutation 需要 interactive confirmation。没有 UI 时返回稳定 `co
 
 ## 完成检查
 
-- Node 是 `>=22.19`，`doctor pi` 看到 `powercontext-pi`。
-- Server health、readiness、capabilities 已单独检查。
-- 新 session 能从 `systemPrompt` 召回你显式保存的 OpenAPI decision，并看到 Citation。
-- 自动 recall 失败时，普通编码任务仍继续。
-- 显式 Memory 或 Handoff 失败时，Pi 把错误告诉你。
-- 无 UI 时 durable write 被拒绝，而不是静默成功。
-- 你没有把 bundled Skill 当成 managed export。
+- [ ] PowerContext 与 Pi package 来自同一 reviewed Git ref；Node 为 `>=22.19`。
+- [ ] Pi 0.82.1 只记录为 compatibility evidence，不写成正式 minimum 或完整 0.82.x promise。
+- [ ] `powercontext doctor` 与 `powercontext doctor pi` 分别通过各自边界。
+- [ ] `pi list` 指向 manifest name 为 `powercontext-pi` 的 package，新 Pi process 能看到 `/pc`。
+- [ ] `/pc doctor` 能访问预期 Server。
+- [ ] Scope 来自 explicit override、sanitized Git identity 或 local-root hash；caller Scope 不能替换它。
+- [ ] Valid PreparedContext 经过严格校验，并以 untrusted evidence 追加到现有 `systemPrompt`。
+- [ ] Capture 存储 trimmed prompt、`cwd`、`session_id`、derived `turn_id`，不包含 project 或 branch field。
+- [ ] Secret 与超过 200,000-byte 的 prompt 不 capture。
+- [ ] Pending work 仅在 `current_cursor >= position` 时清除，并遵守 call/closing budgets。
+- [ ] 每个 gated tool 与 `/pc` mutation 都会确认，或返回稳定的 no-write error。
+- [ ] Remote transport 使用 HTTPS、拒绝 redirect，并执行 JSON 与 response-size bounds。
+- [ ] Source、position、flush、Candidate、Review 与 Memory 保持为不同阶段。
+- [ ] Package-load evidence 与 bundled-Skill discovery、full real-host turn 保持区分。
+- [ ] Pi-native Task Outcome 与其他 absent surfaces 保持 **Unsupported**。
+- [ ] Bundled Skill presence 不代表 managed Skill export。
 
-下一页是[扩展 Hook](/zh/coding-agents/extend-hooks)。
+下一页是 [扩展 Hook](/zh/coding-agents/extend-hooks)。

@@ -1,15 +1,32 @@
 ---
 title: "用 Hooks 扩展"
-description: "先写可验证 adapter contract，再复用现有 transport、Scope、capture、flush 和 doctor 规则。"
+description: "先发现宿主能力，再定义可验证的 adapter contract，并在发布前取得 real-host 证据。"
 ---
 
-接第六个宿主前，先确认宿主能提供什么。没有稳定 prompt event、pre-dispatch injection point 或 permission API，就不能照抄现有 adapter。
+<Warning>
+当前没有统一的 `HostAdapter` SDK。本页的 contract 名称是设计 checklist，不是已有 class 或稳定 public API。
+</Warning>
 
-## Capability discovery
+## 从 capability discovery 开始
 
-记录：prompt event、turn/session identity、workspace、transient injection channel、tool registration、permission/UI、package/Skill install、headless lifecycle 和 version probe。
+不要先复制最相近的 integration。先记录新宿主实际能提供什么：
 
-## Adapter contract
+- 稳定的 prompt event 及其 ordering；
+- turn、message、session、workspace 和 project identity；
+- model dispatch 前的 transient injection channel；
+- tool 与 command registration；
+- permission request、confirmation UI 和 headless behavior；
+- package、plugin 与 bundled Skill installation；
+- end、compaction、switch、shutdown 与 interruption events；
+- CLI/version probe 和 activation probe。
+
+同时查询 `GET /v1/capabilities`。它会返回 `memory_extraction`、`experience_generation`、`managed_skill_generation`、`external_skill_registry`、Handoff generation、search modes 和 context versions 等 Server capability。Host capability discovery 与 Server capability discovery 回答的问题不同，两者都需要。
+
+如果宿主没有稳定 prompt event、pre-dispatch injection point 或 permission surface，就直接写明。除非你实现了保证等价的另一套 contract，否则该 capability 是 **Unsupported**。如果宿主看起来提供了入口，但没有 real-host test 证明完整路径，则标为 **Not validated**。
+
+## 编写 adapter contract
+
+用以下 vocabulary 把关键决策摆到台面上：
 
 ```text
 PromptEvent
@@ -24,56 +41,163 @@ Diagnostics
 Installer / Doctor
 ```
 
-每项写明 input/output、失败策略和可观察 assertion。Automatic helper 可 fail-open；explicit mutation 不可。
+这些是建议的角色。每项都要定义 input、output、failure policy、security boundary 和 observable assertion。
+
+| Role | 需要明确的 contract |
+|---|---|
+| `PromptEvent` | 精确 host event、prompt normalization、lifecycle ordering 和稳定 turn identity。 |
+| `ScopeResolver` | Authorized override、Git identity、project fallback、normalization 与 cache lifetime。 |
+| `PreparedContextProvider` | `/v1/context/prepare`、接受的 schema versions、response-size budget 与 fail-open result。 |
+| `TransientInjector` | Context 从哪里进入、如何标记为 untrusted，以及 injection 不会持久化的证据。 |
+| `SourceCapture` | Capture 内容、deterministic Source identity、metadata、secret policy、UTF-8 byte limit 与返回的 `position`。 |
+| `FlushCoordinator` | 每个 Scope 的 pending state、boundary events、retry/deadline budget 与 `current_cursor >= position` 清除规则。 |
+| `ToolSurface` | 精确 operation allowlist、generated schema source、tool result shape 和 unsupported operations。 |
+| `PermissionGate` | Read 与 mutation、approval UX、denial、cancellation，以及无 UI 时的行为。 |
+| `Diagnostics` | Activation、version、package ownership、Server state 与不含内容的错误报告。 |
+| `Installer / Doctor` | Idempotency、ownership、rollback、activation probe 与 partial-failure status。 |
+
+Automatic recall、capture 和 optional flush 可以 fail-open。Explicit durable write、Review、Handoff commit 与 Skill export 必须报告失败。不能给两组操作套用同一 policy。
+
+## 最小用法
+
+先只实现一条 prompt path、一条 boundary path 和一个 explicit mutation。第一版不要带入任何 unsupported capability。
+
+## 执行流程
+
+Host glue 要薄。它只负责解析 identity、调用已验证 helper，并把结果转换成宿主的 native event shape。
+
+```text
+onPrompt(event)
+→ normalize PromptEvent
+→ resolve Scope
+→ prepare context and capture Source independently
+→ retain returned position for bounded flush
+→ inject PreparedContext through the host's transient channel
+
+onBoundary(event)
+→ flush pending position for the same Scope
+
+onMutation(call)
+→ validate Scope and payload
+→ request host permission
+→ execute only after approval
+```
+
+如果宿主无法实现其中某个箭头，就删掉对应 claim。不要用一个泛化的 adapter 名称掩盖缺口。
 
 ## 复用现有实现
 
-- `powercontext.transport` 与 loopback vectors；
-- Codex/Claude prepared-context schema validation；
-- 各宿主 Scope normalization tests；
-- Pi pending flusher；
-- DSH OpenAPI-derived operation table；
-- Codex/Claude Skill projections；
-- `cli/hosts.py` setup/doctor catalog。
+只复用 contract 与宿主一致的代码：
 
-当前没有统一 HostAdapter SDK。不要为了文档整齐虚构一个。
+- `powercontext.http` 下的 generated HTTP client 与 transport models；
+- canonical `PreparedContext` 和 capability models；
+- Python capture rendering 与 redaction helpers；
+- shared loopback transport vectors；
+- Codex 与 Claude Code 的 prepared-context validation patterns；
+- host-specific Scope normalization tests；
+- Pi 的 pending-position flusher pattern；
+- DSH 等 integration 的 generated operation tables；
+- Codex 与 Claude Code managed Skill projections；
+- first-class setup/doctor catalog 与通用 `Diagnostic` value model。
+
+目前仍有不少 helper 是重复实现，而不是共享实现。Scope resolution、PreparedContext validation、deadline/redirect policy、secret detection、Source ID construction 和 bounded flush logic 仍分散在各 host package 中。文件名相似，不代表它们组成了 supported SDK。
+
+## Scope、injection、capture 与 flush
+
+新宿主必须一起定义这四个边界。
+
+Scope 应来自稳定、授权后的 project data。Git remote 要去除 credential。不要信任模型提供的 `scope_id`；除非 host contract 证明 session identity 与 repository identity 相同，也不要混用两者。
+
+Injection 应在 model dispatch 前使用宿主的 native transient channel，并把 `PreparedContext` 标为不可信的历史证据。只在 system guide 里告诉模型搜索 Memory，不能证明 recall 已注入。
+
+Capture 要明确记录 turn 的哪一侧。Transport 前过滤 secret-shaped content，并按 UTF-8 bytes 执行 limit。Recall 与 capture 要彼此独立，避免一个失败清掉另一个的有效结果。
+
+Flush 要按 Scope 保存 Source `position`，且仅在 `current_cursor >= position` 时清除。每个 retry loop 都要有 call limit 和 wall-clock budget。宿主没有可靠 boundary event 时，automatic flush 为 **Unsupported**；event 存在但未在真实宿主中运行时，为 **Not validated**。
+
+## Permission 与 explicit writes
+
+列出所有 mutating operation。明确宿主在 interactive 和 headless 模式下能否 ask、deny、cancel 或 pause，再测试实际行为。
+
+没有 permission API 的宿主不能继承 Pi 的 `confirmation_required` contract，也不能继承 OpenCode 的 `context.ask()` behavior。可选方案只有三种：在 adapter-controlled code 中 fail closed、只提供 read-only operation，或把 durable mutation 标为 **Unsupported**。“模型应该先问”不是 permission boundary。
+
+Diagnostics 不得输出 prompt content、prepared context、可识别 private repository 的 Scope details、authorization values 或含 secret 的 payload。
+
+## Setup 与 doctor
+
+Installation 与 activation 分开检查后，才能把宿主加入 setup。
+
+Setup 应保持 idempotent，不覆盖 foreign same-name files，对自己管理的文件记录 ownership；remote refresh 使用 staging，并在失败时恢复之前的状态。Multi-host setup 要隔离各宿主失败，并把每个选中项报告为 installed、failed 或 skipped。
+
+Doctor 有三项工作：
+
+1. 找到 host executable，并报告 version evidence；
+2. 确认 installed package 或 configuration 属于 PowerContext；
+3. 如果宿主提供安全且不调用模型的 probe，通过宿主验证 activation。
+
+不要把 `powercontext doctor` 当作 integration scan。通用命令检查 package 与 Server；host check 属于 `powercontext doctor <host>` 和只读的 `powercontext doctor integrations` matrix。
 
 ## Acceptance tiers
 
-1. Unit contract：schema、Scope、size、secret、permission。
-2. Service-chain：真实 Server、Source/Memory lineage、fail-open。
-3. Setup/doctor：幂等、ownership、rollback、activation。
-4. Real-host E2E：启动宿主，发送 prompt，观察 injection/capture/permission。
-5. Negative/security：Server down、wrong auth、redirect、unknown schema、oversize、stale turn、no UI、flush timeout。
+用以下 tier 描述证据。它们是本页的分类，不是当前 test framework 中的名称。
 
-Managed Skill export 只有 Codex/Claude Code。新宿主要增加 export，必须单独实现 projection contract 与 drift tests，不能因为有 bundled Skill 就标 Supported。
+1. **Contract/unit：** schema、Scope、size、secret、permission 与 failure-policy tests。
+2. **Package/load：** build、install、import、manifest、command 或 plugin registration。
+3. **Service chain：** real PowerContext Server，加上直接 hook/module execution 与 Source/Memory lineage。
+4. **Real-host E2E：** 启动实际宿主，发送 prompt，观察 lifecycle、injection、capture、flush 与 permission behavior。
+5. **Live provider journey：** 用实际 host 和 provider/model 运行，并保留 acceptance evidence。
 
-## 第六个宿主怎么立项
+Package/load 和 service-chain tests 很有用，但不能证明 host API compatibility 或 event ordering。标为 Supported 的每项 capability，都需要 real-host E2E。Provider behavior 影响 claim 时，还需要第五层证据。
 
-不要先抄 `POST /v1/context/prepare`。按这个顺序写：
+## Negative matrix
 
-1. 先发现宿主 capability：prompt event、injection channel、permission / UI、version probe。缺其中一项，先标 **Unsupported** 或 **Not validated**，不要开 installer。
-2. 对照至少两个现有宿主。先读 [Hook 与插件](/zh/coding-agents/hooks-and-plugins)，再比 [OpenCode](/zh/coding-agents/opencode)（真实 host-process E2E 是 **Supported**，且 **Version-gated** `>=1.18.21,<2`）和 [Codex](/zh/coding-agents/codex)（Hook + MCP，真实 host E2E 是 **Not validated**）。
-3. 先写测试，再写 adapter。现有分层可以点名这些模块：
-   - unit contract：`tests/test_transport.py`、`tests/codex_plugin/test_recall.py`、`tests/claude_code_plugin/test_hook.py`
-   - service-chain：`tests/e2e/test_codex_service_chain.py`、`tests/e2e/test_dsh_http_chain.py`
-   - setup / doctor：`tests/test_setup_select.py`、`tests/test_doctor_integrations.py`、对应 `tests/test_*_cli.py`
-   - real-host E2E：以 `tests/e2e/test_opencode_plugin_host.py` 为标杆；只打 HTTP 的 chain 不算
-   - 负向安全：Server down、wrong auth、redirect、unknown schema、oversize、stale turn、no UI
-4. 只有 version gate、幂等 setup、activation probe 和 real-host E2E 都齐了，才能把名字加进 `cli/hosts.py` 的 `FIRST_CLASS_HOSTS`。独立 `setup` 命令（例如 WorkBuddy）不自动进入这个 catalog。
+至少测试以下情况：
 
-当前没有统一 HostAdapter SDK。不要为了对齐文档虚构一个。
+| Area | Experiment | Required observation |
+|---|---|---|
+| Availability | Server down 或 request timeout | Automatic path 有界且 fail-open。 |
+| Authentication | Wrong token | 不泄露 credential、prompt、context 或 private Scope。 |
+| Transport | Redirect 或 plaintext non-loopback endpoint | 不跟随 redirect；拒绝不安全 transport。 |
+| Schema | Unknown 或 incomplete PreparedContext | 不注入任何内容。 |
+| Size | Oversized response 或 prompt | 在 configured byte budget 处停止。 |
+| Identity | Missing、stale 或 caller-supplied Scope/turn ID | 不发生 cross-project 或 stale-turn injection。 |
+| Capture | Disabled、secret-shaped 或 failed request | Recall 保持独立；不发送 forbidden Source。 |
+| Flush | Cursor lag、transient failure 或 timeout | Pending position 保留；重试在 budget 内结束。 |
+| Permission | Deny、cancel 或 no UI | 除非 declared host contract 允许，否则 mutation 不运行。 |
+| Capability | `memory_extraction=false` | Capture 仍只是 Source evidence；不声称 unsupported flush/extraction。 |
+| Lifecycle | Compact、switch、shutdown、interruption | 只使用匹配的 Scope 与 turn state。 |
+| Setup | Foreign file、failed refresh 或 failed activation | Existing state 保留，并报告 partial failure。 |
 
-## 交付 checklist
+宿主有 private/group session 等概念时，再加入对应的 host-specific privacy case。
 
-- Host version gate 和 activation probe 已实现。
-- Scope 来自稳定、授权后的 identity。
-- PreparedContext 临时注入且标 untrusted。
-- Capture 明确内容、size、secret policy。
-- Explicit writes 有 permission/no-UI 行为。
-- Diagnostics 不泄密。
-- Setup 不覆盖 foreign config，并有 rollback/partial-failure 报告。
-- Real-host E2E 存在；仅 HTTP-chain 不算。
-- Unsupported 与 Not validated 分开。
+## Managed Skill export
+
+Managed Skill export 当前只支持 Codex 和 Claude Code。其他 plugin 安装 bundled `project-context` Skill，不会改变这个 matrix。
+
+新增 export target 时，需要实现 projection contract、target enum 与 OpenAPI surface、ownership rules、validation、rollback 和 drift tests。在这些工作完成前，该宿主的 managed export 为 **Unsupported**。如果 implementation 已存在，但未运行 real install/refresh test，则标为 **Not validated**。
+
+## Unsupported 与 Not validated
+
+| 状态 | 使用条件 | Example |
+|---|---|---|
+| **Unsupported** | Code 明确拒绝、排除，或无法安全实现 capability。 | 没有 host permission API，也没有 adapter-controlled fail-closed mutation path。 |
+| **Not validated** | 路径可能工作，但现有证据没有到达 claimed host/provider boundary。 | Hook 通过 unit 和 service-chain tests，但没有 test 启动真实宿主。 |
+
+不要把这两个 label 合并成“limited support”。一个是 product boundary，另一个是 evidence gap。
+
+## 完成 checklist
+
+- [ ] Host 与 Server capability discovery 分开记录。
+- [ ] 每个 proposed contract role 都有 input、output、failure policy 与 observable assertion。
+- [ ] Host version gate 或 compatibility evidence，以及 activation probe 已存在。
+- [ ] Scope 来自稳定、授权后的 identity，并去除 credential。
+- [ ] PreparedContext 已校验、临时注入，并标为 untrusted。
+- [ ] Capture 明确 content、Source identity、UTF-8 size limit 与 secret policy。
+- [ ] Flush 按 Scope 保存 position，只在 `current_cursor >= position` 时清除。
+- [ ] Explicit writes 已测试 allow、deny、cancel 与 no-UI behavior。
+- [ ] Diagnostics 不输出 content 或 credential。
+- [ ] Setup 保留 foreign config，并报告 rollback 或 partial failure。
+- [ ] 除非完整 projection target 已存在，否则 managed Skill export 为 **Unsupported**。
+- [ ] Real-host E2E 覆盖每项 Supported lifecycle 与 permission claim。
+- [ ] **Unsupported** 与 **Not validated** 在 docs、tests 和 release notes 中保持区分。
 
 完成这些，才把宿主加入 first-class catalog。

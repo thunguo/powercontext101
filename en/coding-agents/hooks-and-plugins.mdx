@@ -1,11 +1,41 @@
 ---
 title: "Hooks and plugins"
-description: "Map host events onto Scope, ephemeral injection, Source capture, permissions, and bounded diagnostics."
+description: "Map five host event models onto one verified domain contract without inventing a unified HostAdapter SDK."
 ---
 
-A reliable adapter is more than one API call before a prompt. It must fit host events, prevent stale context, protect credentials, and separate automatic helpers from explicit mutations.
+<Warning>
+A shared contract does not make the hosts interchangeable. Event timing, turn identity, injection, transcript behavior, permission UI, and activation remain host-specific.
+</Warning>
 
-## Adapter contract
+A reliable adapter has to prevent stale context, keep credentials out of content, preserve the host task during automatic failure, and expose explicit mutation failure. One pre-prompt API call is not enough.
+
+## Maturity and installation
+
+| Area | Status | Evidence boundary |
+|---|---|---|
+| Shared domain contract and negative-test vectors | **Supported** | Current policies, helpers, and tests cover reusable behavior |
+| One unified `HostAdapter` SDK | **Unsupported** | No such repository abstraction exists |
+| Codex, Claude Code, and DSH real-host E2E | **Not validated** | Contract and service-chain tests do not launch those hosts |
+| OpenCode real host-process prepare/capture smoke | **Supported** | A version-gated real-host test observes prepare/capture requests |
+| OpenCode full host lifecycle E2E | **Not validated** | Transform injection, permission UI, Skill loading, cleanup, and flush are not all covered by that smoke |
+| Pi full recall host chain | **Not validated** | Package load is covered separately |
+
+<Note>
+`doctor` belongs to the setup/activation acceptance tier. It is not a substitute for launching the host, sending a prompt, and observing injection, capture, and permission behavior.
+</Note>
+
+Install one adapter and keep the Server separate:
+
+```bash
+powercontext setup <host> \
+  --source oceanbase/powercontext \
+  --ref master
+
+powercontext server run
+powercontext doctor <host>
+```
+
+## Minimal adapter contract
 
 ```text
 PromptEvent
@@ -19,32 +49,89 @@ PromptEvent
 → content-free Diagnostics
 ```
 
-## Five event models
+For each stage, define its input, output, failure policy, and observable assertion. Also mark it automatic or explicit.
 
-| Host | Preparation timing | Injection channel |
-|---|---|---|
-| Codex | short-process `UserPromptSubmit` | hook stdout additional context |
-| Claude Code | `UserPromptSubmit` | JSON `additionalContext` |
-| DSH | `agent/pre-step` middleware | plugin message after downstream decision |
-| OpenCode | prepare on `chat.message`, inject on message transform | `(sessionID,messageID)` exact-turn cache |
-| Pi | `before_agent_start` | returned `systemPrompt` augmentation |
+| Stage | Required contract |
+|---|---|
+| `PromptEvent` | Stable event timing and turn/session identity |
+| `ScopeResolver` | Authorized workspace/project mapping and bounded `scope_id` |
+| `PreparedContextProvider` | Schema, response-size, and deadline bounds with a fail-open result |
+| `TransientInjector` | Current-turn-only channel with stale-turn rejection |
+| `SourceCapture` | Exact capture range, secret policy, character/byte limit, and failure behavior |
+| `FlushCoordinator` | Bounded cursor target and no false Memory-complete claim |
+| `ToolSurface` | Curated explicit operations; Candidate approval remains controlled |
+| `PermissionGate` | Host-specific allow/ask/deny and no-UI behavior |
+| `Diagnostics` | Bounded status without content or credentials |
+| `Installer / Doctor` | Version, ownership, rollback, activation, and honest evidence level |
 
-Do not copy one host's Stop, transcript, or permission assumptions onto another.
+## Five distinct event models
 
-## Security contract
+```text
+Codex / Claude Code
+UserPromptSubmit → prepare + prompt capture → transient context
+explicit work → MCP + Skill
 
-Automatic path tests must cover:
+DSH
+agent/pre-step → prepare + user-originated batch capture
+→ await downstream decision → plugin message
+explicit work → curated HTTP tools
 
-- Server down: the original task continues;
-- 401/403 vs empty are distinguishable;
-- unknown schema is not injected;
-- oversized response / timeout are bounded;
-- redirect does not leak Authorization (promise this only where the implementation explicitly refuses);
-- capture failure does not delete valid recall;
-- stale turn context does not enter a new turn;
-- diagnostics contain no prompt, Scope, content, or token.
+OpenCode
+chat.message → prepare + capture → cache by (sessionID,messageID)
+experimental.chat.messages.transform → exact latest-turn match → inject
+explicit mutation → context.ask
 
-Explicit mutation must fail visibly and go through host permission. Candidate approval must not be silently opened as a normal model tool.
+Pi
+before_agent_start → prepare + prompt capture → immediate flush or pending position
+→ augment systemPrompt
+boundary events → retry pending flush within a bounded budget
+explicit mutation → interactive confirmation; deny without UI
+```
+
+| Host | Preparation event | Injection channel | Identity and stale-state rule |
+|---|---|---|---|
+| Codex | Short-process `UserPromptSubmit` | Hook stdout additional context | One submitted prompt; bounded process lifetime |
+| Claude Code | Short-process `UserPromptSubmit` | JSON `hookSpecificOutput.additionalContext` | v1 has no `Stop` capture path |
+| DSH | `agent/pre-step` middleware | Plugin message only after downstream `enter` | Call `next()` once; do not inject for a non-enter decision |
+| OpenCode | Prepare on `chat.message`; inject on `experimental.chat.messages.transform` | `(sessionID,messageID)` exact-turn cache | Match the latest user turn; clear state on session deletion |
+| Pi | `before_agent_start` | Returned `systemPrompt` augmentation | Boundary events retry the greatest pending Source position per Scope |
+
+Do not copy assumptions about Stop events, transcripts, message mutation, or permission UI from one host to another.
+
+## Scope and injection
+
+Scope selects a data partition. It is not a credential or authorization decision. Derive it from an authenticated tenant/project mapping when isolation matters.
+
+Document the resolver's precedence chain. Normalize Git or workspace identity without credentials, bound the public value, and keep raw Scope out of diagnostics. Add a cross-Scope test where identical prompts cannot share transient state.
+
+PreparedContext is untrusted historical evidence. Validate its exact v1 schema and UTF-8 `content_bytes`, then inject it through the current host's ephemeral channel. Current system and user instructions still win, and recalled text grants no tool permission.
+
+OpenCode makes stale-turn handling explicit because prepare and inject happen in different events. Its cache key must match the exact latest user turn. The ID gate prevents wrong-turn injection, but concurrent out-of-order preparation can still cause a missed newer injection; that race is **Not validated**. Every host needs the basic assertion that one prompt's context never enters a later prompt.
+
+## Automatic safety contract
+
+Automatic recall, capture, and optional flush are auxiliary. Expected Server-call, validation, size, and deadline failures normally fail open: omit the PowerContext contribution and preserve the original host task or downstream result.
+
+| Outcome | Required behavior |
+|---|---|
+| Server unavailable or timeout | Continue without injection; keep wall-clock work bounded |
+| 401/403 | Report bounded auth/configuration status; do not call it empty Memory |
+| Empty successful result | Continue without an injected block |
+| Unknown PreparedContext schema | Reject the block and continue |
+| Oversized response | Stop at the configured bound and continue |
+| Redirect | Reject it where the implementation promises rejection; never forward Authorization |
+| Capture failure after valid recall | Keep valid transient context where paths are independently guarded |
+| Recall failure before eligible capture | Capture may continue where paths are independently guarded |
+| Stale turn/session identity | Drop the prepared block |
+| Flush timeout or lagging cursor | Stop retrying; do not claim Memory exists |
+
+Claude Code, DSH, OpenCode, and Pi independently guard recall and capture. Codex does so for expected failures, but an unexpected recall exception can skip capture for that invocation. Keep this weaker edge visible.
+
+All five implementations parse the exact `powercontext.prepared-context.v1` shape, enforce UTF-8 byte counts, cap general response bodies at 1 MiB, and reject redirects in transport code. Test depth differs. Codex has a slow-body deadline regression; OpenCode has the strongest direct response-size tests. Equivalent body-overrun or full shared-budget tests are **Not validated** for every host.
+
+DSH is the transport outlier: current configuration does not enforce the same secure base-URL and bearer-header validation as the other four integrations. Do not infer a shared HTTPS/loopback guarantee from the common contract.
+
+Diagnostics must exclude prompt, raw Scope, PreparedContext, Source content, response body, and authorization token.
 
 ## Capture is not Memory
 
@@ -56,31 +143,121 @@ prompt capture
 → Memory commit or no-op
 ```
 
-Adapter docs must state the capture scope: user prompt only, full visible turn, or no capture at all. They must also state the secret and size policy.
+State whether the adapter captures one user prompt, selected user-originated blocks, a complete visible turn, or nothing. State secret filtering and character/byte bounds too.
+
+Capture creates Source evidence. Flush advances processing through a Source position. Extraction may produce a Candidate or no-op. Only a later commit creates or updates Memory.
+
+- Codex and Claude Code capture the submitted prompt with a 200,000-character bound and no automatic secret-pattern filter.
+- DSH recalls from all batch text but captures user-originated blocks only; secret-like text is not captured.
+- OpenCode captures eligible prompts with secret-like and UTF-8 byte filters.
+- Pi applies secret and UTF-8 byte filters, then flushes immediately or records a pending position.
+- DSH, OpenCode, and Pi secret filters affect persistence, not recall transmission.
+- None captures the final assistant response or records an automatic Task Outcome.
+
+## Flush coordination
+
+A flusher needs a target Source position, a bounded call count or deadline, and a completion check such as `current_cursor >= position`. Clearing pending state before that comparison loses work; retrying forever blocks the host.
+
+Codex, Claude Code, DSH, and OpenCode support optional immediate flush. Pi also keeps the greatest pending position per Scope and retries at `agent_end`, `session_before_compact`, `session_before_switch`, and `session_shutdown`. Pi's compaction retry and immediate-failure retention have committed tests; every lifecycle boundary and the closing deadline are not equally validated.
+
+DSH and OpenCode do not have Pi's pending flusher. Their immediate flush paths lack the same focused completion/failure test depth, so do not describe them as boundary-flush support.
+
+## Explicit mutation and permission
+
+Explicit operations do not inherit automatic fail-open. A Memory write, Handoff commit, Review decision, Task Outcome, or Skill export must return success or visible failure.
+
+| Host | Permission boundary |
+|---|---|
+| Codex | **Host-gated** MCP/tool policy; no plugin-owned interceptor; no-UI denial **Not validated** |
+| Claude Code | **Host-gated** MCP policy; no hook-owned interceptor; no-UI denial **Not validated** |
+| DSH | Named mutation returns pre-execute `ask` |
+| OpenCode | Mutating generated operation calls `context.ask` |
+| Pi | Interactive confirmation; without UI return `confirmation_required` and do not write |
+
+Candidate approve/reject/revise should not be a silent model tool. DSH and OpenCode deliberately keep approval off the model surface. MCP tool visibility is not authorization, and permission to attempt an operation does not prove that it succeeded.
+
+## Bundled Skill versus managed export
+
+All five integrations ship or register bundled host guidance. That guidance can tell a host when to use MCP or native tools, but it does not prove managed Skill export.
+
+Managed export generates a versioned projection with provenance and drift checks. It is **Supported** for Codex and Claude Code. It is **Unsupported** for DSH, OpenCode, and Pi. Loading or executing an exported managed Skill in a real Codex or Claude Code session is still **Not validated**.
 
 ## Setup and doctor contract
 
-A new host installer must at least:
+A first-class installer should:
 
-- gate versions;
-- install idempotently and preserve non-owned config;
-- mark ownership and reject overwriting foreign files;
-- support rollback or an explicit partial-failure state;
-- distinguish plugin installed, host activated, and Server running;
-- provide bounded doctor and a real host activation probe.
+- gate known host versions and label compatibility evidence honestly;
+- install idempotently while preserving foreign configuration;
+- record ownership and refuse foreign same-name files;
+- roll back or report a clear partial-failure state;
+- distinguish installed, activated, Server-ready, and real-host E2E;
+- provide a bounded `doctor` plus a separate real-host activation probe.
 
-## No unified HostAdapter SDK
+Doctor depth differs. Codex and Claude Code inspect enabled plugin state. DSH reads the exact plugin ID from dumped configuration. Pi checks the package manifest/path. OpenCode additionally starts short-lived `opencode serve` and verifies an activation nonce. None of these checks proves a live recall/capture/permission chain.
 
-The repository already has reusable helpers, but it has no unified `HostAdapter` abstraction:
+## Negative experiments
 
-- `powercontext.transport` and loopback vectors;
-- Codex/Claude prepared-context parser;
-- host-specific Scope normalization;
+Run these before claiming an adapter complete:
+
+1. Server down: original host task continues.
+2. Wrong auth: 401/403 stays distinct from empty Memory.
+3. Unknown schema: no injection.
+4. Oversize and deadline: bounded exit.
+5. Redirect: Authorization is not forwarded.
+6. Recall/capture split: test both directions, including unexpected Codex recall failure.
+7. Stale turn: mismatched, deleted, or out-of-order identity cannot inject wrong context.
+8. No UI or denied permission: no durable mutation.
+9. Flush lag: bounded retry and no false completion.
+10. Diagnostics: no content, Scope, or credentials.
+
+Real-host E2E is a separate acceptance tier. Launch the actual host, send a prompt, and observe the event, injection, capture, and permission behavior. An HTTP-only service chain or package-load smoke is useful, but it is different evidence.
+
+## Reuse current implementation
+
+The repository has reusable pieces, not one SDK:
+
+- transport policy and loopback/redirect vectors;
+- Codex and Claude Code PreparedContext parsers;
+- host-specific Scope normalization tests;
 - Pi pending Source flusher;
 - DSH generated operation table;
-- Codex/Claude Skill projection;
-- `hosts.py` setup/doctor catalog.
+- Codex and Claude Code Skill projections;
+- setup and doctor catalog in `cli/hosts.py`.
 
-Reuse the contracts and tests. Do not pretend a unified SDK already exists.
+Reuse the contracts, policies, helpers, and test vectors. Do not invent a unified `HostAdapter` class to make documentation cleaner.
+
+## Currently unsupported or not validated
+
+| Item | Status |
+|---|---|
+| Unified `HostAdapter` SDK | **Unsupported** as a current repository abstraction |
+| Automatic final-response/transcript capture | **Unsupported** |
+| Automatic Task Outcome recording | **Unsupported** |
+| Managed Skill export for DSH, OpenCode, and Pi | **Unsupported** |
+| Codex, Claude Code, and DSH real-host E2E | **Not validated** |
+| Pi full recall host chain | **Not validated** |
+| Codex and Claude Code no-UI durable-mutation denial | **Not validated** |
+| OpenCode out-of-order prepare race behavior | **Not validated** |
+| Uniform DSH secure base-URL/bearer validation | **Unsupported** by current DSH configuration boundary |
+| Equal schema/size/deadline/flush negative-test depth on every host | **Not validated** |
+
+## Completion checklist
+
+- [ ] Event, identity, injection channel, and stale-state rule match the selected host.
+- [ ] Scope comes from stable authorized identity and has a cross-Scope negative test.
+- [ ] PreparedContext remains bounded, transient, and untrusted.
+- [ ] Recall, capture, flush, Candidate extraction, and Memory commit remain separate observations.
+- [ ] Automatic fail-open claims match actual exception boundaries.
+- [ ] Explicit mutation failures and permission denials remain visible.
+- [ ] Redirect, schema, size, deadline, stale-turn, no-UI, and flush-lag tests cover every promised behavior.
+- [ ] Diagnostics contain no prompt, Scope, context, Source content, response body, or token.
+- [ ] Setup preserves foreign files and distinguishes installed, active, Server-ready, and E2E.
+- [ ] `doctor` is not reported as real-host E2E.
+- [ ] A bundled Skill is not reported as managed Skill export.
+- [ ] Unsupported and **Not validated** remain separate.
+
+<Check>
+Do not add a sixth host to the first-class catalog until unit contract, service chain, setup/doctor, real-host E2E, and negative/security tiers have observable evidence.
+</Check>
 
 Continue with [Codex](/en/coding-agents/codex), [Claude Code](/en/coding-agents/claude-code), [DSH](/en/coding-agents/dsh), [OpenCode](/en/coding-agents/opencode), or [Pi](/en/coding-agents/pi).

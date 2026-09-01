@@ -1,49 +1,142 @@
 ---
 title: "OpenCode"
-description: "Install and activate the plugin, verify recall through the exact-turn cache, then gate durable writes with context.ask."
+description: "Inject exact-turn context through native hooks and gate classified mutations with context.ask."
 ---
 
 <Warning>
-OpenCode support is **Version-gated** at OpenCode `>=1.18.21,<2`. A real host-process E2E is **Supported**. Mutations go through host `context.ask()` and are **Host-gated**. Managed Skill export is **Unsupported**.
+**Version-gated:** OpenCode `>=1.18.21,<2`. Versions outside that range are **Unsupported**. The package also declares Node `>=20`. A conditional real-host E2E covers `opencode run`, with the limits below.
 </Warning>
 
-OpenCode injects temporary context through a two-stage exact-turn cache. `chat.message` prepares and caches by `(sessionID, messageID)`. `experimental.chat.messages.transform` inserts a synthetic part only when that exact user turn matches. Setup does not start PowerContext Server.
+OpenCode uses an owned native plugin and an owned bundled `project-context` Skill. `chat.message` prepares and captures. `experimental.chat.messages.transform` injects context only when the current turn matches the cached message exactly.
 
-For full install options, use the Configure OpenCode how-to in the [official docs](https://oceanbase.github.io/powercontext/). This page covers the PowerContext 101 verification contract.
-
-## Install and activate
-
-Start the Server in one terminal:
-
-```bash
-powercontext server run
-```
-
-Install the owned plugin and owned Skill from another terminal:
+## Maturity and installation
 
 ```bash
 powercontext setup opencode --source oceanbase/powercontext --ref master
-
-powercontext doctor
+powercontext server run
 powercontext doctor opencode
 ```
 
-Setup validates the OpenCode version, then writes these owned paths under the OpenCode config directory:
+Setup checks `opencode --version`, locates the config directory through `opencode debug paths`, and requires the built plugin plus `skills/project-context/SKILL.md`. It installs them at `<config>/plugins/powercontext-opencode.js` and `<config>/skills/project-context/`, with separate ownership manifests.
 
-```text
-plugins/powercontext-opencode.js
-plugins/.powercontext-opencode.json
-skills/project-context/SKILL.md
-skills/project-context/.powercontext.json
-```
+Setup preflights both target paths and refuses a foreign same-name plugin or Skill. Each installer has its own recovery behavior, but there is no transaction spanning both artifacts. An I/O failure after the plugin install can still leave a partial setup.
 
-The config directory comes from the `config` line of `opencode debug paths`. A same-name file without a PowerContext ownership manifest is not overwritten. Setup does not start the Server and does not open an OpenCode session.
+Doctor checks the executable and version, the owned Skill, and plugin activation. For activation it starts a short-lived `opencode serve` on loopback, polls `GET /session`, waits for a nonce written by the plugin, and then stops the process. It creates no session, passes no model, and does not check Server readiness, prompt hooks, injection, permission UI, or Skill execution.
 
-After setup, start a **new** OpenCode session in the project directory:
+## Minimal usage
+
+Start OpenCode after the Server:
 
 ```bash
 opencode
+
+# Optional checks from another terminal
+opencode --version
+powercontext doctor opencode
 ```
+
+Then submit a normal coding prompt. Automatic recall and eligible prompt capture need no command. Use the mounted `pc_*` tools for exact Memory, Handoff, Experience, Skill, or Candidate-read operations. The plugin does not start or embed the PowerContext Server.
+
+## Execution flow
+
+```text
+chat.message(sessionID, messageID)
+→ collect non-synthetic text parts
+→ resolve the session directory and derive Scope
+→ prepare context
+→ keep one prepared turn per session, tagged with messageID
+→ capture the user prompt independently
+
+experimental.chat.messages.transform
+→ find the latest user turn
+→ require the same sessionID and exact messageID
+→ skip if context is absent or already injected
+→ append one synthetic untrusted part for that turn
+```
+
+Prepare runs before capture, but each has separate fail-open handling. A prepare failure does not normally suppress capture. A capture failure does not erase valid prepared content. Both calls still share the turn's HTTP budget and resolved session context.
+
+`experimental.chat.system.transform` adds general usage guidance only. It is not the PreparedContext injection path.
+
+## Scope and session cleanup
+
+Scope resolution uses this order:
+
+1. Use `POWERCONTEXT_OPENCODE_SCOPE_ID`; hash it to a bounded ID if needed.
+2. Otherwise use the session directory as the derivation input. Explicit tools use `context.worktree || context.directory`.
+3. Resolve the Git top-level and normalize `remote.origin.url` to a `git:` Scope when possible.
+4. If no usable remote exists, hash the resolved project root to a stable `local:` Scope.
+
+The directory or worktree is an input to derivation, not a Scope that takes precedence over Git identity.
+
+`session.created` and `session.updated` refresh the directory cache. If no entry exists, the plugin calls `client.session.get`. `session.deleted` removes both that entry and the session's prepared turn. The runtime keeps at most one prepared turn per session, rather than a map containing every `(sessionID, messageID)` pair.
+
+Exact matching prevents an older result from entering the wrong turn. There is still an out-of-order race: an older prepare can finish last and replace the newer cache entry. The newer turn then misses injection instead of receiving stale context. Concurrent-turn behavior is **Not validated**.
+
+## Injection
+
+PreparedContext must satisfy `powercontext.prepared-context.v1`, including matching `content_bytes`. The configured prepared-content bound defaults to 8,000 bytes and accepts 512–32,768 bytes. The HTTP client separately caps a response body at 1 MiB.
+
+The transform labels recalled content as host-supplied, untrusted historical evidence, marks the part synthetic, and preserves the session and message IDs. A second transform is idempotent.
+
+`chat.message` does not rewrite the incoming part, and the plugin performs no explicit transcript write. Real-host transcript non-persistence is **Not validated**; the current unit evidence covers only the synthetic transform path.
+
+## Capture and flush
+
+Capture excludes synthetic parts. It writes a deterministic prompt Source with `origin`, event, cwd, session, and message metadata. Automatic capture is on by default. It skips capture when disabled, when a prompt looks like a private key or credential, or when its UTF-8 size exceeds 200,000 bytes.
+
+Prepare receives the prompt before the capture filter runs. A secret-looking prompt may therefore be sent to the configured Server as a recall query even though it is not persisted as a Source. Recall transmission and Source capture are separate privacy decisions.
+
+Automatic flush is optional and off by default. When enabled, a positive capture position starts a bounded `flush_memory` cursor loop. Success requires `current_cursor >= position`; error or call-budget exhaustion fails open and does not prove that a Memory exists. OpenCode has no pending boundary flusher, and its optional flush path has no OpenCode-specific test, so the flush E2E is **Not validated**.
+
+The automatic path captures neither the final assistant response nor a Task Outcome.
+
+## Owned plugin and bundled Skill
+
+Setup may refresh an owned install but preserves foreign paths. The Skill conflict path is directly tested; the equivalent foreign-plugin conflict follows the same implementation but lacks its own direct test.
+
+The installed `project-context` directory is a bundled OpenCode Skill. It teaches the host when to use native plugin tools. It is not a managed Skill export. OpenCode is not a current managed export target, and real-host Skill discovery remains **Not validated**.
+
+## Native tools and permission
+
+The plugin mounts 19 curated HTTP tools. They cover Memory reads and mutations, manual prepare/capture, Handoff activate/prepare/finalize/commit/continue, Experience and Skill generate/get, and read-only Candidate Review list/get.
+
+It does not mount Candidate approve/reject/revise, Work Contract creation, Handoff acknowledgement, Task Outcome recording, external-Skill registry, or Handoff-report operations. Human Candidate mutation remains outside the model surface through the Dashboard or a direct human-controlled API client.
+
+Before one of eight classified mutations—remember, capture Source, revise or retire Memory, activate or commit Handoff, generate Experience, or generate Skill—the tool calls host `context.ask()` with permission `powercontext` and the operation ID. This boundary is **Host-gated**. `pc_remember` has a tested ask-and-success path. A rejected ask stops before HTTP by control flow, but real UI allow/deny and a direct denial test are **Not validated**.
+
+Explicit mutation payloads also reject secret-looking nested strings before transport. This check occurs after `context.ask()`, so the host can ask before returning `secret_rejected`.
+
+## Failure behavior
+
+Automatic prepare, capture, injection, and optional flush fail open. Server unavailability or missing session context must not block normal OpenCode work. Explicit tool errors remain model-visible. A configuration error disables the plugin hooks with a warning instead of crashing the host.
+
+## Negative experiments
+
+Run these when changing setup or the plugin. Treat them as a deployment checklist, not as a claim that every item has an automated test:
+
+- Report `1.18.20` or `2.0.0` from `opencode --version`; setup must refuse before installation.
+- Put an unowned target at either artifact path; setup must preserve it and refuse the install.
+- Stop the Server, submit a prompt, and confirm OpenCode continues without recalled context.
+- Prepare one message, then transform a different session or message ID; nothing should be injected.
+- Complete two prepares out of order; stale context must not enter the newer turn, though the newer injection may be missed.
+- Transform the matching turn twice; only one synthetic part should exist.
+- Delete the session, reuse its old IDs, and confirm both caches are empty.
+- Submit a secret-looking or over-200,000-byte prompt; recall may run, but capture must not.
+- Deny a classified mutation and confirm no HTTP operation runs.
+- Enable flush, keep the cursor behind the captured position, and confirm the bounded loop does not claim Memory exists.
+- Inspect model tools and confirm Candidate mutation, Work Contract, acknowledgement, and Task Outcome operations are absent.
+
+## Unsupported vs Not validated
+
+| State | Current boundary |
+|---|---|
+| **Supported** | Declared OpenCode gate `>=1.18.21,<2`; owned plugin and bundled-Skill setup; automatic prepare and eligible prompt capture; exact-turn transform logic; curated 19-tool surface; ask-before-classified-mutation control flow; conditional real-host `opencode run` prepare/capture smoke. |
+| **Unsupported** | OpenCode `<1.18.21` or `>=2`; overwriting foreign same-name paths; managed Skill export to OpenCode; automatic final-response capture or Task Outcome; model-driven Candidate mutation; the unmounted Work Contract, acknowledgement, Outcome, external-Skill registry, and Handoff-report operations; transactional rollback spanning both installed artifacts. |
+| **Not validated** | Compatibility across every accepted release; real-host model dispatch, injection, transcript non-persistence, permission UI, bundled-Skill discovery, cache cleanup, and optional flush; direct upper-version and foreign-plugin tests; reordered concurrent turns; real-host secret and size filtering. |
+
+The conditional real-host E2E launches a real `opencode run`, uses an invalid model and empty PreparedContext, and observes prepare/capture HTTP requests. It proves neither model dispatch nor transform injection. Doctor's nonce probe is a separate activation check.
+
 
 ## Configuration defaults
 
@@ -67,110 +160,6 @@ export POWERCONTEXT_OPENCODE_CAPTURE_PROMPTS=false
 opencode
 ```
 
-## Minimal verification
-
-`doctor opencode` checks the OpenCode CLI version, the owned plugin configuration, and the owned `project-context` Skill. It also starts a short-lived `opencode serve` and verifies plugin activation with a nonce. It creates no session, calls no model, and does not prove that the Server is reachable or that recall works.
-
-Check Server health separately:
-
-```bash
-powercontext doctor
-powercontext ready
-powercontext capabilities
-```
-
-Then make one explicit write in OpenCode:
-
-```text
-Use PowerContext pc_remember to store this decision:
-after changing the OpenAPI contract, regenerate the client and inspect the diff.
-Return the Memory Citation. Do not store secrets.
-```
-
-The host should prompt `context.ask` for `pc_remember`. After you approve, OpenCode should return a Memory Citation instead of only repeating the sentence.
-
-Exit, open a new session, and ask the learning-path question:
-
-```text
-What should happen after the OpenAPI contract changes?
-```
-
-Check exact-turn in this order. Do not stop at the diagram:
-
-1. In the current session, send one user message: the learning-path question.
-2. Inspect the latest user turn. `experimental.chat.messages.transform` should insert a synthetic part that starts with `PowerContext host-supplied context`, includes a Citation, and is labeled untrusted historical evidence. That text enters the exact turn and is not stored in the OpenCode transcript.
-3. Delete the session. `session.deleted` must clear the stale turn cache and the Scope cache.
-4. Open a new session and send an unrelated coding question. The old synthetic part must not appear.
-
-A `(sessionID, messageID)` pair that is not the current user turn must not inject the previous cache either.
-
-## Scope resolution
-
-OpenCode resolves Scope in this order:
-
-1. A nonempty `POWERCONTEXT_OPENCODE_SCOPE_ID`.
-2. The normalized Git `remote.origin.url`, written as `git:...`.
-3. A `local:<sha256>` identifier for the project root.
-
-The session must have a directory. Without one, this turn does not prepare. Scope is bounded to 256 characters. OpenCode does not read the Codex / Claude Code Workstream binding.
-
-Set an explicit Scope when you need a fixed value:
-
-```bash
-export POWERCONTEXT_OPENCODE_SCOPE_ID=project:powercontext-101
-opencode
-```
-
-## Automatic path and explicit tools
-
-```mermaid
-flowchart TD
-  M[chat.message] --> S[Resolve session directory / Scope]
-  S --> P[prepare_context]
-  P --> C[Cache by sessionID and messageID]
-  C --> T[experimental.chat.messages.transform]
-  T --> H{Exact latest user turn?}
-  H -->|yes| I[Inject synthetic untrusted part]
-  H -->|no| N[Do not inject]
-```
-
-`experimental.chat.system.transform` appends usage guidance only. `session.created` / `session.updated` maintain the directory cache; `session.deleted` clears stale turn and Scope state.
-
-Automatic capture stores the user prompt only. Secret-looking prompts and prompts over 200,000 UTF-8 bytes are not captured. Automatic recall, capture, and optional flush fail open.
-
-The explicit path is a curated HTTP tool surface. Mutations go through `context.ask()` first:
-
-| Tool | Purpose |
-|---|---|
-| `pc_search` | Search active Memory |
-| `pc_remember` | Write one durable Memory entry |
-| `pc_memory_get` | Read one exact Citation |
-| `pc_prepare_context` | Prepare one bounded context for a focused query |
-| `pc_handoff_commit` | Commit a Handoff only when the user explicitly asks |
-
-Experience / Skill generation and read-only Candidate operations are also on this surface. Candidate approve / reject / revise is not an ordinary model tool.
-
-The bundled `project-context` Skill is integration guidance. It is not a managed Skill export, and OpenCode is not a current export target.
-
-## Negative checks
-
-These cases must land on this page:
-
-- Stop the Server, then ask a normal coding question. OpenCode should continue; automatic recall may be missing.
-- With the Server still down, run `pc_remember`. The tool should report failure such as `unavailable` and must not pretend the write succeeded.
-- Deny `context.ask`. The mutation must not run.
-- A `(sessionID, messageID)` mismatch must not inject the previous turn's cache.
-- After a session is deleted, the old turn cache must be gone.
-- An old OpenCode version: setup refuses.
-- A foreign same-name plugin or Skill: setup refuses to overwrite.
-
-## Current limits
-
-- Managed Skill export is **Unsupported**. Do not treat the bundled Skill as an exported managed Skill.
-- Candidate Review approve / reject remains a human CLI or Dashboard action.
-- Automatic Source-to-Memory extraction needs a generation model and `Memory extraction: enabled` in `powercontext capabilities`.
-- OpenCode does not share the Codex / Claude Code Workstream binding. Cross-host sharing requires both sides to resolve the exact same `scope_id`.
-- Redirect, unknown schema, oversize, and timeout block injection without blocking the ordinary turn.
 
 ## Finish the shared check on this host
 
@@ -184,14 +173,20 @@ These cases must land on this page:
 
 ## Completion checklist
 
-- OpenCode is `>=1.18.21,<2`.
-- `doctor opencode` reports the plugin configured and active, and the owned Skill present.
-- Server health, readiness, and capabilities were checked separately.
-- A new session can recall the OpenAPI decision you saved explicitly, and the Citation appears in the exact-turn synthetic part.
-- That recalled block did not enter the transcript.
-- Ordinary coding continues when automatic recall fails.
-- Explicit Memory or Handoff failure is visible in OpenCode.
-- Denying `context.ask` writes nothing.
-- You did not confuse the bundled `project-context` Skill with managed Skill export.
+- [ ] OpenCode is `>=1.18.21,<2`, and Node satisfies the package's `>=20` declaration.
+- [ ] Setup installs both owned paths and documents the lack of cross-artifact rollback.
+- [ ] Foreign plugin and Skill targets are preserved rather than overwritten.
+- [ ] `powercontext doctor opencode` is treated as activation evidence, not a Server or model-turn test.
+- [ ] Scope uses an explicit override, otherwise Git identity derived from the session/worktree directory, then a local-root hash.
+- [ ] `chat.message` excludes synthetic text, prepares first, and captures with separate fail-open handling.
+- [ ] Transform injection requires exact session and message IDs and remains idempotent.
+- [ ] Concurrent out-of-order prepare is classified **Not validated** and can cause a missed, not wrong-turn, injection.
+- [ ] `session.deleted` clears session context and the current prepared turn.
+- [ ] Secret and byte-limit filtering applies to capture, while recall transmission is assessed separately.
+- [ ] Optional flush is off by default, bounded by cursor position and calls, and never stands in for Memory verification.
+- [ ] The 19-tool surface and eight `context.ask()`-gated mutations match the plugin.
+- [ ] Candidate Review stays read-only on the model surface; automatic assistant capture and Task Outcome stay **Unsupported**.
+- [ ] Bundled Skill and managed Skill export remain distinct.
+- [ ] Conditional real-host E2E limits remain visible.
 
 Continue with [Pi](/en/coding-agents/pi).
