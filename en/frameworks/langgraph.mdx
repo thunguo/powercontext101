@@ -18,28 +18,30 @@ The adapter has three parts: `powercontext_tools()` returns three tools, `PowerC
 | Runtime | Python `>=3.11,<4.0`; LangGraph `>=1.2,<2` |
 | Invocation | **Async only** |
 | Mutable-branch reproducibility | **Not validated** |
-| Real model-provider round trip in this guide | **Not validated** |
+| Real model-provider round trip in the documented evidence | **Not validated** |
 
 Install the Server and adapter from the reviewed source commit:
 
 ```bash
-uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
-uv pip install "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10#subdirectory=integrations/langgraph"
+uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
+uv pip install "powercontext-langgraph @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977#subdirectory=integrations/langgraph"
 powercontext server run
 ```
 
 For a local checkout at the same commit:
 
 ```bash
-git -C /path/to/powercontext checkout 4213d32d672a6fb16e74730eb50b9be6a38bcb10
+git -C /path/to/powercontext checkout 3e629eb163ba0ddf2935ce3b3fbaced0f9371977
 uv pip install /path/to/powercontext/integrations/langgraph
 ```
 
 <Note>
-Pinning removes the mutable-branch ambiguity, but this guide did not run the upstream VCS-install path or an external-provider round trip. Verify both in your deployment environment.
+Pinning removes the mutable-branch ambiguity, but the documented verification did not run the upstream VCS-install path or an external-provider round trip. Verify both in your deployment environment.
 </Note>
 
 ## Minimum use
+
+The snippet below is the integration seam, not a standalone program: provide your application's initialized chat `model` and LangGraph `my_checkpointer`. To test PowerContext before adding either dependency, write the shared Memory through the API tour and call `PowerContextRecall` in the focused adapter test; the upstream suite does this without an external model provider.
 
 `create_react_agent` already reads the `llm_input_messages` channel written by the recall hook.
 
@@ -197,7 +199,7 @@ The adapter performs no automatic capture. Explicit `powercontext_remember` stil
 | Handoff and Candidate Review | **Unsupported** |
 | Experience and Skill operations | **Unsupported** |
 | Reproducible install from mutable `master` | **Not validated** |
-| Real external-provider round trip in this guide | **Not validated** |
+| Real external-provider round trip in the documented evidence | **Not validated** |
 
 ## Completion checklist
 

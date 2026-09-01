@@ -7,7 +7,7 @@ description: "Install the provider and command companion, activate PowerContext,
 Hermes support is **Version-gated** at Hermes Agent `>=0.20.4`. Setup installs two plugins, but it neither starts PowerContext Server nor selects PowerContext as Hermes's active memory provider.
 </Warning>
 
-Hermes has the widest host integration in this section. The MemoryProvider handles lifecycle hooks and tools. A separate command companion registers `/pc` and `/powercontext` early enough for interactive use.
+Hermes has the widest host integration among the documented common-agent hosts. The MemoryProvider handles lifecycle hooks and tools. A separate command companion registers `/pc` and `/powercontext` early enough for interactive use.
 
 ## Install and activate
 
@@ -206,7 +206,7 @@ Test these cases:
 - Candidate approval/rejection/revision is review-gated by policy and version checks, but the provider does not attest that the caller is a human.
 - Hermes has no OpenClaw-style group/channel/incognito eligibility filter.
 - Redirects are rejected, and invalid, oversized, timed-out, or non-2xx responses are normalized.
-- A real Hermes host-process E2E is **Not validated** by this page.
+- A real Hermes host-process E2E is **Not validated** here.
 
 ## Finish the shared check on this host
 

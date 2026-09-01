@@ -4,7 +4,7 @@ description: "从心智模型到 Agent 集成，沿一条可运行的路径学�
 icon: house
 keywords:
   - PowerContext 101
-  - mental model
+  - mental 模型
   - Source
   - Memory
   - Handoff
@@ -14,17 +14,19 @@ PowerContext 保存项目在推进过程中留下的证据、决策和交接状�
 
 PowerContext 101 关注使用路径和集成边界。安装参数、完整接口契约和部署配置仍以 [PowerContext 官方文档](https://oceanbase.github.io/powercontext/)为准。
 
+先完成最小、可验证的结果：显式写入一条 Memory，得到一次搜索命中，再构造带 Citation 的 PreparedContext。这条闭环能先证明 Server 与 Scope 正确，再接入框架、宿主 Hook 或模型提供方。
+
 <Info>
 本站不会复制 OpenAPI 或 RFC。代码、当前测试和正式文档与旧 RFC 冲突时，以已经实现并经过测试的行为为准。
 </Info>
 
 ## 30 秒看懂 PowerContext
 
-一次工作通常从 `Source` 开始。它可以是一条 prompt、一次任务结果，或者其他可定位的证据。采集 Source 只表示“这件事发生过”，不会自动把整段内容变成长期 Memory。
+一次工作通常从 `Source` 开始。它可以是一条提示词、一次任务结果，或者其他可定位的证据。采集 Source 只表示“这件事发生过”，不会自动把整段内容变成长期 Memory。
 
-`Memory` 保存经过选择、以后还会用到的项目知识。`Handoff` 处理另一件事：把当前目标、已验证进度、阻塞项和下一步交给接手者。Handoff 默认可以只是临时包；只有显式 commit 后，它才成为持久的里程碑。
+`Memory` 保存经过选择、以后还会用到的项目知识。`Handoff` 处理另一件事：把当前目标、已验证进度、阻塞项和下一步交给接手者。Handoff 默认可以只是临时包；只有显式提交后，它才成为持久的里程碑。
 
-`Experience` 和 managed `Skill` 先进入 Candidate。模型可以起草 Candidate，但不能因为“生成成功”就算批准。Review 中的 approve 会创建不可变 Artifact Revision；reject 会记录拒绝原因，不创建结果 Artifact。Skill 获批后仍需显式 export，也不会自动获得执行权限。
+`Experience` 和托管 `Skill` 先进入 Candidate。模型可以起草 Candidate，但不能因为“生成成功”就算批准。Review 中的批准会创建不可变 Artifact Revision；拒绝会记录拒绝原因，不创建结果 Artifact。Skill 获批后仍需显式导出，也不会自动获得执行权限。
 
 ```mermaid
 flowchart LR
@@ -66,13 +68,13 @@ Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先花�
   <Card title="配置通用 Agent" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="选择通用 Agent">
     Hermes、OpenClaw 和 WorkBuddy 都有实际接入路径。先完成安装与激活，再分别验证 Server 连接、召回和显式写入。凭证、持久写入和 Review 仍由你授权。
   </Card>
-  <Card title="配置编程 Agent" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="选择编程 Agent">
+  <Card title="配置编程 Agent" icon="终态" href="/zh/coding-agents/overview" arrow="true" cta="选择编程 Agent">
     了解 Codex、Claude Code、DSH、OpenCode 和 Pi 如何把同一 Server 契约映射到各自的生命周期。
   </Card>
 </Columns>
 
 <Check>
-自动 recall、prompt capture 和可选 flush 失败时，宿主应继续原任务。显式 Memory 写入、Handoff commit、Candidate Review 和 Skill export 不在这个规则内：失败必须明确告诉调用者。
+自动召回、提示词采集和可选刷新失败时，宿主应继续原任务。显式 Memory 写入、Handoff 提交、Candidate Review 和 Skill 导出不在这个规则内：失败必须明确告诉调用者。
 </Check>
 
 不知道先读哪一部分？打开[学习路径](/zh/start/learning-path)。已经卡住时，先对[排错](/zh/start/troubleshooting)。
@@ -80,13 +82,13 @@ Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先花�
 <GitHub.Repo repo="oceanbase/powercontext" />
 
 <Visibility for="agents">
-Route Chinese PowerContext 101 questions from this page. Treat current implementation and tests as the product facts; do not present RFC goals as shipped behavior.
+从本页分流中文 PowerContext 101 问题。产品事实以当前实现和测试为准，不要把 RFC 目标写成已发布行为。
 
-- Concepts: `/zh/mental-model/overview`
-- Install and API loop: `/zh/basic-usage/install-and-run`
-- Python frameworks: `/zh/frameworks/overview`
-- Hermes, OpenClaw, WorkBuddy, and Agent Plugin: `/zh/common-agents/overview`
-- Coding-agent hosts and hooks: `/zh/coding-agents/overview`
-- Full contracts and deployment: `https://oceanbase.github.io/powercontext/`
-- Learning order: `/zh/start/learning-path`
+- 概念：`/zh/mental-model/overview`
+- 安装与 API 闭环：`/zh/basic-usage/install-and-run`
+- Python 框架：`/zh/frameworks/overview`
+- Hermes、OpenClaw、WorkBuddy 与 Agent Plugin：`/zh/common-agents/overview`
+- 编程 Agent 宿主与 Hook：`/zh/coding-agents/overview`
+- 完整契约与部署：`https://oceanbase.github.io/powercontext/`
+- 学习顺序：`/zh/start/learning-path`
 </Visibility>

@@ -1,9 +1,9 @@
 ---
 title: "常用 API 串讲"
-description: "用 async Python Client 完成 explicit Memory 的写入、搜索、准备、修订、停用和历史读取。"
+description: "用异步 Python Client 完成显式 Memory 的写入、搜索、准备、修订、停用和历史读取。"
 ---
 
-这一页只用最小 Server。没有 generation model，也不需要 vector search。
+这里使用最小 Server。没有生成模型，也不需要向量搜索。
 
 目标很具体：写入一条项目决策，确认它能被搜索和组装进 `PreparedContext`，然后修订、停用，并验证历史还在。
 
@@ -14,7 +14,7 @@ PowerContext 的远程接口都连接同一个 Server 和持久数据。
 | 接口 | 适合什么 |
 |---|---|
 | HTTP | 跨语言服务集成；完整契约以 OpenAPI 为准 |
-| Python Client | Python 应用的 typed async 调用 |
+| Python Client | Python 应用的类型化异步调用 |
 | MCP | Agent-facing 的精选工具面，不等于完整 HTTP API |
 | CLI | 安装、诊断、Server 管理和人工 Review |
 
@@ -25,11 +25,11 @@ http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/openapi.json
 ```
 
-`/docs` 是公开的 API 参考页。开启 Server auth 后它仍可打开。`/openapi.json` 和实际 API 调用需要 Bearer header。不要把 token 放进 URL。
+`/docs` 是公开的 API 参考页。开启 Server 认证后它仍可打开。`/openapi.json` 和实际 API 调用需要 Bearer 请求头。不要把令牌放进 URL。
 
 ## 准备示例项目
 
-上一页已经安装了 client extra。新建 `api_tour.py`，使用下面的完整脚本。
+上一页已经安装了客户端附加依赖。新建 `api_tour.py`，使用下面的完整脚本。
 
 ```python
 import asyncio
@@ -207,24 +207,24 @@ if __name__ == "__main__":
 uv run python api_tour.py
 ```
 
-每次运行使用唯一 Scope，避免上一次教程数据让 duplicate、entry count 或 Revision 断言失效。真实项目应改用稳定的 project/tenant Scope，而不是随机值。
+每次运行使用唯一 Scope，避免上一次教程数据让重复写入、条目计数或 Revision 断言失效。真实项目应改用稳定的项目/租户 Scope，而不是随机值。
 
 ## 这段代码验证了什么
 
-### Explicit Memory 不需要 Source
+### 显式 Memory 不需要 Source
 
 `remember_memory` 直接写入已经确认的长期知识。示例中 `source_refs` 通常为空。
 
 首次有效写入返回：
 
-- exact Memory Artifact ref；
-- logical `entry_id`；
-- exact `entry_version_id`；
-- current entry content 和 state。
+- 精确 Memory Artifact 版本引用；
+- 逻辑 `entry_id`；
+- 精确 `entry_version_id`；
+- 当前条目内容和状态。
 
-完全重复的 active content 是 no-op。它返回当前 Memory ref，但 `entry` 是 `null`。因此，不要假设每次 `remember_memory` 都有 `response.entry.citation`。
+完全重复的启用状态内容是无变更。它返回当前 Memory 版本引用，但 `entry` 是 `null`。因此，不要假设每次 `remember_memory` 都有 `response.entry.citation`。
 
-### Search 的 empty 有两种
+### 搜索的空结果有两种
 
 Scope 从未有过 Memory：
 
@@ -234,7 +234,7 @@ mode = null
 hits = []
 ```
 
-Scope 有 Memory，但 query 没匹配：
+Scope 有 Memory，但查询没匹配：
 
 ```text
 memory = current exact ref
@@ -244,9 +244,9 @@ hits = []
 
 两者都是 HTTP 200 下的正常领域结果。
 
-### PreparedContext 已经是最终 envelope
+### PreparedContext 已经是最终封装
 
-`prepared.content` 已包含 trust marker、边界和 Citation。宿主可以把它作为不可信历史证据注入当前模型请求，不需要重新拼 search hits。
+`prepared.content` 已包含信任标记、边界和 Citation。宿主可以把它作为不可信历史证据注入当前模型请求，不需要重新拼搜索命中。
 
 `status="empty"` 时：
 
@@ -255,28 +255,28 @@ content = null
 content_bytes = 0
 ```
 
-`status="ready"` 时，实际 UTF-8 bytes 必须等于 `content_bytes`，并且不超过 request 的 `max_bytes`。
+`status="ready"` 时，实际 UTF-8 字节必须等于 `content_bytes`，并且不超过请求的 `max_bytes`。
 
-### Exact read 与 mutation 的版本规则不同
+### 精确读取与修改操作的版本规则不同
 
 旧 Citation 可用于 `get_memory_entry` 读取历史。
 
-`revise_memory_entry` 和 `retire_memory_entry` 只接受 current-head Citation。任何 Memory mutation 推进 Revision 后，旧 Citation 会返回 HTTP 409 `revision_conflict`。
+`revise_memory_entry` 和 `retire_memory_entry` 只接受当前头版本 Citation。任何 Memory 修改操作推进 Revision 后，旧 Citation 会返回 HTTP 409 `revision_conflict`。
 
-用 mutation response 返回的新 Citation 继续下一步。
+用修改操作响应返回的新 Citation 继续下一步。
 
-### Retire 不删除
+### 停用不删除
 
-retire 后：
+停用后：
 
-- 默认 list 不再显示条目；
-- active search / recall 不再选择它；
+- 默认列出不再显示条目；
+- 启用状态搜索 / 召回不再选择它；
 - `include_inactive=True` 仍能审计；
-- exact historical read 仍然有效。
+- 精确历史读取仍然有效。
 
-## Client 错误怎么处理
+## 客户端错误怎么处理
 
-Python Client 保留 HTTP status、稳定 error code、Server message 和 `X-PowerContext-Request-ID`。
+Python Client 保留 HTTP 状态、稳定错误 code、Server 消息和 `X-PowerContext-Request-ID`。
 
 ```python
 from powercontext.client import (
@@ -299,19 +299,19 @@ except InvalidResponseError as exc:
 
 | HTTP | 含义 |
 |---|---|
-| 401 | Bearer token 缺失或错误 |
-| 404 | exact immutable value 不存在 |
-| 409 | current head、Citation 或 expected version 冲突 |
-| 422 | request 或 capability 不满足契约 |
-| 503 | 必需 Runtime binding / dependency 不可用 |
+| 401 | Bearer 令牌缺失或错误 |
+| 404 | 精确不可变值不存在 |
+| 409 | 当前头版本、Citation 或预期版本冲突 |
+| 422 | 请求或能力不满足契约 |
+| 503 | 必需运行时绑定 / 依赖不可用 |
 
 409 后先重新读取当前值，再决定是否重试。不要猜 Revision。
 
 ## MCP 与 HTTP 不是同一覆盖面
 
-MCP 是给 Agent 的精选工具面。HTTP 是完整 application 契约。
+MCP 是给 Agent 的精选工具面。HTTP 是完整应用契约。
 
-`POST /v1/context/prepare` 和 Python Client 的 `prepare_context` 不作为 MCP tool 暴露，因为最终 PreparedContext 通常由 Hook 或 framework adapter 在请求时自动准备。MCP 也不等于每个 integration 的自动 capture 和 flush 生命周期。
+`POST /v1/context/prepare` 和 Python Client 的 `prepare_context` 不作为 MCP 工具暴露，因为最终 PreparedContext 通常由 Hook 或框架适配器在请求时自动准备。MCP 也不等于每个集成的自动采集和刷新生命周期。
 
 要连上客户端、核对能调哪些工具，看[用 MCP 连接 Server](/zh/basic-usage/mcp)。
 
@@ -319,12 +319,12 @@ MCP 是给 Agent 的精选工具面。HTTP 是完整 application 契约。
 
 脚本应证明：
 
-- 首次 remember 返回 exact entry Citation；
-- duplicate 是 `entry=None` 的 no-op；
-- FTS/auto search 找到 active entry；
+- 首次记住返回精确条目 Citation；
+- 重复写入是 `entry=None` 的无变更；
+- FTS/auto 搜索找到启用状态条目；
 - PreparedContext 是 `ready` 且字节数一致；
-- revise 后旧 Citation 仍可 exact read；
-- 旧 Citation mutation 返回 409；
-- retire 后默认 list 为空，audit 仍能读取 inactive entry。
+- 修订后旧 Citation 仍可精确读取；
+- 旧 Citation 修改操作返回 409；
+- 停用后默认列出为空，审计仍能读取停用状态条目。
 
-要在页面上看到刚写入的 Memory，打开[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard)。下一页比较[显式 Memory 与 Source extraction](/zh/basic-usage/source-and-memory)。
+要在页面上看到刚写入的 Memory，打开[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard)。下一页比较[显式 Memory 与 Source 抽取](/zh/basic-usage/source-and-memory)。

@@ -1,45 +1,47 @@
 ---
 title: "LangChain"
-description: "每次 model request 前召回，并按需捕获一次成功完成的 turn，不修改 agent state。"
+description: "每次模型请求前召回，并按需捕获一次成功完成的轮次，不修改 agent 状态。"
 ---
 
 <Warning>
-仅支持 source install：`powercontext-langchain==0.0.1` 尚未发布到 PyPI。官方安装 URL 跟随可变的 `master`，focused package test 也没有覆盖这条 VCS install 路径。可复现性为 **Not validated**；请固定经过审阅的 commit 及其依赖。
+仅支持源码安装：`powercontext-langchain==0.0.1` 尚未发布到 PyPI。官方安装 URL 跟随可变的 `master`，专项软件包测试也没有覆盖这条 VCS 安装路径。可复现性为 **Not validated**；请固定经过审阅的提交及其依赖。
 </Warning>
 
-`PowerContextMiddleware` 接入 LangChain `create_agent`。它支持 sync 与 async，只修改当前 model request，并可把完成的 turn 捕获为 Source evidence。它没有 adapter-owned PowerContext tools。
+`PowerContextMiddleware` 接入 LangChain `create_agent`。它支持同步与异步，只修改当前模型请求，并可把完成的轮次捕获为 Source 证据。它没有 adapter-owned PowerContext 工具。
 
 ## 成熟度与安装
 
 | 项目 | 状态 |
 |---|---|
-| Package | 仅 source install；不在 PyPI |
-| Version | `0.0.1` |
-| Runtime | Python `>=3.11,<4.0`；LangChain `>=1.3,<2` |
-| Invocation | Sync 与 async |
+| 软件包 | 仅源码安装；不在 PyPI |
+| 版本 | `0.0.1` |
+| 运行时 | Python `>=3.11,<4.0`；LangChain `>=1.3,<2` |
+| 调用方式 | Sync 与异步 |
 | 可变分支的可复现性 | **Not validated** |
-| 本指南中的真实模型 provider round trip | **Not validated** |
+| 文档证据中的真实模型提供方往返验证 | **Not validated** |
 
-从已审阅的 source commit 安装 Server 与 middleware：
+从已审阅的源码提交安装 Server 与中间件：
 
 ```bash
-uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
-uv pip install "powercontext-langchain @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10#subdirectory=integrations/langchain"
+uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
+uv pip install "powercontext-langchain @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977#subdirectory=integrations/langchain"
 powercontext server run
 ```
 
-如果使用同一 commit 的本地 checkout：
+如果使用同一提交的本地检出：
 
 ```bash
-git -C /path/to/powercontext checkout 4213d32d672a6fb16e74730eb50b9be6a38bcb10
+git -C /path/to/powercontext checkout 3e629eb163ba0ddf2935ce3b3fbaced0f9371977
 uv pip install /path/to/powercontext/integrations/langchain
 ```
 
 <Note>
-Middleware 与 `powercontext-langgraph` 相互独立。LangChain 内部可能安装 LangGraph，但两个 PowerContext adapters 使用不同的 settings、Scope types 和 lifecycle behavior。
+中间件 与 `powercontext-langgraph` 相互独立。LangChain 内部可能安装 LangGraph，但两个 PowerContext 适配器使用不同的设置、Scope types 和生命周期行为。
 </Note>
 
 ## 最小用法
+
+下面的示例假设应用已经有初始化完成的聊天模型和正常的 Agent 或模型调用循环。PowerContext 只提供中间件，不替你选择或创建模型。先用中间件专项测试或无模型假实现验证 Scope 与召回，再把中间件放到真实调用外围。
 
 ```python
 from langchain.agents import create_agent
@@ -65,10 +67,10 @@ result = await agent.ainvoke(
 )
 ```
 
-同一 middleware 在同步应用中支持 `invoke` 与 `stream`，在 async 应用中支持 `ainvoke` 与 `astream`。
+同一中间件在同步应用中支持 `invoke` 与 `stream`，在异步应用中支持 `ainvoke` 与 `astream`。
 
 <Warning>
-不要在已经运行的 event loop 中调用同步 agent method。Host 仍会运行，但 PowerContext recall 与 capture 会被跳过，middleware 记录一次 warning。此时应使用 async agent API。
+不要在已经运行的事件循环中调用同步 agent method。宿主仍会运行，但 PowerContext 召回与采集会被跳过，中间件记录一次警告。此时应使用异步 agent API。
 </Warning>
 
 ## 执行流程
@@ -83,36 +85,36 @@ before every model request
 → after successful agent completion, optionally capture latest user + final response
 ```
 
-每个 model request 前都会 recall。它不像 Pydantic AI Capability 那样每个 run 一次，也不像 LangGraph 那样按 human turn prepare 一次并跨 model steps 使用 cache。因此，同一 run 中 application-owned tool 先写入 Memory，后续 model step 可能看到新内容。
+每个模型请求前都会召回。它不像 Pydantic AI 能力那样每个运行一次，也不像 LangGraph 那样按用户轮次准备一次并跨模型 steps 使用缓存。因此，同一运行中应用-owned 工具先写入 Memory，后续模型步骤可能看到新内容。
 
-Middleware 只 override 当前 `ModelRequest.system_message`，从不把 recalled block 写入 framework state 或 checkpointer。原有 system message 保持在前，untrusted context block 只 append 到这一次 request。
+中间件 只覆盖值当前 `ModelRequest.system_message`，从不把召回的内容块写入框架状态或检查点存储器。原有系统消息保持在前，不可信上下文内容块只追加到这一次请求。
 
-## Capture 默认关闭
+## 采集默认关闭
 
-只有在确认可以持久保存 user 与 final model content 后才开启 capture：
+只有在确认可以持久保存用户与最终模型内容后才开启采集：
 
 ```python
 middleware = PowerContextMiddleware(auto_capture=True)
 ```
 
-`auto_capture` 默认为 `False`。`after_agent` 或 `aafter_agent` 只在成功完成后捕获，内容是最新的非空 user message，加上可序列化的 `structured_response` 或最后一条非空 assistant response。
+`auto_capture` 默认为 `False`。`after_agent` 或 `aafter_agent` 只在成功完成后捕获，内容是最新的非空用户消息，加上可序列化的 `structured_response` 或最后一条非空助手响应。
 
 | 包含 | 排除 |
 |---|---|
-| Latest user text | Tool output |
-| Final assistant text | Intermediate tool-calling messages |
-| 可序列化的 `structured_response` | Recalled PowerContext block |
-| Truncation metadata | Aborted run 或没有 final response 的 run |
+| Latest 用户 文本 | 工具输出 |
+| Final 助手 文本 | Intermediate 工具-calling 消息 |
+| 可序列化的 `structured_response` | 召回的 PowerContext 内容块 |
+| Truncation 元数据 | Aborted 运行或没有最终响应的运行 |
 
-合并后的 Source payload 另有 200,000 Python-character 上限。Adapter 会在 user 与 assistant text 之间分配预算，并记录 truncation flags。
+合并后的 Source 载荷另有 200,000 Python-character 上限。适配器会在用户与助手 文本 之间分配预算，并记录 截断 flags。
 
 <Note>
-Capture 创建 Source，不创建或批准 Memory，middleware 也不 flush。Server extraction 可以稍后由 scheduler 或显式 Client operation 触发，也可能得到 no-op。
+采集创建 Source，不创建或批准 Memory，中间件也不刷新。Server 抽取可以稍后由调度器或显式客户端操作触发，也可能得到无变更。
 </Note>
 
 ## Scope 与配置
 
-一个 agent 服务多个 tenant 时，应在每次 invocation 传入 `PowerContextScope`。每次 invocation 的 Scope、base URL、token 和 timeout 会覆盖环境变量。
+一个 agent 服务多个租户时，应在每次调用传入 `PowerContextScope`。每次调用的 Scope、基础 URL、令牌和超时会覆盖环境变量。
 
 ```python
 scope = PowerContextScope(
@@ -125,15 +127,15 @@ scope = PowerContextScope(
 result = await agent.ainvoke(state, context=scope)
 ```
 
-| Setting | 默认值 |
+| 设置 | 默认值 |
 |---|---:|
 | `POWERCONTEXT_LANGCHAIN_BASE_URL` | `http://127.0.0.1:8000` |
 | `POWERCONTEXT_LANGCHAIN_TOKEN` | 未设置 |
 | `POWERCONTEXT_LANGCHAIN_SCOPE_ID` | 派生或报错 |
-| `POWERCONTEXT_LANGCHAIN_TIMEOUT` | `10` seconds |
-| `POWERCONTEXT_LANGCHAIN_MAX_BYTES` | `8000`；允许范围 `512`–`32768` bytes |
+| `POWERCONTEXT_LANGCHAIN_TIMEOUT` | `10` 秒 |
+| `POWERCONTEXT_LANGCHAIN_MAX_BYTES` | `8000`；允许范围 `512`–`32768` 字节 |
 
-Scope precedence：
+Scope 优先顺序：
 
 ```text
 PowerContextScope(scope_id=...)
@@ -142,62 +144,64 @@ PowerContextScope(scope_id=...)
 → MissingScopeError
 ```
 
-没有 local-path fallback。HTTP(S)、SSH、Git 和 SCP-like network remote 会在移除 credentials 后做 normalization。过长的显式 Scope 会被替换为有界的 SHA-256 identifier。
+没有 local-path 后备路径。HTTP(S)、SSH、Git 和 SCP-like 网络远程会在移除凭证后做规范化。过长的显式 Scope 会被替换为有界的 SHA-256 标识。
 
-Token 采用不含 `Bearer ` 的 bare token 约定。Adapter 不严格校验该语法。除非 caller 提供并显式标记 trusted transport，共享的 `PowerContextClient` 会拒绝向非 loopback host 使用明文 HTTP。
+令牌采用不含 `Bearer ` 的不带前缀的令牌约定。适配器不严格校验该语法。除非调用方提供并显式标记可信传输层，共享的 `PowerContextClient` 会拒绝向非本机回环地址宿主使用明文 HTTP。
 
-## Failure、隐私与 Scope boundary
+## 失败、隐私与 Scope 边界
 
-Automatic recall 与 capture 是相互独立的 fail-open paths。Scope 缺失、配置错误、request validation、authentication failure、timeout、Server failure，或无法序列化的 structured response，都不会替换 model result，也不会中止 host run。HTTP 401/403 会记录为配置问题，不会冒充 empty Memory。
+自动召回与采集是相互独立的 fail-open 路径。Scope 缺失、配置错误、请求校验、认证失败、超时、Server 失败，或无法序列化的 结构化 响应，都不会替换模型结果，也不会中止宿主运行。HTTP 401/403 会记录为配置问题，不会冒充空结果 Memory。
 
-Middleware 不添加显式 PowerContext tools。如果应用自行把 Python Client mutation 包装成 tool，其 失败契约 和 permission 归应用负责；automatic fail-open 不会让这些 mutation 假装成功。
+中间件 不添加显式 PowerContext 工具。如果应用自行把 Python Client 修改操作包装成工具，其失败契约和权限归应用负责；自动 fail-open 不会让这些修改操作假装成功。
 
 <Warning>
-Recall 可能包含旧 user 或 model text。它是 untrusted evidence，不是 instruction、identity proof 或 permission grant。Scope 只选择数据分区；需要隔离时，应从 authenticated tenant/project mapping 派生 Scope。
+召回可能包含旧用户或模型 文本。它是不可信证据，不是指令、标识 proof 或权限 grant。Scope 只选择数据分区；需要隔离时，应从 已认证 租户/项目映射派生 Scope。
 </Warning>
 
-Capture 可能存储普通 prompt、代码、业务数据和 final model output。此 adapter 不承诺完整 secret redaction。在应用明确 content filtering、consent、retention 与 deletion rules 前，保持 `auto_capture=False`。排除 tool output 并不能替代隐私策略。
+采集可能存储普通提示词、代码、业务数据和最终模型输出。此适配器不承诺完整敏感信息脱敏。在应用明确内容 过滤、consent、保留策略与 deletion 规则 前，保持 `auto_capture=False`。排除工具输出并不能替代隐私策略。
 
 ## 与 LangGraph 对比
 
+两者的区别在于召回挂接到哪个生命周期。选择应用已经使用的生命周期，不要额外包装一个框架去模仿另一个。
+
 | 能力 | LangChain | LangGraph |
 |---|---|---|
-| Recall frequency | 每个 model request | 每个 human turn 一次，跨 model steps 使用 cache |
-| Adapter-owned tools | 无 | 三个 Memory tools |
-| Automatic capture | 可选 completed-turn Source；默认关闭 | 无 |
-| Invocation | Sync 与 async | 仅 async |
-| Injection channel | 当前 `ModelRequest.system_message` | 临时 `llm_input_messages` |
-| Framework state mutation | 无 | Recall 不修改 persisted `messages` |
-| Flush | 无 | 无 |
+| 召回 frequency | 每个模型请求 | 每个用户轮次一次，跨模型 steps 使用缓存 |
+| 适配器负责的 工具 | 无 | 三个 Memory 工具 |
+| 自动采集 | 可选已完成轮次 Source；默认关闭 | 无 |
+| 调用方式 | Sync 与异步 | 仅异步 |
+| 注入频道 | 当前 `ModelRequest.system_message` | 临时 `llm_input_messages` |
+| Framework 状态修改操作 | 无 | 召回不修改持久化的 `messages` |
+| 刷新 | 无 | 无 |
 
 ## 当前不支持或尚未验证
 
 | 项目 | 状态 |
 |---|---|
-| Adapter-owned PowerContext tools | **Unsupported** |
-| Automatic 或 final flush | **Unsupported** |
+| 适配器负责的 PowerContext 工具 | **Unsupported** |
+| 自动或最终刷新 | **Unsupported** |
 | Handoff 与 Candidate Review | **Unsupported** |
-| Experience 与 Skill operations | **Unsupported** |
-| Failed 或 aborted-run capture | **Unsupported** |
-| 完整 secret redaction | **Unsupported** |
+| Experience 与 Skill 操作 | **Unsupported** |
+| Failed 或 aborted-run 采集 | **Unsupported** |
+| 完整敏感信息脱敏 | **Unsupported** |
 | 从可变 `master` 进行可复现安装 | **Not validated** |
-| 本指南中的真实外部 provider round trip | **Not validated** |
+| 文档证据中的真实外部模型提供方往返验证 | **Not validated** |
 
 ## 完成检查清单
 
-- Server 单独运行，source-installed middleware 固定到经过审阅的 commit。
-- Sync code 在 event loop 外运行；async code 使用 `ainvoke` 或 `astream`。
-- 捕获到的 model request 含 untrusted recall block，returned 与 checkpointed state 不含该 block。
-- 测试按每个 model request 发生 recall 编写，而不是按 run 一次或 turn 一次。
-- 每次 invocation 收到预期 Scope；cross-Scope negative test 证明 tenant isolation。
-- `MAX_BYTES` 在 512 到 32,768 之间，超过 8,192 characters 的 query 会被截断，remote transport 使用 HTTPS。
-- Server unavailable 时 model flow 继续，401/403 仍能与 empty Memory 区分。
-- 除非 completed-turn storage 已有明确的 privacy 与 retention policy，否则 `auto_capture` 保持关闭。
-- Capture 开启时检查 Source，不假定 Memory 已生成或 flush 已发生。
+- Server 单独运行，源码安装的中间件固定到经过审阅的提交。
+- 同步代码在事件循环外运行；异步代码使用 `ainvoke` 或 `astream`。
+- 捕获到的模型请求含不可信召回内容块，返回的 与写入检查点的状态不含该内容块。
+- 测试按每个模型请求发生召回编写，而不是按运行一次或轮次一次。
+- 每次调用收到预期 Scope；跨 Scope 负向 测试证明租户 isolation。
+- `MAX_BYTES` 在 512 到 32,768 之间，超过 8,192 字符的查询会被截断，远程传输层使用 HTTPS。
+- Server 不可用时模型流程继续，401/403 仍能与空结果 Memory 区分。
+- 除非已完成轮次 storage 已有明确的隐私与保留策略，否则 `auto_capture` 保持关闭。
+- 采集开启时检查 Source，不假定 Memory 已生成或刷新已发生。
 - 部署记录没有混淆 Unsupported 与 Not validated。
 
 <Check>
-先 seed 一条 explicit Memory，检查 model request，再检查 framework state。另开一次 run 启用 capture，然后确认 Source journal 有记录且没有 automatic flush。
+先 种子 一条显式 Memory，检查模型请求，再检查框架状态。另开一次运行启用采集，然后确认 Source 日志有记录且没有自动刷新。
 </Check>
 
-下一页进入[框架进阶技巧](/zh/frameworks/tricks)，继续检查跨框架的 Scope、transport、budget 与 failure behavior。
+下一页进入[框架进阶技巧](/zh/frameworks/tricks)，继续检查跨框架的 Scope、传输层、预算与失败行为。

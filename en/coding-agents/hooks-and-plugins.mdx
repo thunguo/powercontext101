@@ -35,6 +35,7 @@ powercontext server run
 powercontext doctor <host>
 ```
 
+The tables below are not a universal implementation to copy. Start with the event exposed by the chosen host, then implement Scope resolution, transient injection, Source capture, and permission handling one layer at a time. Prove each layer with its own failure case before moving on. The five hosts align on domain semantics; their event payloads and return channels still belong to their native APIs.
 ## Minimal adapter contract
 
 ```text
@@ -64,6 +65,7 @@ For each stage, define its input, output, failure policy, and observable asserti
 | `Diagnostics` | Bounded status without content or credentials |
 | `Installer / Doctor` | Version, ownership, rollback, activation, and honest evidence level |
 
+Read the event-model table as a timing map. The prepare event determines which user input becomes the query; the injection event determines how long recalled content lives; the boundary event determines when captured Source can be flushed. If a host has no event for one of those moments, mark that behavior unsupported instead of simulating it with stale state.
 ## Five distinct event models
 
 ```text
@@ -193,7 +195,7 @@ A first-class installer should:
 - distinguish installed, activated, Server-ready, and real-host E2E;
 - provide a bounded `doctor` plus a separate real-host activation probe.
 
-Doctor depth differs. Codex and Claude Code inspect enabled plugin state. DSH reads the exact plugin ID from dumped configuration. Pi checks the package manifest/path. OpenCode additionally starts short-lived `opencode serve` and verifies an activation nonce. None of these checks proves a live recall/capture/permission chain.
+Doctor depth differs. Codex and Claude Code inspect enabled plugin state. DSH reads the exact plugin ID from dumped configuration. Pi checks the package manifest/path. OpenCode goes further: it starts a short-lived `opencode serve` process and verifies an activation nonce. None of these checks proves a live recall/capture/permission chain.
 
 ## Negative experiments
 
@@ -243,18 +245,20 @@ Reuse the contracts, policies, helpers, and test vectors. Do not invent a unifie
 
 ## Completion checklist
 
-- [ ] Event, identity, injection channel, and stale-state rule match the selected host.
-- [ ] Scope comes from stable authorized identity and has a cross-Scope negative test.
-- [ ] PreparedContext remains bounded, transient, and untrusted.
-- [ ] Recall, capture, flush, Candidate extraction, and Memory commit remain separate observations.
-- [ ] Automatic fail-open claims match actual exception boundaries.
-- [ ] Explicit mutation failures and permission denials remain visible.
-- [ ] Redirect, schema, size, deadline, stale-turn, no-UI, and flush-lag tests cover every promised behavior.
-- [ ] Diagnostics contain no prompt, Scope, context, Source content, response body, or token.
-- [ ] Setup preserves foreign files and distinguishes installed, active, Server-ready, and E2E.
-- [ ] `doctor` is not reported as real-host E2E.
-- [ ] A bundled Skill is not reported as managed Skill export.
-- [ ] Unsupported and **Not validated** remain separate.
+Treat the integration as complete only when these results are observable:
+
+- Event, identity, injection channel, and stale-state rule match the selected host.
+- Scope comes from stable authorized identity and has a cross-Scope negative test.
+- PreparedContext remains bounded, transient, and untrusted.
+- Recall, capture, flush, Candidate extraction, and Memory commit remain separate observations.
+- Automatic fail-open claims match actual exception boundaries.
+- Explicit mutation failures and permission denials remain visible.
+- Redirect, schema, size, deadline, stale-turn, no-UI, and flush-lag tests cover every promised behavior.
+- Diagnostics contain no prompt, Scope, context, Source content, response body, or token.
+- Setup preserves foreign files and distinguishes installed, active, Server-ready, and E2E.
+- `doctor` is not reported as real-host E2E.
+- A bundled Skill is not reported as managed Skill export.
+- Unsupported and **Not validated** remain separate.
 
 <Check>
 Do not add a sixth host to the first-class catalog until unit contract, service chain, setup/doctor, real-host E2E, and negative/security tiers have observable evidence.

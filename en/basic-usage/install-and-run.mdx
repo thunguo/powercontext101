@@ -5,6 +5,8 @@ description: "Install the PowerContext CLI and Server, start a model-free local 
 
 Start with the minimum Server. It has no generation or embedding model, but it can already store explicit Memory, run FTS search, and expose the same durable data through HTTP, the Python Client, and MCP.
 
+Keeping the first run model-free is deliberate. It leaves only installation, persistence, Scope, and transport in the debugging path. Add inference after that loop works; otherwise a provider failure can look like a database or integration failure.
+
 ## Prerequisites
 
 The documented installation environment is:

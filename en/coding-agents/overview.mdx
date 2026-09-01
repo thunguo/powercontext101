@@ -25,6 +25,7 @@ All five hosts connect to one separately running PowerContext Server. They share
 
 Setup installs host files or packages. It does not start the Server. `doctor` checks a bounded installation and activation boundary; it is not proof of a live prompt, recall, capture, permission UI, cross-session behavior, or real-host E2E.
 
+When choosing a host, first ask whether you control a pre-prompt event and a transient injection channel, then examine capture and permission behavior. A “yes” in the matrix is not completion. Completion means a new session recalls from the same Scope, an ordinary task continues when the Server is down, and an explicit write reports that outage.
 ## Minimal usage
 
 ```bash
@@ -38,6 +39,7 @@ powercontext doctor <host>
 
 Open a new host session and send one ordinary coding prompt. Use the explicit tool surface only when you intend to search or mutate Memory, create a Handoff, run Review, or export a Skill.
 
+The shared sequence is useful for comparing failure behavior. A prepare failure should remove only the recalled contribution. A capture failure should not erase already validated transient context. Permission belongs to explicit operations and cannot be inferred from a successful automatic hook.
 ## Common execution flow
 
 ```text
@@ -76,6 +78,8 @@ explicit mutation → interactive confirmation; deny without UI
 ```
 
 ## Capability matrix
+
+Choose by lifecycle first, then use the matrix to confirm that the selected adapter has the exact behavior you need.
 
 | Capability | Codex | Claude Code | DSH | OpenCode | Pi |
 |---|---|---|---|---|---|
@@ -149,6 +153,8 @@ Run the checks that apply to the selected host:
 
 ## Choose a host
 
+Use the smallest host surface that completes the task. Broader integration adds more behavior to verify and more content that may cross the Server boundary.
+
 | Need | Read next |
 |---|---|
 | Short `UserPromptSubmit`, MCP, and project Skill | [Codex](/en/coding-agents/codex) or [Claude Code](/en/coding-agents/claude-code) |
@@ -158,16 +164,19 @@ Run the checks that apply to the selected host:
 
 ## Completion checklist
 
-- [ ] The Server runs separately; setup and `doctor` are not presented as E2E evidence.
-- [ ] The host version or compatibility claim matches the maturity table.
-- [ ] One ordinary prompt proves the intended event and transient injection path.
-- [ ] Scope comes from stable authorized identity, with a cross-Scope negative test.
-- [ ] Capture content, secret policy, and character/byte bounds are documented and observed.
-- [ ] Flush and Memory commit are verified as separate stages.
-- [ ] Automatic failures fail open only to the extent current code and tests prove.
-- [ ] Permission and no-UI behavior are tested only for the selected host.
-- [ ] A bundled Skill is not reported as managed Skill export.
-- [ ] Unsupported and **Not validated** remain distinct in deployment notes.
+Treat the integration as complete only when these results are observable:
+
+- The Server runs separately.
+- Setup and `doctor` are not presented as E2E evidence.
+- The host version or compatibility claim matches the maturity table.
+- One ordinary prompt proves the intended event and transient injection path.
+- Scope comes from stable authorized identity, with a cross-Scope negative test.
+- Capture content, secret policy, and character/byte bounds are documented and observed.
+- Flush and Memory commit are verified as separate stages.
+- Automatic failures fail open only to the extent current code and tests prove.
+- Permission and no-UI behavior are tested only for the selected host.
+- A bundled Skill is not reported as managed Skill export.
+- Unsupported and **Not validated** remain distinct in deployment notes.
 
 <Check>
 If the real host has not launched and processed a prompt, report the completed contract, service-chain, or doctor tier. Do not call it real-host E2E.

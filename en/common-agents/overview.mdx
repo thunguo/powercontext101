@@ -40,7 +40,10 @@ powercontext setup select \
 
 `--host` is repeatable. Setup follows catalog order, continues after one selected host fails, and exits nonzero if any selected install fails. It never silently selects every host. Hermes still needs its generic memory-provider wizard afterward; OpenClaw setup selects the memory slot and restarts its Gateway.
 
+Use the comparison table to choose a path, not as a substitute for the host tutorial. Hermes fits work that needs a broader PowerContext surface. OpenClaw exposes only Memory and applies stricter private-session admission. WorkBuddy and Agent Plugin have independent paths; adding either to `setup select` does not create the same automatic behavior.
 ## Hermes or OpenClaw?
+
+The deciding difference is scope, not the number of checkmarks. Hermes exposes more PowerContext operations; OpenClaw narrows the surface to Memory and applies its own session-admission rules.
 
 | Capability | Hermes | OpenClaw |
 |---|---|---|
@@ -96,6 +99,7 @@ These commands answer different questions:
 
 There is also one aggregate-report edge case: `doctor integrations` currently drops Hermes's `command_plugin` result. Use `doctor hermes` when that companion matters.
 
+Installation, activation, and runtime are separate states. A copied plugin can still be inactive; an active plugin can still point at a stopped Server; and a healthy Server says nothing about which Scope the host selected. Diagnose those states in that order, because each has a different repair.
 ## Execution flow
 
 ```mermaid

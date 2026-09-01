@@ -3,7 +3,7 @@ title: "学习路径"
 description: "先建立最小心智模型，再按你的框架或宿主完成一条可验证的路径。"
 icon: route
 keywords:
-  - learning path
+  - learning 路径
   - Source
   - Memory
   - Handoff
@@ -12,12 +12,14 @@ keywords:
 
 第一次使用 PowerContext，不必把整站从头读到尾。先弄清几个对象，再完成一条与你当前工作有关的路径。
 
+第一次不要混着走多条路径。本地 API 闭环、框架适配器和宿主插件验证的是不同问题。先完成其中一条，记录可观察的成功与失败行为；只有任务确实需要时，再进入下一条路径。
+
 <Steps titleSize="h3">
   <Step title="理解对象边界" icon="brain">
     从[心智模型总览](/zh/mental-model/overview)开始，然后读 [Scope](/zh/mental-model/scope) 和 [fail-open](/zh/mental-model/fail-open)。至少要分清 Source、Memory、PreparedContext 和 Handoff。
   </Step>
   <Step title="启动本地 Server" icon="server">
-    按[安装并运行 Server](/zh/basic-usage/install-and-run)完成最小配置。显式 Memory 和 FTS 不需要 inference provider。
+    按[安装并运行 Server](/zh/basic-usage/install-and-run)完成最小配置。显式 Memory 和 FTS 不需要推理模型提供方。
   </Step>
   <Step title="只选一条路径" icon="route">
     根据下面的工作目标继续。先把一个闭环跑通，再回来看其他框架和宿主。
@@ -43,42 +45,42 @@ keywords:
     4. [安装并运行 Server](/zh/basic-usage/install-and-run)
     5. [常用 API 串讲](/zh/basic-usage/api-tour)
 
-    完成标志：你走完第一条闭环——写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
+    完成标志：你走完第一条闭环。先写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
 
     可以先跳过框架、宿主，以及后面的 Source / Handoff 页。
 
     **加长路径（可选，不是完成标志）**
 
-    对象还容易混时，再读 [Source](/zh/mental-model/source)、[Memory](/zh/mental-model/memory)、[Handoff](/zh/mental-model/handoff) 和 [Experience 与 Skill](/zh/mental-model/experience-and-skill)。第一条闭环跑通后，需要时再做 [Source 与 Memory](/zh/basic-usage/source-and-memory)、[Handoff 闭环](/zh/basic-usage/handoff-loop) 和 [Experience / Skill Review](/zh/basic-usage/experience-skill-review)。要用 MCP 客户端连同一套数据，看[用 MCP 连接 Server](/zh/basic-usage/mcp)。要核对同一 Scope 的 active / inactive 统计，看[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。Memory 正文仍通过 Client、HTTP 或 MCP 读取。
+    对象还容易混时，再读 [Source](/zh/mental-model/source)、[Memory](/zh/mental-model/memory)、[Handoff](/zh/mental-model/handoff) 和 [Experience 与 Skill](/zh/mental-model/experience-and-skill)。第一条闭环跑通后，需要时再做 [Source 与 Memory](/zh/basic-usage/source-and-memory)、[Handoff 闭环](/zh/basic-usage/handoff-loop) 和 [Experience / Skill Review](/zh/basic-usage/experience-skill-review)。要用 MCP 客户端连同一套数据，看[用 MCP 连接 Server](/zh/basic-usage/mcp)。要核对同一 Scope 的启用状态 / 停用状态统计，看[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。Memory 正文仍通过客户端、HTTP 或 MCP 读取。
   </Tab>
   <Tab title="我写 Python Agent">
     阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [常用 API 串讲](/zh/basic-usage/api-tour) → [框架集成](/zh/frameworks/overview)。
 
-    先用 Python Client 跑通 `remember_memory`、`search_memory` 和 `prepare_context`，再进入[框架集成总览](/zh/frameworks/overview)。总览下一步是 LangGraph 或 LangChain，不是 Server inference，也不是 Preview adapter。Pydantic AI Agent adapter 目前是 Preview，普通安装路径不可用，不要把它作为第一次接入。
+    先用 Python Client 跑通 `remember_memory`、`search_memory` 和 `prepare_context`，再进入[框架集成总览](/zh/frameworks/overview)。总览下一步是 LangGraph 或 LangChain，不是 Server 推理，也不是预览适配器。Pydantic AI Agent 适配器目前是预览，普通安装路径不可用，不要把它作为第一次接入。
 
-    如果你只需要自动 recall，可以暂时跳过 Handoff 和 Skill。
+    如果你只需要自动召回，可以暂时跳过 Handoff 和 Skill。
 
     **加长路径（可选，不是完成标志）**
 
-    接上 LangGraph 或 LangChain 之后，再看[框架技巧](/zh/frameworks/tricks)。需要 Source 抽取、Handoff 或 Skill 时，走 [Source 与 Memory](/zh/basic-usage/source-and-memory)、[Handoff 闭环](/zh/basic-usage/handoff-loop) 和 [Experience / Skill Review](/zh/basic-usage/experience-skill-review)。Server inference 和 Preview adapter 只在需要时再读。
+    接上 LangGraph 或 LangChain 之后，再看[框架技巧](/zh/frameworks/tricks)。需要 Source 抽取、Handoff 或 Skill 时，走 [Source 与 Memory](/zh/basic-usage/source-and-memory)、[Handoff 闭环](/zh/basic-usage/handoff-loop) 和 [Experience / Skill Review](/zh/basic-usage/experience-skill-review)。Server 推理和预览适配器只在需要时再读。
   </Tab>
   <Tab title="我用 Hermes / OpenClaw">
     阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [通用 Agent 总览](/zh/common-agents/overview) → [Hermes](/zh/common-agents/hermes) 或 [OpenClaw](/zh/common-agents/openclaw)。
 
     完成标志：宿主插件已安装并激活，`powercontext doctor <host>` 通过，而且新会话能召回你显式保存的 Memory。
 
-    Hermes 在 `powercontext setup hermes` 后还要运行 `hermes memory setup` 并选择 PowerContext。OpenClaw 需要确认插件占用了 Memory 插槽。WorkBuddy 使用独立的 `setup workbuddy` 路径。便携 Agent Plugin 没有 setup 命令；加载其软件包目录，并验证显式 MCP 操作。安装、凭证和持久写入仍受你的授权控制。
+    Hermes 在 `powercontext setup hermes` 后还要运行 `hermes memory setup` 并选择 PowerContext。OpenClaw 需要确认插件占用了 Memory 插槽。WorkBuddy 使用独立的 `setup workbuddy` 路径。便携 Agent Plugin 没有安装配置命令；加载其软件包目录，并验证显式 MCP 操作。安装、凭证和持久写入仍受你的授权控制。
 
     **加长路径（可选，不是完成标志）**
 
-    召回跑通后再读 [Handoff](/zh/mental-model/handoff)、[Handoff 闭环](/zh/basic-usage/handoff-loop) 和 [Experience / Skill Review](/zh/basic-usage/experience-skill-review)。[Agent 自扩展](/zh/common-agents/agent-self-extension) 只覆盖 managed Skill export，Hermes / OpenClaw 导不出去，要换 Codex 或 Claude Code。
+    召回跑通后再读 [Handoff](/zh/mental-model/handoff)、[Handoff 闭环](/zh/basic-usage/handoff-loop) 和 [Experience / Skill Review](/zh/basic-usage/experience-skill-review)。[Agent 自扩展](/zh/common-agents/agent-self-extension) 只覆盖托管 Skill 导出，Hermes / OpenClaw 导不出去，要换 Codex 或 Claude Code。
   </Tab>
   <Tab title="我用编程 Agent">
     阅读顺序：心智模型 → [安装并运行 Server](/zh/basic-usage/install-and-run) → [编程 Agent 总览](/zh/coding-agents/overview) → 对应宿主页。
 
-    选择 Codex、Claude Code、DSH、OpenCode 或 Pi。它们连接同一个 Server，但 Hook 事件、注入位置、capture、flush 和权限确认并不相同。
+    选择 Codex、Claude Code、DSH、OpenCode 或 Pi。它们连接同一个 Server，但 Hook 事件、注入位置、采集、刷新和权限确认并不相同。
 
-    完成标志：自动 recall 失败时普通编码任务仍能继续；显式 Memory 或 Handoff 操作失败时，宿主会把错误告诉你。
+    完成标志：自动召回失败时普通编码任务仍能继续；显式 Memory 或 Handoff 操作失败时，宿主会把错误告诉你。
 
     **加长路径（可选，不是完成标志）**
 
@@ -87,13 +89,13 @@ keywords:
   <Tab title="我在写新集成">
     先完成 [Hook 与插件](/zh/coding-agents/hooks-and-plugins)，再比较至少两个现有宿主，最后阅读[扩展 Hook](/zh/coding-agents/extend-hooks)。
 
-    你的产物不是一段能调用 `/v1/context/prepare` 的代码，而是一份可验证的 适配器契约：Scope、临时注入、Source capture、权限、诊断、安装和 real-host E2E 都有明确行为。
+    你的产物不是一段能调用 `/v1/context/prepare` 的代码，而是一份可验证的适配器契约：Scope、临时注入、Source 采集、权限、诊断、安装和真实宿主端到端验证都有明确行为。
 
-    Basic Usage 的 Handoff 和 Skill 教程可以等到 adapter 的 recall/capture 主链稳定后再补。
+    Basic Usage 的 Handoff 和 Skill 教程可以等到适配器的召回/采集主链稳定后再补。
 
     **加长路径（可选，不是完成标志）**
 
-    主链稳定后再补 [Source 与 Memory](/zh/basic-usage/source-and-memory)、[Handoff 闭环](/zh/basic-usage/handoff-loop)、[Experience / Skill Review](/zh/basic-usage/experience-skill-review) 和[框架技巧](/zh/frameworks/tricks)。对象页 [Source](/zh/mental-model/source)、[Memory](/zh/mental-model/memory)、[Handoff](/zh/mental-model/handoff)、[Experience 与 Skill](/zh/mental-model/experience-and-skill) 用来对照合同，不是立项门槛。
+    主链稳定后再补 [Source 与 Memory](/zh/basic-usage/source-and-memory)、[Handoff 闭环](/zh/basic-usage/handoff-loop)、[Experience / Skill Review](/zh/basic-usage/experience-skill-review) 和[框架技巧](/zh/frameworks/tricks)。对象页 [Source](/zh/mental-model/source)、[Memory](/zh/mental-model/memory)、[Handoff](/zh/mental-model/handoff)、[Experience 与 Skill](/zh/mental-model/experience-and-skill) 用来对照契约，不是立项门槛。
   </Tab>
 </Tabs>
 
@@ -105,8 +107,8 @@ keywords:
 
 1. 在固定 Scope 中显式保存答案。
 2. 换一个请求或新会话提问。
-3. 检查召回内容是否带 Citation，并确认它只按该 adapter 的约定进入当前模型输入；是否持久化 message history 由宿主和应用决定。
-4. 停止 Server 后再问一次。自动 recall 可以失败，但原任务应继续。
+3. 检查召回内容是否带 Citation，并确认它只按该适配器的约定进入当前模型输入；是否持久化消息历史内容由宿主和应用决定。
+4. 停止 Server 后再问一次。自动召回可以失败，但原任务应继续。
 5. 尝试一次显式写入。它必须明确失败，不能假装保存成功。
 
 Hermes、OpenClaw 和五个编程宿主页各自用该宿主的工具重写了这 5 步。选一条路径后，在对应页上逐步做完，不要只在这里打勾。
@@ -114,7 +116,7 @@ Hermes、OpenClaw 和五个编程宿主页各自用该宿主的工具重写了�
 症状对不上时，先看[排错](/zh/start/troubleshooting)。
 
 <Info>
-Bub 目前主要由 integration 目录里的 README 说明，101 不为它单独维护路径。它也不在官方 12 个 configure how-to 里。
+Bub 目前主要由集成目录里的 README 说明，101 不为它单独维护路径。它也不在官方 12 个 configure 操作指南 里。
 </Info>
 
 ## 下一步

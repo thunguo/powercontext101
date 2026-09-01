@@ -4,7 +4,7 @@ description: "Install the UserPromptSubmit + MCP + Skill plugin, then work withi
 ---
 
 <Note>
-This page documents the v1 integration. Claude Code 2.1.133 is tested compatibility evidence, not a declared minimum version. Explicit denial of a durable mutation when no permission UI is available is **Not validated**.
+The v1 integration is documented here. Claude Code 2.1.133 is tested compatibility evidence, not a declared minimum version. Explicit denial of a durable mutation when no permission UI is available is **Not validated**.
 </Note>
 
 ## Maturity and installation
@@ -103,7 +103,6 @@ Run these before treating the integration as complete:
 - Let Handoff preparation succeed and commit fail; report the boundary Source and the missing durable milestone.
 - Request a preview and confirm no PowerContext write occurs.
 
-
 ## Configuration defaults
 
 Non-secret options can be set during setup or overridden for one launch:
@@ -147,7 +146,6 @@ export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
 claude
 ```
 
-
 ## Finish the shared check on this host
 
 > What should happen after the OpenAPI contract changes?
@@ -160,14 +158,19 @@ claude
 
 ## Completion checklist
 
-- [ ] `powercontext doctor claude-code` reports plugin installation/enabled state; separate `powercontext doctor` checks Server liveness/readiness.
-- [ ] `/hooks` shows only the v1 `UserPromptSubmit` automatic path.
-- [ ] `/mcp` shows the PowerContext Server connected without exposing credentials.
-- [ ] Ordinary prompts receive valid `additionalContext` when recall succeeds.
-- [ ] Prompt Source exists; assistant final response and automatic Task Outcome do not.
-- [ ] Claude Code and Codex resolve the same repository or Workstream Scope.
-- [ ] Preview produces no write; an imperative Handoff returns an exact committed Revision.
-- [ ] Server and explicit MCP write failures remain distinguishable.
-- [ ] Unsupported and **Not validated** claims above remain visible in release notes and tests.
+Treat the integration as complete only when these results are observable:
+
+- `powercontext doctor claude-code` reports plugin installation/enabled state.
+- Separate `powercontext doctor` checks Server liveness/readiness.
+- `/hooks` shows only the v1 `UserPromptSubmit` automatic path.
+- `/mcp` shows the PowerContext Server connected without exposing credentials.
+- Ordinary prompts receive valid `additionalContext` when recall succeeds.
+- Prompt Source exists.
+- Assistant final response and automatic Task Outcome do not.
+- Claude Code and Codex resolve the same repository or Workstream Scope.
+- Preview produces no write.
+- An imperative Handoff returns an exact committed Revision.
+- Server and explicit MCP write failures remain distinguishable.
+- Unsupported and **Not validated** claims above remain visible in release notes and tests.
 
 Continue with [DeepSeek Harness](/en/coding-agents/dsh).

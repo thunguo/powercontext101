@@ -1,6 +1,6 @@
 ---
 title: "Handoff"
-description: "Handoff 把当前工作整理成可检查的交接包；commit 只在需要持久里程碑时发生。"
+description: "Handoff 把当前工作整理成可检查的交接包；提交只在需要持久里程碑时发生。"
 ---
 
 Memory 保存以后仍要知道的项目知识。Handoff 处理正在进行的工作：目标是什么，已经验证了什么，哪里卡住，接手者下一步做什么。
@@ -9,10 +9,12 @@ Memory 保存以后仍要知道的项目知识。Handoff 处理正在进行的�
 
 ## 先选 Memory 还是 Handoff
 
+先看谁需要这些信息。Memory 保存可复用知识；Handoff 保存另一位执行者继续当前任务所需的状态。
+
 | 你要保存的内容 | 选择 |
 |---|---|
-| “运行 契约测试 前先重新生成 client” | Memory |
-| “client 已生成，但 tests 尚未运行，下一步执行命令 X” | Handoff |
+| “运行契约测试前先重新生成客户端” | Memory |
+| “客户端已生成，但测试尚未运行，下一步执行命令 X” | Handoff |
 | “项目只支持 Python 3.11+” | Memory |
 | “这个会话已修改文件 A/B，文件 C 仍待检查” | Handoff |
 
@@ -20,9 +22,9 @@ Memory 保存以后仍要知道的项目知识。Handoff 处理正在进行的�
 
 ## 两层 API
 
-PowerContext 有低层 Handoff lifecycle，也有高层 Work continuity loop。
+PowerContext 有低层 Handoff 生命周期，也有高层 Work 连续性循环。
 
-### 低层 lifecycle
+### 低层生命周期
 
 ```text
 PrepareHandoff
@@ -34,7 +36,7 @@ PrepareHandoff
 → committed Handoff Revision
 ```
 
-### 高层 work loop
+### 高层工作循环
 
 ```text
 Work Contract
@@ -47,96 +49,96 @@ Work Contract
 → Work continuity projection
 ```
 
-高层操作把 工作契约、boundary、receipt 和 outcome 保存为 Source records，并复用低层 Handoff 模型。
+高层操作把工作契约（Work Contract）、边界、回执和 Task Outcome 保存为 Source 记录，并复用低层 Handoff 模型。
 
-## Prepared Handoff 先于 commit
+## 已准备 Handoff 先于提交
 
-`finalize` 把 draft 变成 `PreparedHandoff`。它会验证内容和 direct evidence，并读取当前 Handoff head，设置 `base`：
+`finalize` 把 draft 变成 `PreparedHandoff`。它会验证内容和直接证据，并读取当前 Handoff 头版本，设置 `base`：
 
-- 当前没有 head：`base=None`；
-- 已经有 committed head：`base` 是当前 exact Handoff ref。
+- 当前没有头版本：`base=None`；
+- 已经有已提交头版本：`base` 是当前精确 Handoff 版本引用。
 
 这一步不写 Handoff Artifact。
 
-Prepared Handoff 可以序列化并交给另一个进程或会话。接手者可以直接从它 continue。只要调用方保留这个值，Server 重启并不会使它失效；但没有 commit，它不会成为 `latest`。
+已准备 Handoff 可以序列化并交给另一个进程或会话。接手者可以直接从它继续。只要调用方保留这个值，Server 重启并不会使它失效；但没有提交，它不会成为 `latest`。
 
 <Note>
-`handoff_current_work` 也不会自动 commit。不过它会 capture 一条 Handoff boundary Source，所以它不是零写入的 preview API。
+`handoff_current_work` 也不会自动提交。不过它会采集一条 Handoff 边界 Source，所以它不是零写入的预览 API。
 </Note>
 
-## Commit 保存里程碑
+## 提交保存里程碑
 
-只有用户明确需要 durable milestone 时才 commit。
+只有用户明确需要持久里程碑时才提交。
 
-commit 会检查：
+提交会检查：
 
-1. Prepared Handoff 的 Scope 与请求一致；
-2. `base` 仍然等于当前 head；
-3. 内容和 lineage 合法。
+1. 已准备 Handoff 的 Scope 与请求一致；
+2. `base` 仍然等于当前头版本；
+3. 内容和证据链合法。
 
-第一次 commit 创建 Revision 1。以后同一 lifecycle 的里程碑创建下一 Revision。
+第一次提交创建 Revision 1。以后同一生命周期的里程碑创建下一 Revision。
 
-对同一 Prepared Handoff 重试相同内容是幂等的，会返回当前 Revision，而不是重复新增。
+对同一已准备 Handoff 重试相同内容是幂等的，会返回当前 Revision，而不是重复新增。
 
-### Stale base
+### 过期基础
 
-两个 worker 可以从同一个 base 准备不同 Handoff。第一个 commit 后，第二个的 base 已经过期，应返回 Revision conflict。调用者需要读取新 head，检查变化，再重新 prepare。
+两个 工作进程 可以从同一个基础准备不同 Handoff。第一个提交后，第二个的基础已经过期，应返回 Revision 冲突。调用者需要读取新头版本，检查变化，再重新准备。
 
-不要把 conflict 处理成“把 revision 加一再试”。
+不要把冲突处理成“把 Revision 加一再试”。
 
-## Continue 有三种选择
+## 继续有三种选择
 
-| selection | 读取什么 | selected Revision |
+| 选择方式 | 读取什么 | 已选择 Revision |
 |---|---|---|
-| `prepared` | 调用方携带的 Prepared Handoff | 无 committed Revision |
-| `exact` | 指定 historical Revision | 指定 Revision，同时返回 current |
-| `latest` | 当前 committed head | selected 等于 current |
+| `prepared` | 调用方携带的已准备 Handoff | 无已提交 Revision |
+| `exact` | 指定历史 Revision | 指定 Revision，同时返回当前 |
+| `latest` | 当前已提交头版本 | 已选择等于当前 |
 
-所有 Handoff resolution 都是 `untrusted_history`。它会列出 state、next action、Citation 和无法读取的 evidence，但不会证明这些内容仍然新鲜。
+所有 Handoff 解析结果 都是 `untrusted_history`。它会列出状态、next 动作、Citation 和无法读取的证据，但不会证明这些内容仍然新鲜。
 
 接手者应检查：
 
-- referenced files 和 Source 是否仍可读；
-- live workspace 是否符合描述；
-- 自己是否具备所需 capability；
+- 引用式 文件和 Source 是否仍可读；
+- 实时工作区是否符合描述；
+- 自己是否具备所需能力；
 - 当前用户是否授权它继续。
 
-## Acknowledgement 绑定精确目标
+## 确认绑定精确目标
 
-接手者从 `latest` 发现 Handoff 后，应取返回的 exact selected Revision，再用 exact selection acknowledgement。
+接手者从 `latest` 发现 Handoff 后，应取返回的精确已选择 Revision，再用精确选择方式确认。
 
-accepted acknowledgement 要求：
+接受确认要求：
 
-- evidence 都 available；
-- live state confirmed；
-- capability confirmed；
-- authorization confirmed；
-- selection 是 `prepared` 或 `exact`，不是 `latest`。
+- 证据都 可用；
+- 实时状态已确认；
+- 能力已确认；
+- 授权信息已确认；
+- 选择方式是 `prepared` 或 `exact`，不是 `latest`。
 
-如果任何检查没通过，结果应该是 needs clarification、declined 或其他真实状态，不能为了闭环好看就写 accepted。
+如果任何检查没通过，结果应该是 needs clarification、declined 或其他真实状态，不能为了闭环好看就写接受。
 
-Acknowledgement 也不授予权限。它只是记录接手者检查了什么，以及是否愿意继续。
+确认也不授予权限。它只是记录接手者检查了什么，以及是否愿意继续。
 
 ## Task Outcome 关闭工作循环
 
-Task Outcome 记录整体结果，合法状态包括 `succeeded`、`partial`、`blocked`、`failed`、`cancelled` 和 `unknown`。单项检查的 `skipped` 或 `timed_out` 属于 TaskCheck，不是 Task Outcome status。两层都应原样保存真实状态。
+Task Outcome 记录整体结果，合法状态包括 `succeeded`、`partial`、`blocked`、`failed`、`cancelled` 和 `unknown`。单项检查的 `skipped` 或 `timed_out` 属于 TaskCheck，不是 Task Outcome 状态。两层都应原样保存真实状态。
 
-要让一个 committed Handoff 显示为 covered，Outcome 必须：
+要让一个已提交 Handoff 显示为 covered，结果必须：
 
-1. 链接一个 accepted acknowledgement receipt；
-2. receipt 绑定 exact committed Handoff Revision；
-3. Outcome 在 receipt 之后出现；
+1. 链接一个接受确认回执；
+2. 回执绑定精确已提交 Handoff Revision；
+3. 结果在回执之后出现；
 4. 位于同一 Scope。
 
-同 Scope 下随便一条 Outcome 不会自动覆盖 Handoff。
+同 Scope 下随便一条结果不会自动覆盖 Handoff。
 
-## Handoff Report 是投影
+## Handoff 报告是投影
 
-Work continuity 和 Handoff Report 从 Source journal 与 committed Handoff history 生成视图。它们不会改写底层 Source、Handoff 或 Outcome。
+Work 连续性和 Handoff 报告从 Source 日志与已提交 Handoff 历史内容生成视图。它们不会改写底层 Source、Handoff 或结果。
 
-Projection 读取 malformed work Source 时会 fail-soft：无效记录计入 `invalid_record_count`，其余有效历史仍可展示。
+投影 读取 格式错误的 工作 Source 时会 软失败：无效记录计入 `invalid_record_count`，其余有效历史仍可展示。
 
-当前 work continuity 最多投影最近 64 个有效事件，同时保留 total 和 truncated 信息。这是展示上限，不是 journal 数据删除。
+当前工作连续性最多投影最近 64 个有效事件，同时保留总数和 truncated 信息。这是展示上限，不是日志数据删除。
 
 ## 用 OpenAPI 案例走一遍
 
@@ -156,17 +158,17 @@ Disposition: continuable
 Next action: run contract tests
 ```
 
-每条 state 和 next action 都引用 exact Source 或 Artifact evidence。
+每条状态和 next 动作都引用精确 Source 或 Artifact 证据。
 
 ### 3. 临时交接
 
-`handoff_current_work` 返回 Prepared Handoff。先把它交给接手者 continue，不 commit。
+`handoff_current_work` 返回已准备 Handoff。先把它交给接手者继续，不提交。
 
 检查：`latest` 仍然为空。这是预期行为。
 
 ### 4. 持久里程碑
 
-用户要求保留后，commit Prepared Handoff：
+用户要求保留后，提交已准备 Handoff：
 
 ```text
 handoff/HANDOFF_ID@1
@@ -174,19 +176,19 @@ handoff/HANDOFF_ID@1
 
 ### 5. 接手与确认
 
-接手者 `continue latest`，检查返回的 exact `@1`，再 acknowledgement exact `@1`。
+接手者 `continue latest`，检查返回的精确 `@1`，再确认精确 `@1`。
 
-### 6. Outcome
+### 6. 结果
 
-契约测试 运行后记录 Task Outcome，并引用 acknowledgement receipt SourceRef。Work continuity 应显示 transfer accepted、outcome covered。
+契约测试运行后记录 Task Outcome，并引用确认回执 SourceRef。Work 连续性应显示 transfer 接受、outcome covered。
 
 ## 失败不会总是原子回滚
 
-高层 work loop 跨越多个持久操作。`handoff_current_work` 先 capture boundary Source，再返回 Prepared Handoff。后续 commit 失败时：
+高层工作循环跨越多个持久操作。`handoff_current_work` 先采集边界 Source，再返回已准备 Handoff。后续提交失败时：
 
-- boundary Source 仍存在；
-- 没有新的 committed Handoff Revision；
-- continuity 可以看到边界事件，但不能把它当成 durable milestone。
+- 边界 Source 仍存在；
+- 没有新的已提交 Handoff Revision；
+- 连续性可以看到边界事件，但不能把它当成持久里程碑。
 
 文档和调用方都要报告这个实际状态。
 
@@ -194,27 +196,27 @@ handoff/HANDOFF_ID@1
 
 <AccordionGroup>
   <Accordion title="为什么 Handoff Report 里没有刚才的 Prepared Handoff？">
-    Report 面向 committed history。Prepared Handoff 没有 commit，不是 durable milestone。
+    报告面向已提交历史内容。已准备 Handoff 没有提交，不是持久里程碑。
   </Accordion>
-  <Accordion title="我从 latest 读取了 Handoff，为什么不能直接 acknowledge latest？">
-    latest 会随 head 变化。先读取它选中的 exact Revision，再把 acknowledgement 绑定到那个不可变目标。
+  <Accordion title="我从最新版本读取了 Handoff，为什么不能直接 acknowledge 最新版本？">
+    最新版本会随头版本变化。先读取它选中的精确 Revision，再把确认绑定到那个不可变目标。
   </Accordion>
-  <Accordion title="Evidence 都能读取，为什么还不能 accepted？">
-    可读不等于当前仍正确，也不证明接手者有能力或授权。accepted 还需要 live state、capability 和 authorization checks。
+  <Accordion title="证据都能读取，为什么还不能 accepted？">
+    可读不等于当前仍正确，也不证明接手者有能力或授权。接受还需要实时状态、能力和授权信息 检查。
   </Accordion>
-  <Accordion title="Commit 冲突后可以复用旧 Prepared Handoff 吗？">
-    先读取新 head。旧 base 已失效，直接重试会继续冲突。
+  <Accordion title="提交冲突后可以复用旧 Prepared Handoff 吗？">
+    先读取新头版本。旧基础已失效，直接重试会继续冲突。
   </Accordion>
 </AccordionGroup>
 
 ## 检查清单
 
 - Memory 与 Handoff 是否按“长期知识”和“当前任务状态”分开？
-- Prepared 与 committed 是否分开？
-- `handoff_current_work` 的 boundary Source 写入是否被说明？
-- latest discovery 是否转换成 exact acknowledgement？
-- receiver checks 是否包含 evidence、live state、capability、authorization？
-- Outcome 是否链接 accepted receipt？
-- Report 是否仍然只是投影？
+- 已准备与已提交是否分开？
+- `handoff_current_work` 的边界 Source 写入是否被说明？
+- 最新版本发现是否转换成精确确认？
+- 接收方检查是否包含证据、实时状态、能力、授权信息？
+- 结果是否链接接受回执？
+- 报告是否仍然只是投影？
 
-下一页是 [Experience 与 Skill](/zh/mental-model/experience-and-skill)。工作完成后，可以从 exact evidence 提炼可复用判断，但仍要经过 Review。
+下一页是 [Experience 与 Skill](/zh/mental-model/experience-and-skill)。工作完成后，可以从精确证据提炼可复用判断，但仍要经过 Review。

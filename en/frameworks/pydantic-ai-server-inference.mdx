@@ -6,7 +6,7 @@ description: "Configure the Server's independent generation and embedding provid
 Pydantic AI is used here inside the PowerContext Server. It supplies schema-bound generation and an independent embedding provider. It does not install the [Pydantic AI Agent adapter](/en/frameworks/pydantic-ai), add tools to an Agent, or share that adapter's lifecycle.
 
 <Note>
-Status: available in the built-in runtime at the upstream revision used for this guide. Install `powercontext[builtin]` for in-process composition or `powercontext[server]` for the Server. Python 3.11 or later is required. Calls to real providers, credentials, and production latency were not validated for this page.
+Status: available in the built-in runtime at the upstream revision used for this documentation. Install `powercontext[builtin]` for in-process composition or `powercontext[server]` for the Server. Python 3.11 or later is required. Calls to real providers, credentials, and production latency were not validated in this verification.
 </Note>
 
 ## Choose one of four runtime states
@@ -27,14 +27,15 @@ Generation does not enable the Scheduler. You may call `flush_memory` manually, 
 Install one of the supported roles. This pin is the same commit as the [LangGraph](/en/frameworks/langgraph) and [LangChain](/en/frameworks/langchain) pages, written as a full hash:
 
 ```bash
-uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
-uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
+uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
+uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
 ```
 
-The Server settings use Pydantic AI model strings. Provider-specific environment variables, such as credentials and base URLs, are read by the selected provider.
+The Server settings use Pydantic AI model strings. Provider-specific environment variables, such as credentials and base URLs, are read by the selected provider. `POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL_SETTINGS` accepts a JSON object shared by generation pipelines, reranking, and the readiness probe. Put provider request fields under `extra_body`; keep credentials and static headers in provider configuration. Non-empty settings without a generation model, or settings containing `extra_headers`, fail configuration validation.
 
 ```bash
 export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL="openai:gpt-5.2"
+export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL_SETTINGS='{}'
 export POWERCONTEXT_SERVER_INFERENCE_GENERATION_TIMEOUT_SECONDS="30"
 export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MAX_REQUESTS="2"
 
@@ -51,7 +52,7 @@ uv run powercontext server run
 `EMBEDDING_MODEL`, `EMBEDDING_PROFILE_ID`, and `EMBEDDING_DIMENSION` are all-or-none. Partial configuration is rejected before startup. The profile is part of the persisted vector contract, so choose its ID, dimension, and normalization deliberately rather than changing them in place.
 
 <Warning>
-A model string is configuration, not evidence that a provider works. Readiness sends a small live request, but this page does not certify a provider account, credential, quota, regional endpoint, model dimension, or acceptable latency.
+A model string is configuration, not evidence that a provider works. Readiness sends a small live request, but the documented check does not certify a provider account, credential, quota, regional endpoint, model dimension, or acceptable latency.
 </Warning>
 
 ## Use the structured generator directly
@@ -116,6 +117,8 @@ Generation and embedding do not fall back to each other, and there is no cross-p
 
 ## Understand search and write failures
 
+A provider outage affects only the paths that depend on that provider. The table separates those paths from durable state that remains authoritative in storage.
+
 | Path | Provider failure behavior | Authoritative data |
 |---|---|---|
 | Search with `mode="auto"` | A temporary query-embedding failure may fall back to FTS when FTS is supported | No durable state changes |
@@ -156,7 +159,7 @@ Scope still selects PowerContext data. It does not stop selected content from le
 | Generation-to-embedding failover or cross-provider failover | **Unsupported** |
 | Silent fallback for explicit vector or hybrid search | **Unsupported** |
 | Schema validation as a substitute for domain invariants or Review | **Unsupported** |
-| Real provider credentials, quotas, regional endpoints, and latency | **Not validated** for this page |
+| Real provider credentials, quotas, regional endpoints, and latency | **Not validated** in this verification |
 | Automatic Scheduler activation from generation configuration | **Unsupported**; configure scheduling separately |
 
 ## Completion check

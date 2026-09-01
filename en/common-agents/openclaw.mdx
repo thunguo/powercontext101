@@ -39,6 +39,8 @@ powercontext setup openclaw \
 
 ## Runtime defaults
 
+Run once with defaults before changing them. This gives you a known local baseline for separating host configuration from Server or authentication failures.
+
 | Key | Default | Meaning |
 |---|---:|---|
 | `endpoint` | written by setup | PowerContext Server URL |
@@ -53,6 +55,8 @@ powercontext setup openclaw \
 CLI setup rejects endpoint credentials, query strings, and fragments. Manual plugin configuration is less strict, so use the setup command or apply the same operator checks yourself.
 
 ## Exactly five tools
+
+OpenClaw exposes this exact Memory subset. If the task needs Handoff, Review, Experience, or Skill, choose another integration instead of trying to infer hidden tools.
 
 | Tool | Operation |
 |---|---|
@@ -185,7 +189,7 @@ flowchart TD
   F -->|no| W[Leave Source pending]
 ```
 
-Lifecycle recall, capture, and Flush fail open. Explicit tool failures return structured unavailable, rejected, or conflict results. Unlike Hermes, the OpenClaw HTTP client uses standard `fetch()` behavior; this page does not claim that redirects are refused.
+Lifecycle recall, capture, and Flush fail open. Explicit tool failures return structured unavailable, rejected, or conflict results. Unlike Hermes, the OpenClaw HTTP client uses standard `fetch()` behavior; the documented behavior does not claim that redirects are refused.
 
 ## Negative paths to test
 
@@ -205,7 +209,7 @@ Lifecycle recall, capture, and Flush fail open. Explicit tool failures return st
 - Setup is not transactional; a late failure may leave partial host changes.
 - Reusing a cached checkout for a mutable ref may not fetch its latest commit.
 - Doctor is an installation check, not a Server or runtime E2E test.
-- A real OpenClaw host-process E2E is **Not validated** by this page.
+- A real OpenClaw host-process E2E is **Not validated** here.
 
 ## Finish the shared check on this host
 

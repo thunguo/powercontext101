@@ -1,11 +1,13 @@
 ---
 title: "Experience 与 Skill"
-description: "Experience 和 managed Skill 先作为 Candidate 进入 Review；批准、导出和执行是不同步骤。"
+description: "Experience 和托管 Skill 先作为 Candidate 进入 Review；批准、导出和执行是不同步骤。"
 ---
 
 任务完成后，通常能提炼出两类东西：下次遇到类似情况时该怎么判断，以及可以交给 Agent 重复执行的做法。
 
-PowerContext 把前者保存为 Experience，把后者保存为 managed Skill。两者都不能从模型输出直接变成 approved Artifact。
+PowerContext 把前者保存为 Experience，把后者保存为托管 Skill。两者都不能从模型输出直接变成已批准 Artifact。
+
+两类对象的 Review 问题不同。审核 Experience 时，要判断经验结论能否由引用的结果支持，以及它是否适用于相似情形；审核 Skill 时，要检查另一位 Agent 能否安全执行步骤，包括验证方法和权限边界。
 
 ## Experience 与 Skill 的区别
 
@@ -29,20 +31,20 @@ Outcome: the generated transport matched the contract
 Lesson: inspect generated drift before running contract tests
 ```
 
-它的用途是帮助后续请求在相似情境中做判断。approved current Experience 可以作为 cited evidence 进入 PreparedContext。
+它的用途是帮助后续请求在相似情境中做判断。已批准当前 Experience 可以作为 cited 证据进入 PreparedContext。
 
 ### Skill 保存操作指导
 
-Managed Skill 包含：
+托管 Skill 包含：
 
-- name；
+- 名称；
 - description，供宿主判断何时发现它；
-- instructions；
-- validation checks。
+- 指令；
+- 校验 检查。
 
-Skill 不是普通 Memory。它不会进入 PreparedContext，也不会因为 approval 就出现在 Agent 的 Skill 目录。
+Skill 不是普通 Memory。它不会进入 PreparedContext，也不会因为批准就出现在 Agent 的 Skill 目录。
 
-## 共同的 Candidate lifecycle
+## 共同的 Candidate 生命周期
 
 ```mermaid
 flowchart LR
@@ -61,96 +63,96 @@ flowchart LR
   R -->|reject| X
 ```
 
-Candidate 有自己的 lifecycle：
+Candidate 有自己的生命周期：
 
-- `pending`：可以 inspect、revise、approve 或 reject；
+- `pending`：可以 inspect、修订、批准或拒绝；
 - `approved`：终态，必须有 `result_artifact`；
 - `rejected`：终态，必须有拒绝原因，不产生结果 Artifact。
 
-所有 Candidate 至少要引用一条 exact Source 或 Artifact evidence。Source 与 Artifact refs 合计当前最多 32 条。
+所有 Candidate 至少要引用一条精确 Source 或 Artifact 证据。Source 与 Artifact 引用合计当前最多 32 条。
 
-## Propose 与 generate
+## Propose 与生成
 
-### Typed propose
+### 类型化提案
 
-你已经知道内容时，可以直接提交结构化 proposal：
+你已经知道内容时，可以直接提交结构化提案：
 
 - `propose_experience`
 - `propose_skill`
 
-这条路径不需要 generation model。结果仍然是 pending Candidate。
+这条路径不需要生成模型。结果仍然是待处理 Candidate。
 
-### Model-backed generate
+### 模型驱动生成
 
-模型可以基于 bounded evidence 生成 Candidate：
+模型可以基于有界证据生成 Candidate：
 
 - `generate_experience`
 - `generate_skill`
 
-generation 可能返回 pending Candidate，也可能返回明确 no-op。没有 generation provider 时，operation 在持久化 Candidate 前失败。
+生成可能返回待处理 Candidate，也可能返回明确无变更。没有生成模型提供方时，操作在持久化 Candidate 前失败。
 
-无论模型写得多好，都不会自动 approve。
+无论模型写得多好，都不会自动批准。
 
-## Candidate version 不是 Artifact Revision
+## Candidate 版本不是 Artifact Revision
 
-每次 revise 会创建 Candidate 的新 proposal version。Review write 必须提供 `expected_version`，确保决定的是刚才检查过的版本。
+每次修订会创建 Candidate 的新提案版本。Review 写入必须提供 `expected_version`，确保决定的是刚才检查过的版本。
 
-假设 reviewer 读取 Candidate v1，另一个人先 revise 到 v2：
+假设审核者读取 Candidate v1，另一个人先修订到 v2：
 
 ```text
 approve(expected_version=1) → conflict
 ```
 
-正确处理方式是重新读取 v2，比较完整 proposal，再决定 approve 或 reject。不要把 expected version 机械加一。
+正确处理方式是重新读取 v2，比较完整提案，再决定批准或拒绝。不要把预期版本机械加一。
 
-revise 是完整 replacement，不是 patch。这样每个 proposal version 都可以独立审计。
+修订是完整替换内容，不是 局部更新。这样每个提案版本都可以独立审计。
 
-## Approval 是一笔事务
+## 批准是一笔事务
 
-approve 会在一个数据库 transaction 中：
+批准会在一个数据库 事务 中：
 
-1. lock 当前 pending Candidate；
-2. 验证 `expected_version` 和 lineage；
+1. 锁当前待处理 Candidate；
+2. 验证 `expected_version` 和证据链；
 3. 创建或修订 Artifact；
-4. 对 Experience 更新 approved-head search projection；
-5. 把 Candidate 标为 approved，并记录 exact `result_artifact`。
+4. 对 Experience 更新 approved-head 搜索投影；
+5. 把 Candidate 标为已批准，并记录精确 `result_artifact`。
 
-最后一步失败时，Artifact commit 也回滚，不会留下“Artifact 已创建但 Candidate 仍 pending”的半个结果。
+最后一步失败时，Artifact 提交也回滚，不会留下“Artifact 已创建但 Candidate 仍待处理”的半个结果。
 
-reject 不创建 Artifact。它只记录 terminal decision 和 reason。
+拒绝不创建 Artifact。它只记录终态决定和 reason。
 
 <Warning>
-“人工 Review”是产品治理合同，不是身份认证机制。Server 无法证明 API 调用者在生物意义上是人。部署方仍要通过 auth、host permission 和流程控制决定谁能调用 approve/reject。
+“人工 Review”是产品治理契约，不是身份认证机制。Server 无法证明 API 调用者在生物意义上是人。部署方仍要通过认证、宿主权限和流程控制决定谁能调用批准/拒绝。
 </Warning>
 
 ## Experience 怎样进入召回
 
 只有同时满足下面条件的 Experience 才能进入 PreparedContext：
 
-- Candidate 已 approve；
-- 它是该 Experience artifact 的 current head；
+- Candidate 已批准；
+- 它是该 Experience Artifact 的当前头版本；
 - 与请求使用同一 Scope；
-- search 和 PreparedContext builder 认为它与 query 相关。
+- 搜索和 PreparedContext 构建器 认为它与查询相关。
 
-pending、rejected 和 historical Experience Revisions 都不会自动进入 recall。
+待处理、已拒绝和历史 Experience Revisions 都不会自动进入召回。
 
-所以，approve 一个 replacement Experience 后，旧 Revision 仍可 exact read，但默认召回只看新 head。
+所以，批准一个替换内容 Experience 后，旧 Revision 仍可精确读取，但默认召回只看新头版本。
 
-## Skill 的 provenance
+## Skill 的来源信息
 
-Model-backed Skill generation 有三类 origin：
+模型驱动 Skill 生成有三类 来源：
 
-| origin | 直接 evidence |
+| 来源 | 直接证据 |
 |---|---|
-| `experience` | 一个或多个 approved Experience Revision，可附加 Source |
-| `source` | 一个或多个 exact Source；`artifact_refs` 必须为空 |
-| `usage` | exact target Skill Revision，加至少一条 Source；reviewer 负责确认 Source 是否真的记录了使用情况 |
+| `experience` | 一个或多个已批准 Experience Revision，可附加 Source |
+| `source` | 一个或多个精确 Source；`artifact_refs` 必须为空 |
+| `usage` | 精确目标 Skill Revision，加至少一条 Source；审核者负责确认 Source 是否真的记录了使用情况 |
 
-新 managed Skill approval 对 lineage 有额外限制：Artifact evidence 应来自 Experience，而不是另一个 Skill。
+新托管 Skill 批准对证据链有额外限制：Artifact 证据应来自 Experience，而不是另一个 Skill。
 
-Skill replacement 必须包含 target Skill，并至少带一条 bounded Source。Server 校验引用形状，不判断 Source 文本是否真的证明了使用效果；这项判断留给 reviewer。模型不能只看旧 Skill 文本就自我改写成下一版。
+Skill 替换内容必须包含目标 Skill，并至少带一条有界 Source。Server 只校验引用形状，不判断 Source 文本能否支持关于使用效果的结论；这项判断留给审核者。模型不能只看旧 Skill 文本就自我改写成下一版。
 
-## Approval、export、execution
+## 批准、导出、执行
 
 这三个动作必须分开：
 
@@ -162,9 +164,9 @@ approve Candidate
 → host/user decides whether to execute
 ```
 
-### Approval
+### 批准
 
-创建 exact Skill Revision，例如：
+创建精确 Skill Revision，例如：
 
 ```text
 skill/SKILL_ID@1
@@ -172,35 +174,35 @@ skill/SKILL_ID@1
 
 这时宿主文件系统没有变化。
 
-### Export
+### 导出
 
-CLI 读取 exact approved Revision，再生成 host-local package：
+CLI 读取精确已批准 Revision，再生成 host-local 软件包：
 
 ```text
 SKILL.md
 powercontext.json
 ```
 
-`powercontext.json` 保存 agent kind、exact ArtifactRef 和渲染后 `SKILL.md` 的 SHA-256。managed Artifact 仍是权威来源；目录只是可重建副本。
+`powercontext.json` 保存 agent 类型、精确 ArtifactRef 和渲染后 `SKILL.md` 的 SHA-256。托管 Artifact 仍是权威来源；目录只是可重建副本。
 
-当前 CLI export target 只有：
+当前 CLI 导出目标只有：
 
 - `codex`
 - `claude_code`
 
-不要从这两个 target 推断 Hermes、OpenClaw、DSH、OpenCode 或 Pi 也支持 managed Skill export。
+不要从这两个目标推断 Hermes、OpenClaw、DSH、OpenCode 或 Pi 也支持托管 Skill 导出。
 
-### Execution
+### 执行
 
-PowerContext 不执行导出的 Skill，也不授予工具权限。宿主决定何时发现 Skill，用户或宿主 policy 决定是否允许运行其中的操作。
+PowerContext 不执行导出的 Skill，也不授予工具权限。宿主决定何时发现 Skill，用户或宿主策略决定是否允许运行其中的操作。
 
-## 两种发布 surface
+## 两种发布范围
 
-CLI direct export 是 create-only。destination 已存在时拒绝覆盖。
+CLI 直接导出是 仅创建。目标目录已存在时拒绝覆盖。
 
-Server-managed safe publish 是另一条路径。它只在 projection 仍由 PowerContext 管理、内容未 drift，并且状态为 `unpublished` 或 `update_available` 时允许创建或更新。
+Server-managed safe 发布是另一条路径。它只在投影仍由 PowerContext 管理、内容未漂移，并且状态为 `unpublished` 或 `update_available` 时允许创建或更新。
 
-常见 projection 状态：
+常见投影状态：
 
 - `unpublished`
 - `current`
@@ -209,27 +211,27 @@ Server-managed safe publish 是另一条路径。它只在 projection 仍由 Pow
 - `drifted`
 - `incompatible`
 
-foreign directory、本地手改内容、同 Artifact 多个 projection、或比目标更新的已发布 Revision，都不能被静默覆盖。
+外部目录、本地手改内容、同 Artifact 多个投影、或比目标更新的已发布 Revision，都不能被静默覆盖。
 
-## Managed、external 和 bundled Skill
+## 托管、外部和内置 Skill
 
 这三个名字容易混在一起。
 
 | 类型 | 权威来源 | 如何进入宿主 |
 |---|---|---|
-| managed Skill | PowerContext approved Artifact Revision | explicit export / managed publish |
-| external Skill | 宿主文件系统或 registry package | scan、resolve、import/fork 后进入 Candidate 流程 |
-| bundled Skill | 某个 integration 随插件一起安装的静态 Skill | host setup 安装 |
+| 托管 Skill | PowerContext 已批准 Artifact Revision | 显式导出 / 托管发布 |
+| 外部 Skill | 宿主文件系统或 registry 软件包 | 扫描、resolve、导入/分支后进入 Candidate 流程 |
+| 内置 Skill | 某个集成随插件一起安装的静态 Skill | 宿主安装配置安装 |
 
-OpenCode、Pi、Codex 或 Claude Code 插件里自带 `project-context` Skill，不代表它们都支持 managed Skill export。两件事无关。
+OpenCode、Pi、Codex 或 Claude Code 插件里自带 `project-context` Skill，不代表它们都支持托管 Skill 导出。两件事无关。
 
-External Skill import/fork 也不会自动获得 approved 状态。它会生成新的 managed Candidate，等待 Review；package 中的任意 scripts/assets 不会因此自动执行。
+外部 Skill 导入/分支也不会自动获得已批准状态。它会生成新的托管 Candidate，等待 Review；软件包中的任意 scripts/assets 不会因此自动执行。
 
 ## 用 OpenAPI 案例走完生命周期
 
-### 1. 准备 evidence
+### 1. 准备证据
 
-捕获 契约-test result Source，并保留 exact SourceRef。
+捕获契约-test 结果 Source，并保留精确 SourceRef。
 
 ### 2. Experience Candidate
 
@@ -244,17 +246,17 @@ Lesson: inspect generated drift before tests
 
 ### 3. Review
 
-读取 Candidate v1，revise lesson 得到 v2。故意用 `expected_version=1` approve，应得到 conflict。重新读取 v2 后再 approve，得到：
+读取 Candidate v1，修订 lesson 得到 v2。故意用 `expected_version=1` 批准，应得到冲突。重新读取 v2 后再批准，得到：
 
 ```text
 experience/EXPERIENCE_ID@1
 ```
 
-下一次相关 `prepare_context` 可以召回这个 approved Experience。
+下一次相关 `prepare_context` 可以召回这个已批准 Experience。
 
 ### 4. Skill Candidate
 
-以 Experience Revision 为 origin 生成：
+以 Experience Revision 为 来源 生成：
 
 ```text
 name: powercontext-openapi-change
@@ -263,7 +265,7 @@ validation:
   - contract tests pass
 ```
 
-approve 后得到：
+批准后得到：
 
 ```text
 skill/SKILL_ID@1
@@ -271,46 +273,46 @@ skill/SKILL_ID@1
 
 PreparedContext 仍然不包含它。这是正确行为。
 
-### 5. Export
+### 5. 导出
 
-把 exact `@1` 分别导出到支持的宿主目录。检查两件事：
+把精确 `@1` 分别导出到支持的宿主目录。检查两件事：
 
 - `SKILL.md` 内容；
-- `powercontext.json` 是否引用同一个 exact ArtifactRef。
+- `powercontext.json` 是否引用同一个精确 ArtifactRef。
 
-手工修改 `SKILL.md` 后再 inspect，状态应变成 `drifted`，safe publish 不得覆盖。
+手工修改 `SKILL.md` 后再 inspect，状态应变成 `drifted`，safe 发布不得覆盖。
 
 ## 常见错误
 
-### Generation 成功后，Review Inbox 是空的
+### 生成成功后，Review 收件箱是空的
 
-operation 可能返回 no-op。检查 response，不要假设每次 generation 都创建 Candidate。
+操作可能返回无变更。检查响应，不要假设每次生成都创建 Candidate。
 
-### approved Experience 没被召回
+### 已批准 Experience 没被召回
 
-检查 Scope、是否为 current head、query relevance 和 PreparedContext byte budget。
+检查 Scope、是否为当前头版本、查询 相关性 和 PreparedContext 字节预算。
 
-### Skill 已 approve，但 Agent 看不到
+### Skill 已批准，但 Agent 看不到
 
-approval 不 export。确认你使用 exact Revision 导出到了当前宿主实际扫描的目录。
+批准不导出。确认你使用精确 Revision 导出到了当前宿主实际扫描的目录。
 
-### Export 报 destination exists
+### 导出报目标目录 exists
 
-CLI direct export 不覆盖。先检查目录是 foreign、managed current、update available 还是 drifted，再选择保留、换目录或使用受控 managed publish。
+CLI 直接导出不覆盖。先检查目录是外部、托管当前、update 可用 还是 发生漂移的，再选择保留、换目录或使用受控托管发布。
 
-### Replacement Candidate 一直 conflict
+### 替换内容 Candidate 一直冲突
 
-target Skill 可能已经推进到新 head。重新读取 current target 和 Candidate，不要修改 expected version 后盲重试。
+目标 Skill 可能已经推进到新头版本。重新读取当前目标和 Candidate，不要修改预期版本后盲重试。
 
 ## 检查清单
 
-- Candidate version 和 Artifact Revision 是否分开？
-- propose/generate 是否都停在 pending 或 no-op？
-- approve/reject 是否绑定 inspected `expected_version`？
-- Experience recall 是否只看 approved current head？
+- Candidate 版本和 Artifact Revision 是否分开？
+- 提案/生成是否都停在待处理或无变更？
+- 批准/拒绝是否绑定已检查的 `expected_version`？
+- Experience 召回是否只看已批准当前头版本？
 - Skill 是否始终不进入 PreparedContext？
-- approval、export、execution 是否分成三步？
-- 当前 export target 是否只写 Codex 和 Claude Code？
-- local drift 和 conflict 是否阻止覆盖？
+- 批准、导出、执行是否分成三步？
+- 当前导出目标是否只写 Codex 和 Claude Code？
+- 本地漂移和冲突是否阻止覆盖？
 
 心智模型到这里已经完整。下一步进入[安装并运行 Server](/zh/basic-usage/install-and-run)，用真实 ID、Citation 和 Revision 练习这些对象。

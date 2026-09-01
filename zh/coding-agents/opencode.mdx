@@ -1,15 +1,15 @@
 ---
 title: "OpenCode"
-description: "通过 native hooks 注入 exact-turn context，并用 context.ask 控制指定 mutation。"
+description: "安装原生 Hook，在精确轮次注入召回内容，并通过宿主确认控制持久修改。"
 ---
 
 <Warning>
-**Version-gated：** OpenCode `>=1.18.21,<2`。超出这个范围的版本属于 **Unsupported**。Package 还要求 Node `>=20`。Conditional real-host E2E 覆盖 `opencode run`，具体边界见下文。
+OpenCode 集成受版本限制（**Version-gated**）：支持 `>=1.18.21,<2`，插件还要求 Node.js `>=20`。超出 OpenCode 版本范围属于 **Unsupported**。真实 `opencode run` 冒烟测试只证明宿主会发出准备与采集请求；模型分派、转换注入和权限界面的完整端到端流程仍是 **Not validated**。
 </Warning>
 
-OpenCode 使用 owned native plugin 和 owned bundled `project-context` Skill。`chat.message` 负责 prepare/capture。`experimental.chat.messages.transform` 只在当前 turn 与 cached message 完全匹配时注入 context。
+OpenCode 集成包含一个原生插件和内置的 `project-context` Skill。`chat.message` 负责准备上下文并采集符合条件的用户提示词；`experimental.chat.messages.transform` 只把与当前会话、当前消息精确匹配的结果注入该轮次。PowerContext Server 始终单独运行。
 
-## 成熟度与安装
+## 安装并确认激活
 
 ```bash
 powercontext setup opencode --source oceanbase/powercontext --ref master
@@ -17,15 +17,15 @@ powercontext server run
 powercontext doctor opencode
 ```
 
-Setup 检查 `opencode --version`，通过 `opencode debug paths` 找到 config directory，并要求 built plugin 和 `skills/project-context/SKILL.md` 都存在。两者分别安装到 `<config>/plugins/powercontext-opencode.js` 和 `<config>/skills/project-context/`，各自带 ownership manifest。
+安装程序先读取 `opencode --version`，再通过 `opencode debug paths` 找到配置目录。构建后的插件安装到 `<config>/plugins/powercontext-opencode.js`，Skill 安装到 `<config>/skills/project-context/`。两个目录各有归属清单；如果目标位置已经存在不归 PowerContext 管理的同名内容，安装会保留原内容并拒绝覆盖。
 
-Setup 会预先检查两个目标路径，拒绝 foreign 同名 plugin 或 Skill。单个 installer 有各自的恢复机制，但两个 artifact 之间没有 transaction。如果 plugin 装好后发生 I/O failure，setup 仍可能处于部分完成状态。
+插件和 Skill 各自有恢复机制，但两者之间没有跨 Artifact 的事务回滚。I/O 在中途失败时，安装可能只完成一部分。此时应先检查两个目标目录，再重新运行安装，而不是把单个成功步骤当成整个集成已经完成。
 
-Doctor 检查 executable/version、owned Skill 和 plugin activation。Activation probe 会在 loopback 上短暂启动 `opencode serve`，轮询 `GET /session`，等待 plugin 写入 nonce，然后停止进程。它不创建 session、不传 model，也不检查 Server readiness、prompt hooks、injection、permission UI 或 Skill execution。
+`powercontext doctor opencode` 会检查可执行文件、版本、Skill、插件和激活状态。激活探测会短暂启动本机回环地址上的 `opencode serve`，轮询 `GET /session`，等待插件写入随机标识，然后停止进程。它不创建会话、不调用模型，也不验证 PowerContext Server、提示词 Hook、注入或权限界面。
 
-## 最小用法
+## 跑通一次召回
 
-Server 启动后，再启动 OpenCode：
+Server 启动后，打开新的 OpenCode 会话：
 
 ```bash
 opencode
@@ -35,9 +35,9 @@ opencode --version
 powercontext doctor opencode
 ```
 
-之后提交普通 coding prompt。Automatic recall 和符合条件的 prompt capture 不需要命令。需要精确处理 Memory、Handoff、Experience、Skill 或只读 Candidate 时，使用已挂载的 `pc_*` tools。Plugin 不会启动或内嵌 PowerContext Server。
+提交一条普通编码问题。自动召回和提示词采集不需要额外命令。若要显式维护 Memory、处理 Handoff、生成 Experience 或 Skill，使用插件挂载的 `pc_*` 工具。插件不会替你启动 Server。
 
-## 执行流程
+这一轮在宿主中的实际顺序是：
 
 ```text
 chat.message(sessionID, messageID)
@@ -54,139 +54,87 @@ experimental.chat.messages.transform
 → append one synthetic untrusted part for that turn
 ```
 
-Prepare 先于 capture 执行，但两者分别处理 fail-open。Prepare 失败通常不影响 capture；capture 失败也不会清掉已经有效的 prepared content。不过，两次调用仍共用当前 turn 的 HTTP budget 和已解析的 session context。
+准备发生在采集之前，但两条路径分别执行 fail-open。准备失败通常不妨碍采集，采集失败也不会删除已经校验通过的临时上下文。两者仍共用本轮 HTTP 总预算和已经解析出的会话上下文。`experimental.chat.system.transform` 只加入通用使用说明，不注入 PreparedContext。
 
-`experimental.chat.system.transform` 只添加通用 usage guidance，不负责 PreparedContext injection。
-
-## Scope 与 session cleanup
+## Scope 与精确轮次
 
 Scope 按以下顺序解析：
 
-1. 使用 `POWERCONTEXT_OPENCODE_SCOPE_ID`；必要时 hash 成有界 ID。
-2. 否则把 session directory 作为派生输入。Explicit tools 使用 `context.worktree || context.directory`。
-3. 解析 Git top-level，并尽量把 `remote.origin.url` 规范化成 `git:` Scope。
-4. 没有可用 remote 时，把解析后的 project root hash 成稳定的 `local:` Scope。
+1. 已设置 `POWERCONTEXT_OPENCODE_SCOPE_ID` 时使用该值；过长值会变成有界哈希。
+2. 否则使用会话目录。显式工具读取 `context.worktree || context.directory`。
+3. 插件寻找 Git 顶层目录，并优先把 `remote.origin.url` 规范化为 `git:` Scope。
+4. 没有可用远程仓库时，插件把项目根目录哈希成稳定的 `local:` Scope。
 
-Directory 或 worktree 是 Scope derivation 的输入，不是优先于 Git identity 的 Scope 结果。
+目录只是派生 Scope 的输入，不会优先于规范化的 Git 标识。`session.created` 和 `session.updated` 更新目录缓存；没有缓存时，插件调用 `client.session.get`。`session.deleted` 会同时清除目录缓存和当前会话的已准备轮次。
 
-`session.created` 与 `session.updated` 刷新 directory cache。没有 entry 时，plugin 调用 `client.session.get`。`session.deleted` 同时删除该 entry 和当前 session 的 prepared turn。Runtime 每个 session 最多保存一个 prepared turn，而不是保存所有 `(sessionID, messageID)` pair 的 map。
+每个会话只保存一个已准备轮次。转换时必须同时匹配 `sessionID` 和最新用户消息的 `messageID`，注入过一次后也不会重复注入。这个规则能阻止旧上下文进入错误轮次，但仍有一个乱序竞态：较早的准备如果最后完成，可能覆盖较新的缓存，使新轮次漏掉注入。它不会把旧内容注入新轮次；并发乱序行为仍为 **Not validated**。
 
-Exact matching 能阻止旧结果注入错误 turn，但仍有 out-of-order race：较早的 prepare 若最后完成，可能覆盖较新的 cache entry。此时新 turn 会漏掉 injection，而不是收到 stale context。Concurrent-turn behavior 为 **Not validated**。
+PreparedContext 必须符合 `powercontext.prepared-context.v1`，并且 `content_bytes` 与实际 UTF-8 字节数一致。默认内容预算为 8,000 字节，可配置范围是 512–32,768 字节；HTTP 响应体另有 1 MiB 上限。注入内容会标记为宿主提供的不可信历史证据，并保留会话与消息 ID。当前测试证明转换路径不会显式写对话记录，但真实宿主是否持久化合成内容仍是 **Not validated**。
 
-## 注入
+## 采集与刷新
 
-PreparedContext 必须符合 `powercontext.prepared-context.v1`，并且 `content_bytes` 与实际内容一致。Configured prepared-content bound 默认为 8,000 bytes，可设置为 512–32,768 bytes。HTTP client 另外把 response body 限制为 1 MiB。
+采集会排除合成内容，并把用户提示词写成具有稳定来源信息的 Source。元数据包含来源、事件、当前目录、会话 ID 和消息 ID。采集默认开启；以下情况会跳过：
 
-Transform 把 recalled content 标成 host-supplied、untrusted historical evidence，将 part 标为 synthetic，并保留 session/message IDs。第二次 transform 不会重复注入。
+- `POWERCONTEXT_OPENCODE_CAPTURE_PROMPTS=false`；
+- 提示词疑似包含私钥或凭证；
+- UTF-8 大小超过 200,000 字节。
 
-`chat.message` 不改写 incoming part，plugin 也不显式写 transcript。Real-host transcript non-persistence 为 **Not validated**；当前 unit evidence 只覆盖 synthetic transform path。
+过滤器只控制持久化。准备在过滤之前运行，所以含敏感信息的提示词仍可能作为召回查询发往配置好的 Server。召回传输和 Source 采集必须分别做隐私判断。
 
-## Capture 与 flush
+采集后的自动刷新默认关闭。启用后，插件以 Source 位置为目标执行有界的 `flush_memory` 循环；只有 `current_cursor >= position` 才算追上。错误、预算耗尽或游标落后都会 fail-open，且不能据此声称 Memory 已生成。OpenCode 没有在后续边界补偿刷新的队列，这条刷新路径也没有 OpenCode 专项端到端测试，因此状态为 **Not validated**。
 
-Capture 排除 synthetic parts，并写入 deterministic prompt Source，metadata 包含 `origin`、event、cwd、session 和 message。Automatic capture 默认开启。关闭 capture、prompt 疑似包含 private key/credential，或 UTF-8 大小超过 200,000 bytes 时，会跳过 capture。
+自动路径不采集助手最终响应，也不记录 Task Outcome。
 
-Capture filter 运行前，prepare 已经收到 prompt。因此，疑似包含 secret 的 prompt 仍可能作为 recall query 发往 configured Server，只是不会持久化为 Source。Recall transmission 与 Source capture 是两个独立的隐私决策。
+## 工具与权限
 
-Automatic flush 可选，默认关闭。启用后，正数 capture position 会启动有界 `flush_memory` cursor loop。只有 `current_cursor >= position` 才算成功；error 或 call-budget exhaustion 会 fail-open，也不能证明 Memory 已存在。OpenCode 没有 pending boundary flusher，optional flush path 也没有 OpenCode-specific test，因此 flush E2E 为 **Not validated**。
+插件挂载 19 个精选 HTTP 工具，覆盖 Memory 读取与维护、手动准备和采集、Handoff 的激活/准备/定稿/提交/继续、Experience 与 Skill 的生成和读取，以及 Candidate 的只读列出与读取。
 
-Automatic path 不 capture final assistant response，也不记录 Task Outcome。
+它刻意不挂载 Candidate 批准/拒绝/修订、工作契约（Work Contract）、Handoff 确认、Task Outcome、外部 Skill 注册和 Handoff 报告。需要人工治理的 Candidate 修改应在 Dashboard 或受控 API 客户端中完成。
 
-## Owned plugin 与 bundled Skill
+八类持久修改在发出 HTTP 请求前都会调用宿主 `context.ask()`，权限名为 `powercontext`。这些操作包括：写入 Memory、采集 Source、修订或停用 Memory、激活或提交 Handoff、生成 Experience，以及生成 Skill。这个边界是 **Host-gated**。`pc_remember` 的“询问后成功”路径已有测试；真实权限界面的允许/拒绝流程以及直接拒绝测试仍是 **Not validated**。
 
-Setup 可以刷新 owned install，但会保留 foreign path。Skill conflict path 有直接测试；foreign-plugin conflict 使用同一类实现，不过没有独立的 direct test。
+显式修改的载荷如果包含疑似敏感信息，也会在传输前被拒绝。该检查发生在 `context.ask()` 之后，因此宿主可能先询问，再返回 `secret_rejected`。
 
-安装后的 `project-context` directory 是 bundled OpenCode Skill，用于告诉宿主何时使用 native plugin tools。它不是 managed Skill export。OpenCode 不是当前 managed export target，real-host Skill discovery 仍为 **Not validated**。
+## 失败时应看到什么
 
-## 原生 tools 与 permission
+自动准备、采集、注入和可选刷新都采用 fail-open。Server 不可用或会话上下文缺失时，普通 OpenCode 工作应继续，只是没有 PowerContext 上下文。显式工具错误必须对模型可见。配置无效时，插件发出警告并停用自己的 Hook，不让宿主进程崩溃。
 
-Plugin 挂载 19 个 curated HTTP tools，覆盖 Memory 读取与 mutation、manual prepare/capture、Handoff activate/prepare/finalize/commit/continue、Experience 和 Skill generate/get，以及 read-only Candidate Review list/get。
+发布前至少做这些负向检查：使用 `1.18.20` 或 `2.0.0` 验证版本拒绝；在目标目录放入外部同名内容验证不覆盖；停止 Server 验证普通问题继续而显式写入失败；用不同消息 ID 验证不注入；逆序完成两次准备验证不会注入错误轮次；删除会话后验证缓存清空；拒绝 `context.ask()` 验证 HTTP 修改没有发出；让刷新游标持续落后，验证循环有界且不虚报 Memory。
 
-它不挂载 Candidate approve/reject/revise、工作契约 creation、Handoff acknowledgement、Task Outcome recording、external-Skill registry 或 Handoff-report operations。Human Candidate mutation 留在 model surface 之外，通过 Dashboard 或受人工控制的 direct API client 完成。
+当前证据边界如下：
 
-八类指定 mutation——remember、capture Source、revise/retire Memory、activate/commit Handoff、generate Experience、generate Skill——执行前，tool 会用 permission `powercontext` 和 operation ID 调用宿主 `context.ask()`。这个边界是 **Host-gated**。`pc_remember` 的 ask-and-success path 有测试。Ask 被拒绝时，control flow 会在 HTTP 前停止；但真实 UI allow/deny 和 direct denial test 为 **Not validated**。
-
-Explicit mutation payload 若包含疑似 secret 的 nested string，也会在 transport 前被拒绝。这个检查发生在 `context.ask()` 之后，因此宿主可能先 ask，再返回 `secret_rejected`。
-
-## 失败行为
-
-Automatic prepare、capture、injection 和 optional flush 都 fail-open。Server unavailable 或 session context 缺失时，普通 OpenCode 工作不应被阻止。Explicit tool error 对模型保持可见。Configuration error 会发出 warning 并停用 plugin hooks，而不是让宿主崩溃。
-
-## 负向实验
-
-修改 setup 或 plugin 时运行这些实验。这里列的是 deployment checklist，不代表每一项都有 automated test：
-
-- 让 `opencode --version` 返回 `1.18.20` 或 `2.0.0`；setup 应在安装前拒绝。
-- 在任一 artifact target 放置 unowned 内容；setup 应保留原内容并拒绝安装。
-- 停止 Server，提交 prompt，确认 OpenCode 在没有 recalled context 时仍继续。
-- 为一条 message prepare，再 transform 不同的 session 或 message ID；不应注入内容。
-- 让两个 prepare 逆序完成；stale context 不应进入新 turn，但新 turn 可能漏掉 injection。
-- 对 matching turn 连续 transform 两次；只能有一个 synthetic part。
-- 删除 session 后复用旧 IDs；两个 cache 都应为空。
-- 提交疑似包含 secret 或超过 200,000-byte 的 prompt；recall 可以运行，capture 不应运行。
-- 拒绝指定 mutation，确认没有 HTTP operation 执行。
-- 启用 flush，让 cursor 一直落后于 captured position，确认 bounded loop 不会声称 Memory 已存在。
-- 检查 model tools，确认 Candidate mutation、工作契约、acknowledgement 和 Task Outcome operations 都不存在。
-
-## Unsupported 与 Not validated
-
-| State | Current boundary |
+| 状态 | 已证明或未提供的能力 |
 |---|---|
-| **Supported** | Declared OpenCode gate `>=1.18.21,<2`; owned plugin and bundled-Skill setup; automatic prepare and eligible prompt capture; exact-turn transform logic; curated 19-tool surface; ask-before-classified-mutation control flow; conditional real-host `opencode run` prepare/capture smoke. |
-| **Unsupported** | OpenCode `<1.18.21` or `>=2`; overwriting foreign same-name paths; managed Skill export to OpenCode; automatic final-response capture or Task Outcome; model-driven Candidate mutation; the unmounted 工作契约, acknowledgement, Outcome, external-Skill registry, and Handoff-report operations; transactional rollback spanning both installed artifacts. |
-| **Not validated** | Compatibility across every accepted release; real-host model dispatch, injection, transcript non-persistence, permission UI, bundled-Skill discovery, cache cleanup, and optional flush; direct upper-version and foreign-plugin tests; reordered concurrent turns; real-host secret and size filtering. |
-
-Conditional real-host E2E 用真实 `opencode run` 启动，使用 invalid model 和 empty PreparedContext，并观察 prepare/capture HTTP requests。它不能证明 model dispatch 或 transform injection。Doctor nonce probe 是另一项 activation check。
-
+| **Supported** | OpenCode `>=1.18.21,<2` 的安装准入；归属当前集成的插件与 Skill 安装；自动准备和符合条件的提示词采集；精确轮次转换逻辑；19 个工具的范围；指定修改前调用 `context.ask()`；有条件的真实宿主准备/采集冒烟测试 |
+| **Unsupported** | OpenCode `<1.18.21` 或 `>=2`；覆盖外部同名路径；导出托管 Skill 到 OpenCode；自动采集助手最终响应或 Task Outcome；模型执行 Candidate 修改；未挂载的工作契约、确认、外部 Skill 注册与 Handoff 报告；跨两个 Artifact 的事务回滚 |
+| **Not validated** | 所有可接受版本的兼容性；真实模型分派与转换注入；对话记录不持久化；权限界面；宿主发现内置 Skill；缓存清理和可选刷新端到端；并发乱序轮次；真实宿主上的敏感信息和大小过滤 |
 
 ## 配置默认值
 
-Plugin 从环境变量读取连接设置。这些默认值决定自动 recall 和 capture 怎么跑：
-
-| Key | 默认值 | 含义 |
+| 键 | 默认值 | 含义 |
 |---|---|---|
 | `POWERCONTEXT_OPENCODE_BASE_URL` | `http://127.0.0.1:8000` | 正在运行的 PowerContext Server |
 | `POWERCONTEXT_OPENCODE_SCOPE_ID` | 未设置 | 显式 Scope；未设置则按仓库推导 |
-| `POWERCONTEXT_OPENCODE_AUTHORIZATION` | 未设置 | 完整 Authorization header，含 secret |
-| `POWERCONTEXT_OPENCODE_CAPTURE_PROMPTS` | `true` | 采集当前 user prompt 为 Source |
-| `POWERCONTEXT_OPENCODE_MAX_BYTES` | `8000` | Recall budget，限制在 `512–32768` |
-| `POWERCONTEXT_OPENCODE_REQUEST_TIMEOUT_MS` | `1000` | 单次 HTTP timeout |
-| `POWERCONTEXT_OPENCODE_HTTP_BUDGET_MS` | `4000` | 一轮 prepare/capture 总预算 |
-| `POWERCONTEXT_OPENCODE_FLUSH_ON_CAPTURE` | `false` | 测试用：capture 后等待 flush |
+| `POWERCONTEXT_OPENCODE_AUTHORIZATION` | 未设置 | 完整 Authorization 请求头，属于敏感信息 |
+| `POWERCONTEXT_OPENCODE_CAPTURE_PROMPTS` | `true` | 把当前用户提示词采集为 Source |
+| `POWERCONTEXT_OPENCODE_MAX_BYTES` | `8000` | 召回预算，范围 `512–32768` |
+| `POWERCONTEXT_OPENCODE_REQUEST_TIMEOUT_MS` | `1000` | 单次 HTTP 超时 |
+| `POWERCONTEXT_OPENCODE_HTTP_BUDGET_MS` | `4000` | 一轮准备与采集的总预算 |
+| `POWERCONTEXT_OPENCODE_FLUSH_ON_CAPTURE` | `false` | 测试用途：采集后等待刷新 |
 
-不要把 Authorization 写进 URL、prompt 或仓库示例。非 loopback 必须用 HTTPS。当前工作不能落成 Source 时，启动前关掉 capture：
+不要把 Authorization 写进 URL、提示词或仓库示例。非本机回环地址必须使用 HTTPS。当前工作不应保存为 Source 时，在启动前关闭采集：
 
 ```bash
 export POWERCONTEXT_OPENCODE_CAPTURE_PROMPTS=false
 opencode
 ```
 
+## 完成统一验证
 
-## 在这个宿主上做完统一题
+先在固定 Scope 中用 `pc_remember` 保存“修改 OpenAPI 契约后，重新生成并检查客户端”的决定，并通过 `context.ask()`。打开新会话，提出同一个问题。召回结果必须带 Citation，只能进入当前用户轮次的合成内容，不应在删除会话后继续出现。
 
-> 修改 OpenAPI 契约后，下一步应该做什么？
+随后停止 PowerContext Server，再问一个普通编码问题。OpenCode 应继续工作。再次调用 `pc_remember` 时，工具必须返回 `unavailable` 等明确失败，不能假装写入成功。
 
-1. 在固定 Scope 里用 `pc_remember` 保存答案。先过 `context.ask`，再确认 Citation。
-2. 开一个新 session，再问同一句。
-3. 召回必须带 Citation，并且只出现在当前 user turn 的 exact-turn synthetic part，不写进 OpenCode transcript。
-4. 停掉 Server 后再问。自动 recall 可以失败，普通编码应继续。删掉旧 session 后，不得再注入 stale context。
-5. 再跑 `pc_remember`。Tool 应返回失败，例如 `unavailable`，不能假装写入成功。
-
-## 完成检查
-
-- [ ] OpenCode 为 `>=1.18.21,<2`，Node 满足 package 声明的 `>=20`。
-- [ ] Setup 安装两个 owned path，并明确说明没有 cross-artifact rollback。
-- [ ] Foreign plugin 和 Skill target 会被保留，不会覆盖。
-- [ ] `powercontext doctor opencode` 只作为 activation evidence，不当作 Server 或 model-turn test。
-- [ ] Scope 先看 explicit override，否则从 session/worktree directory 派生 Git identity，最后使用 local-root hash。
-- [ ] `chat.message` 排除 synthetic text，先 prepare，再以独立 fail-open handling capture。
-- [ ] Transform injection 要求 exact session/message IDs，并保持 idempotent。
-- [ ] Concurrent out-of-order prepare 标为 **Not validated**；它可能造成 missed injection，不会造成 wrong-turn injection。
-- [ ] `session.deleted` 清理 session context 和当前 prepared turn。
-- [ ] Secret 与 byte-limit filter 只控制 capture；recall transmission 单独评估。
-- [ ] Optional flush 默认关闭，受 cursor position 和 call count 限制，不能代替 Memory verification。
-- [ ] 19-tool surface 与八类 `context.ask()`-gated mutation 和 plugin 一致。
-- [ ] Candidate Review 在 model surface 上保持 read-only；automatic assistant capture 和 Task Outcome 保持 **Unsupported**。
-- [ ] Bundled Skill 与 managed Skill export 保持区分。
-- [ ] Conditional real-host E2E 的限制仍清楚可见。
+只有以下结果都可观察时，集成才完成：版本、Node.js 和安装诊断通过；插件与 Skill 目标归属正确；Scope 推导稳定；注入精确匹配会话与消息；敏感信息过滤只影响采集；显式修改经过宿主确认；自动失败与显式失败保持不同语义；上述 Unsupported、Not validated 和 Host-gated 边界没有被缩写成“已支持”。
 
 下一页是 [Pi](/zh/coding-agents/pi)。

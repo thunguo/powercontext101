@@ -1,24 +1,26 @@
 ---
 title: "Source 与 Memory 实操"
-description: "对比显式 Memory 和 Source extraction，并用 position、cursor 与 source_refs 验证真实 lineage。"
+description: "对比显式 Memory 和 Source 抽取，并用位置、游标与 Source 引用验证真实证据链。"
 ---
 
-上一页直接写入了已经确认的 Memory。现在走另一条路径：先 capture Source，再让 generation pipeline 从证据中提取长期知识。
+上一页直接写入了已经确认的 Memory。现在走另一条路径：先采集 Source，再让生成流程从证据中提取长期知识。
 
-两条路径都可能得到 Memory，但它们的前提、lineage 和失败方式不同。
+两条路径都可能得到 Memory，但它们的前提、证据链和失败方式不同。
 
 ## 两条路径先放在一起看
+
+两条路径最终都可能得到 Memory，但证据链不同。显式写入保存你已经确认要保留的内容；抽取先保存 Source，而且可能不产生任何 Memory。
 
 | 路径 | 需要模型 | 是否先创建 Source | 适合什么 |
 |---|---:|---:|---|
 | `remember_memory` | 否 | 否 | 你已经知道要保存的事实、决策或约束 |
-| capture → flush/scheduler → extraction | 是 | 是 | 从一批工作证据中找出值得长期保留的内容 |
+| 采集 → 刷新/调度器 → 抽取 | 是 | 是 | 从一批工作证据中找出值得长期保留的内容 |
 
-如果 Agent 已经明确得到用户指令“记住这条决策”，直接 remember 更简单。不要为了获得漂亮 lineage，先人工造一条 Source 再绕回 Memory。
+如果 Agent 已经明确得到用户指令“记住这条决策”，直接记住更简单。不要为了获得漂亮证据链，先人工造一条 Source 再绕回 Memory。
 
-反过来，宿主自动捕获的 prompt 通常只应该成为 Source。模型是否把它提炼为 Memory，是后续判断。
+反过来，宿主自动捕获的提示词通常只应该成为 Source。模型是否把它提炼为 Memory，是后续判断。
 
-## 先检查 extraction capability
+## 先检查抽取能力
 
 ```bash
 powercontext capabilities
@@ -32,9 +34,9 @@ Memory extraction: enabled
 
 如果是 disabled：
 
-- capture 仍可成功；
-- Source 会留在 journal；
-- pending Source window 无法执行 model extraction；
+- 采集仍可成功；
+- Source 会留在日志；
+- 待处理 Source 窗口无法执行模型抽取；
 - 先运行配置流程，再用 `--env-file` 重启 Server。
 
 ```bash
@@ -44,9 +46,9 @@ powercontext config validate --env-file .env
 powercontext server run --env-file .env
 ```
 
-是否开启 scheduler 是另一件事。本页主动调用 `flush_memory`，不依赖定时任务。
+是否开启调度器是另一件事。本页主动调用 `flush_memory`，不依赖定时任务。
 
-## 完整 lineage 脚本
+## 完整证据链脚本
 
 新建 `source_memory.py`：
 
@@ -190,44 +192,44 @@ if __name__ == "__main__":
 uv run python source_memory.py
 ```
 
-Generation output 本身有不确定性。教程使用明确的 durable decision，提高产生 candidate 的概率，但不能把某段模型文本写成固定预期输出。真正稳定的断言是 position、cursor、exact SourceRef 和 entry lineage。
+生成输出本身有不确定性。教程使用明确的持久决定，提高产生 Candidate 的概率，但不能把某段模型文本写成固定预期输出。真正稳定的断言是位置、游标、精确 SourceRef 和条目证据链。
 
 ## 每一步应该看什么
 
-### Capture
+### 采集
 
-成功状态是 HTTP 202，response 包含：
+成功状态是 HTTP 202，响应包含：
 
 - `status="accepted"`；
-- exact content SourceRef；
-- scope-local numeric `position`。
+- 精确内容 SourceRef；
+- Scope 内部 numeric `position`。
 
-同 identity、同序列化 payload bytes 的重放返回原 position。
+同标识、同序列化载荷字节的重放返回原位置。
 
-这个幂等比较不是语义 canonicalization。metadata 键顺序变化可能改变序列化 bytes，从而返回 `source_conflict`。实际重试应复用同一序列化输入。
+这个幂等比较不是语义 规范化。元数据键顺序变化可能改变序列化字节，从而返回 `source_conflict`。实际重试应复用同一序列化输入。
 
-同 identity 改 content 一定不能覆盖旧 Source，应返回 HTTP 409。
+同标识改内容一定不能覆盖旧 Source，应返回 HTTP 409。
 
-### Flush
+### 刷新
 
 判断 Source 是否被消费，看：
 
 - `previous_cursor`；
 - `current_cursor`；
 - `processed_source_count`；
-- capture response 的 `position`。
+- 采集响应的 `position`。
 
-当前 cursor 达到或超过 capture position，才说明该窗口已被处理。
+当前游标达到或超过采集位置，才说明该窗口已被处理。
 
-Scheduler 可能抢先完成工作，所以手动 flush 返回 `idle` 也可能正常。此时 cursor 应已经到位。
+调度器可能抢先完成工作，所以手动刷新返回 `idle` 也可能正常。此时游标应已经到位。
 
-### Memory lineage
+### Memory 证据链
 
-不要只看 search 是否出现相似文本。查找 `entry.source_refs` 是否包含 capture response 的 exact SourceRef。
+不要只看搜索是否出现相似文本。查找 `entry.source_refs` 是否包含采集响应的精确 SourceRef。
 
-这才能证明当前 Memory entry 来自这条 Source。
+这才能证明当前 Memory 条目来自这条 Source。
 
-### Extraction no-op
+### 抽取无变更
 
 合法情况：
 
@@ -238,9 +240,9 @@ current_cursor advanced
 memory = null, or no linked entry
 ```
 
-模型可能没有产生 candidate，或者 candidate 与 active content 重复后被去重。Source 已经消费，但 Memory 不一定改变。
+模型可能没有产生 Candidate，或者 Candidate 与启用状态内容重复后被去重。Source 已经消费，但 Memory 不一定改变。
 
-## 验证 vector，需要更严格的断言
+## 验证向量，需要更严格的断言
 
 如果 `capabilities.search_modes` 包含 `vector`，可以额外请求：
 
@@ -255,78 +257,78 @@ vector = await client.search_memory(
 )
 ```
 
-只有同时满足以下条件，才算验证这条 lineage 的 embedding round trip：
+只有同时满足以下条件，才算验证这条证据链的嵌入往返验证：
 
-- response `mode == "vector"`；
-- hit Citation 指向刚才的 source-linked entry；
+- 响应 `mode == "vector"`；
+- 命中 Citation 指向刚才的关联 Source 的条目；
 - `matched_by` 包含 `vector`。
 
-命中另一条历史 entry、空 hits 或 `mode=None` 都不能证明本次 Source 已建立 vector projection。
+命中另一条历史条目、空命中或 `mode=None` 都不能证明本次 Source 已建立向量投影。
 
-显式 `vector` 请求在 capability 不可用时返回 HTTP 422，不会自动切成 FTS。
+显式 `vector` 请求在能力不可用时返回 HTTP 422，不会自动切成 FTS。
 
-## 跨会话召回靠 Scope，不靠 session
+## 跨会话召回靠 Scope，不靠会话
 
 脚本为了可重复测试使用随机 Scope。要验证跨会话：
 
 1. 改成稳定值，例如 `project:powercontext-101`；
-2. 第一次运行 capture/flush；
-3. 在新的 Python 进程或 Agent session 中只运行 search/prepare；
+2. 第一次运行采集/刷新；
+3. 在新的 Python 进程或 Agent 会话中只运行搜索/准备；
 4. 两边连接同一个 Server，并使用完全相同的 Scope。
 
 如果第二次查不到，依次检查：
 
 - Server URL；
-- database home/URL；
+- 数据库主目录/URL；
 - 最终 `scope_id`；
-- entry 是否 active；
-- query 是否相关。
+- 条目是否启用状态；
+- 查询是否相关。
 
-Session ID 不应该替代 project Scope。
+会话 ID 不应该替代项目 Scope。
 
-## Active、inactive 与历史
+## 启用状态、停用状态与历史
 
-Extraction 产生的 entry 与显式 Memory 使用同一 lifecycle：
+抽取产生的条目与显式 Memory 使用同一生命周期：
 
-- revise 创建新 entry version；
-- retire 将 current entry 设为 inactive；
-- 默认 list/search/PreparedContext 只使用 active content；
-- `include_inactive=True` 和 exact read 保留审计历史。
+- 修订创建新条目版本；
+- 停用将当前条目设为停用状态；
+- 默认列出/搜索/PreparedContext 只使用启用状态内容；
+- `include_inactive=True` 和精确读取保留审计历史。
 
-Source lineage 也随 entry version 保存。修订时，新的 evidence 会加入 lineage，旧版本的 exact evidence 不会消失。
+Source 证据链也随条目版本保存。修订时，新的证据会加入证据链，旧版本的精确证据不会消失。
 
 ## 失败排查
 
-### Capture 成功，flush 返回 503
+### 采集成功，刷新返回 503
 
-检查 generation capability 和 provider credential。Source 已经保存；修复配置后可以重试未消费窗口。
+检查生成能力和模型提供方凭证。Source 已经保存；修复配置后可以重试未消费窗口。
 
-### Flush 是 processed，却没有 linked entry
+### 刷新是已处理，却没有 linked 条目
 
-这是允许的 no-op。先看 Source 内容是否确实包含可复用决策，再检查 generation 输出和去重。
+这是允许的无变更。先看 Source 内容是否确实包含可复用决策，再检查生成输出和去重。
 
-### Cursor 一直追不上 position
+### 游标 一直追不上位置
 
-查看 readiness、generation diagnostics 和 scheduler/flush error。不要把未处理窗口误报成已生成 Memory。
+查看就绪状态、生成诊断信息和调度器/刷新错误。不要把未处理窗口误报成已生成 Memory。
 
-### Search 能命中，但 lineage 不对
+### 搜索能命中，但证据链不对
 
-你命中了同 Scope 中旧的相似 Memory。以 `source_refs` 和 exact entry Citation 为准。
+你命中了同 Scope 中旧的相似 Memory。以 `source_refs` 和精确条目 Citation 为准。
 
-### 第二次 capture 变成 conflict
+### 第二次采集变成冲突
 
-同一 `source_id` 的 content 或 metadata bytes 发生变化。为新事件使用新 ID；真正的重试则复用原输入。
+同一 `source_id` 的内容或元数据字节发生变化。为新事件使用新 ID；真正的重试则复用原输入。
 
 ## 完成检查
 
 这一页完成后，你应能证明：
 
-- capture 创建 Source，不直接创建 Memory；
-- replay 保持原 position；
-- flush cursor 到达 capture position；
-- source-linked entry 通过 exact `source_refs` 被识别；
-- processed window 可以合法 no-op；
+- 采集创建 Source，不直接创建 Memory；
+- 重放保持原位置；
+- 刷新游标到达采集位置；
+- 关联 Source 的条目通过精确 `source_refs` 被识别；
+- 已处理窗口可以合法无变更；
 - 跨进程召回依赖稳定 Scope；
-- inactive entry 退出默认召回，但历史仍在。
+- 停用状态条目退出默认召回，但历史仍在。
 
-下一页进入 [Handoff loop](/zh/basic-usage/handoff-loop)。
+下一页进入 [Handoff 循环](/zh/basic-usage/handoff-loop)。

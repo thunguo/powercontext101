@@ -103,7 +103,7 @@ The plugin mounts 19 curated HTTP tools. They cover Memory reads and mutations, 
 
 It does not mount Candidate approve/reject/revise, Work Contract creation, Handoff acknowledgement, Task Outcome recording, external-Skill registry, or Handoff-report operations. Human Candidate mutation remains outside the model surface through the Dashboard or a direct human-controlled API client.
 
-Before one of eight classified mutations—remember, capture Source, revise or retire Memory, activate or commit Handoff, generate Experience, or generate Skill—the tool calls host `context.ask()` with permission `powercontext` and the operation ID. This boundary is **Host-gated**. `pc_remember` has a tested ask-and-success path. A rejected ask stops before HTTP by control flow, but real UI allow/deny and a direct denial test are **Not validated**.
+Before one of eight classified mutations, the tool calls host `context.ask()` with permission `powercontext` and the operation ID. Those mutations are: remember, capture Source, revise or retire Memory, activate or commit Handoff, generate Experience, and generate Skill. This boundary is **Host-gated**. `pc_remember` has a tested ask-and-success path. A rejected ask stops before HTTP by control flow, but real UI allow/deny and a direct denial test are **Not validated**.
 
 Explicit mutation payloads also reject secret-looking nested strings before transport. This check occurs after `context.ask()`, so the host can ask before returning `secret_rejected`.
 
@@ -137,7 +137,6 @@ Run these when changing setup or the plugin. Treat them as a deployment checklis
 
 The conditional real-host E2E launches a real `opencode run`, uses an invalid model and empty PreparedContext, and observes prepare/capture HTTP requests. It proves neither model dispatch nor transform injection. Doctor's nonce probe is a separate activation check.
 
-
 ## Configuration defaults
 
 The plugin reads connection settings from the environment. These defaults control automatic recall and capture:
@@ -160,7 +159,6 @@ export POWERCONTEXT_OPENCODE_CAPTURE_PROMPTS=false
 opencode
 ```
 
-
 ## Finish the shared check on this host
 
 > What should happen after the OpenAPI contract changes?
@@ -173,20 +171,23 @@ opencode
 
 ## Completion checklist
 
-- [ ] OpenCode is `>=1.18.21,<2`, and Node satisfies the package's `>=20` declaration.
-- [ ] Setup installs both owned paths and documents the lack of cross-artifact rollback.
-- [ ] Foreign plugin and Skill targets are preserved rather than overwritten.
-- [ ] `powercontext doctor opencode` is treated as activation evidence, not a Server or model-turn test.
-- [ ] Scope uses an explicit override, otherwise Git identity derived from the session/worktree directory, then a local-root hash.
-- [ ] `chat.message` excludes synthetic text, prepares first, and captures with separate fail-open handling.
-- [ ] Transform injection requires exact session and message IDs and remains idempotent.
-- [ ] Concurrent out-of-order prepare is classified **Not validated** and can cause a missed, not wrong-turn, injection.
-- [ ] `session.deleted` clears session context and the current prepared turn.
-- [ ] Secret and byte-limit filtering applies to capture, while recall transmission is assessed separately.
-- [ ] Optional flush is off by default, bounded by cursor position and calls, and never stands in for Memory verification.
-- [ ] The 19-tool surface and eight `context.ask()`-gated mutations match the plugin.
-- [ ] Candidate Review stays read-only on the model surface; automatic assistant capture and Task Outcome stay **Unsupported**.
-- [ ] Bundled Skill and managed Skill export remain distinct.
-- [ ] Conditional real-host E2E limits remain visible.
+Treat the integration as complete only when these results are observable:
+
+- OpenCode is `>=1.18.21,<2`, and Node satisfies the package's `>=20` declaration.
+- Setup installs both owned paths and documents the lack of cross-artifact rollback.
+- Foreign plugin and Skill targets are preserved rather than overwritten.
+- `powercontext doctor opencode` is treated as activation evidence, not a Server or model-turn test.
+- Scope uses an explicit override, otherwise Git identity derived from the session/worktree directory, then a local-root hash.
+- `chat.message` excludes synthetic text, prepares first, and captures with separate fail-open handling.
+- Transform injection requires exact session and message IDs and remains idempotent.
+- Concurrent out-of-order prepare is classified **Not validated** and can cause a missed, not wrong-turn, injection.
+- `session.deleted` clears session context and the current prepared turn.
+- Secret and byte-limit filtering applies to capture, while recall transmission is assessed separately.
+- Optional flush is off by default, bounded by cursor position and calls, and never stands in for Memory verification.
+- The 19-tool surface and eight `context.ask()`-gated mutations match the plugin.
+- Candidate Review stays read-only on the model surface.
+- Automatic assistant capture and Task Outcome stay **Unsupported**.
+- Bundled Skill and managed Skill export remain distinct.
+- Conditional real-host E2E limits remain visible.
 
 Continue with [Pi](/en/coding-agents/pi).

@@ -1,11 +1,11 @@
 ---
 title: "Handoff 闭环"
-description: "创建 工作契约，交接当前工作，确认 exact Handoff，并记录真实 Task Outcome。"
+description: "创建工作契约（Work Contract），交接当前工作，确认精确 Handoff，并记录真实 Task Outcome。"
 ---
 
-这一页完成一条真正的工作交接：发送方记录委托边界和当前状态，接收方检查 exact Handoff，最后把结果链接回这次交接。
+这一页完成一条真正的工作交接：发送方记录委托边界和当前状态，接收方检查精确 Handoff，最后把结果链接回这次交接。
 
-Handoff 不要求 generation model。示例使用调用方已经检查过的 typed data，最小 Server 就能运行。
+Handoff 不要求生成模型。示例使用调用方已经检查过的类型化数据，最小 Server 就能运行。
 
 ## 闭环长什么样
 
@@ -19,7 +19,7 @@ Work Contract
 → Task Outcome
 ```
 
-工作契约、Handoff boundary、acknowledgement receipt 和 Task Outcome 都会留下 Source receipt。Committed Handoff 另有不可变 Artifact Revision。
+工作契约、Handoff 边界、确认回执和 Task Outcome 都会留下 Source 回执。已提交 Handoff 另有不可变 Artifact Revision。
 
 ## 完整 Python 示例
 
@@ -211,17 +211,17 @@ if __name__ == "__main__":
 uv run python handoff_loop.py
 ```
 
-这里用 `model_validate` 构造嵌套 request，因为 JSON 契约中的字段名是 `schema`，而生成的 Python model 内部属性使用别名。
+这里用 `model_validate` 构造嵌套请求，因为 JSON 契约中的字段名是 `schema`，而生成的 Python 模型内部属性使用别名。
 
 ## 每一步的边界
 
-### 工作契约 是委托基线
+### 工作契约是委托基线
 
-它记录 objective、in-scope work、exclusions、completion criteria、authorization notes 和 consequential questions。
+它记录 objective、in-scope 工作、exclusions、完成 criteria、授权信息 备注 和 consequential questions。
 
-契约 是 `untrusted_input` Source，不会扩大当前授权。`basis="verified"` 的 claim 必须带 exact evidence；`basis="declared"` 则不能带 evidence。
+契约是 `untrusted_input` Source，不会扩大当前授权。`basis="verified"` 的声明必须带精确证据；`basis="declared"` 则不能带证据。
 
-### `handoff_current_work` 会写 boundary Source
+### `handoff_current_work` 会写边界 Source
 
 它返回：
 
@@ -231,25 +231,25 @@ PreparedWorkHandoff
 └── handoff: PreparedHandoff
 ```
 
-后续 commit/continue 传 `prepared_work.handoff`，不是整个 response。
+后续提交/继续传 `prepared_work.handoff`，不是整个响应。
 
-这一步没有创建 Handoff Revision，但已经持久化 boundary Source。因此，它不是 read-only preview。
+这一步没有创建 Handoff Revision，但已经持久化边界 Source。因此，它不是只读预览。
 
-### Prepared transfer 不需要 commit
+### 已准备 transfer 不需要提交
 
 示例先 `continue_handoff(selection="prepared")`，证明临时交接可用。此时 `selected_revision` 是 `None`。
 
-只有需要 durable milestone 时才调用 `commit_handoff`。
+只有需要持久里程碑时才调用 `commit_handoff`。
 
 ### `latest` 用于发现，`exact` 用于确认
 
-`latest` 返回当前 head，并把它放在 `selected_revision` 和 `current_revision`。接收方检查后，应把 acknowledgement 绑定到 exact Revision。
+`latest` 返回当前头版本，并把它放在 `selected_revision` 和 `current_revision`。接收方检查后，应把确认绑定到精确 Revision。
 
 `acknowledge_handoff` 不接受 `selection="latest"`。
 
-### Accepted 有硬性条件
+### 接受有硬性条件
 
-只有下面三项全部 confirmed，且 evidence 都 available，才能写 `accepted`：
+只有下面三项全部已确认，且证据都 可用，才能写 `accepted`：
 
 ```text
 live_state
@@ -257,11 +257,11 @@ capability
 authorization
 ```
 
-无法确认时使用 `needs_clarification` 或 `declined`，并提供 message。
+无法确认时使用 `needs_clarification` 或 `declined`，并提供消息。
 
-Acknowledgement 只是接收记录，不授予权限。
+确认只是接收记录，不授予权限。
 
-### Outcome 要链接 accepted exact receipt
+### 结果要链接接受精确回执
 
 `handoff_receipt_ref` 使用：
 
@@ -269,13 +269,13 @@ Acknowledgement 只是接收记录，不授予权限。
 acknowledgement.receipt.source
 ```
 
-只有 status accepted、selection exact、selected Revision 指向 committed Handoff 的 receipt，才能声明该 durable Handoff 的结果被覆盖。
+只有状态接受、选择方式精确、已选择 Revision 指向已提交 Handoff 的回执，才能声明该持久 Handoff 的结果被覆盖。
 
-Prepared acknowledgement receipt 不能用于这个 linkage。
+已准备确认回执不能用于这个 linkage。
 
-## Outcome 与 Check 状态
+## 结果与 Check 状态
 
-整体 `TaskOutcome.status` 可选：
+整体 `TaskTask Outcome.status` 可选：
 
 ```text
 succeeded
@@ -298,38 +298,38 @@ cancelled
 unknown
 ```
 
-不要因为一个 check passed 就把整体结果写成 succeeded。没运行的检查也不能写 passed。
+不要因为一个检查 passed 就把整体结果写成 succeeded。没运行的检查也不能写 passed。
 
 ## 负向实验
 
-### 不 commit，读取 latest
+### 不提交，读取最新版本
 
-在 commit 前调用 `continue_handoff(selection="latest")`，应得到 `status="empty"`。Prepared Handoff 仍可通过 `selection="prepared"` 使用。
+在提交前调用 `continue_handoff(selection="latest")`，应得到 `status="empty"`。已准备 Handoff 仍可通过 `selection="prepared"` 使用。
 
-### Accepted 但 authorization 未确认
+### 接受但授权信息未确认
 
-把 authorization 改成 `not_checked`，operation 应拒绝。改用 `needs_clarification` 并说明缺少什么。
+把授权信息改成 `not_checked`，操作应拒绝。改用 `needs_clarification` 并说明缺少什么。
 
-### 用 prepared receipt 记录 committed outcome
+### 用已准备回执记录已提交 outcome
 
-先 acknowledgement prepared，再把它作为 `handoff_receipt_ref`。Server 应拒绝，因为 receipt 没有绑定 committed exact Revision。
+先确认已准备，再把它作为 `handoff_receipt_ref`。Server 应拒绝，因为回执没有绑定已提交精确 Revision。
 
-### 两个 Prepared Handoff 共享 base
+### 两个已准备 Handoff 共享基础
 
-先准备两个 Handoff，commit 第一个，再 commit 第二个。第二个应发生 Revision conflict。读取新 head 后重新准备，不要猜 revision。
+先准备两个 Handoff，提交第一个，再提交第二个。第二个应发生 Revision 冲突。读取新头版本后重新准备，不要猜 Revision。
 
-### Boundary 成功，commit 失败
+### 边界成功，提交失败
 
-此时 boundary Source 已存在，但没有新的 Handoff Revision。向用户报告这个实际状态，不能说“什么都没写”，也不能说“里程碑已保存”。
+此时边界 Source 已存在，但没有新的 Handoff Revision。向用户报告这个实际状态，不能说“什么都没写”，也不能说“里程碑已保存”。
 
 ## 完成检查
 
-- 工作契约 receipt 已保存；
-- Prepared Handoff 可以临时 continue；
-- commit 返回 exact Handoff Revision；
-- latest discovery 转成 exact acknowledgement；
-- accepted 前检查 evidence、live state、capability、authorization；
-- Task Outcome 链接 acknowledgement receipt SourceRef；
-- overall outcome 与 individual check status 没有混用。
+- 工作契约回执已保存；
+- 已准备 Handoff 可以临时继续；
+- 提交返回精确 Handoff Revision；
+- 最新版本发现转成精确确认；
+- 接受前检查证据、实时状态、能力、授权信息；
+- Task Outcome 链接确认回执 SourceRef；
+- overall outcome 与 individual 检查状态没有混用。
 
 下一页进入 [Experience、Skill 与 Review](/zh/basic-usage/experience-skill-review)。

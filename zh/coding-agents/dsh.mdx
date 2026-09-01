@@ -1,15 +1,15 @@
 ---
 title: "DeepSeek Harness"
-description: "通过 agent/pre-step middleware 和原生 pc_* HTTP tools 接入 PowerContext。"
+description: "通过 agent/pre-step 中间件和原生 pc_* HTTP 工具接入 PowerContext。"
 ---
 
 <Warning>
-这是早期 native integration。Plugin package version 是 `0.0.2`，但 DSH 尚无正式最低 host version。完整的真实 `dsh web` host-process/model E2E 为 **Not validated**。
+这是早期原生集成。插件软件包版本是 `0.0.2`，但 DSH 尚无正式最低宿主版本。完整的真实 `dsh web` 宿主进程与模型端到端验证为 **Not validated**。
 </Warning>
 
-DSH 使用宿主原生 Hook，不是 MCP plugin。自动 recall/capture 在 `agent/pre-step` 运行；curated `pc_*` tools 直接调用 PowerContext HTTP API。
+DSH 使用宿主原生 Hook，不是 MCP 插件。自动召回与采集发生在 `agent/pre-step`；精选的 `pc_*` 工具直接调用 PowerContext HTTP API。
 
-## 安装与成熟度
+## 安装并检查配置
 
 ```bash
 powercontext setup dsh --source oceanbase/powercontext --ref master
@@ -17,13 +17,13 @@ powercontext server run
 powercontext doctor dsh
 ```
 
-Setup 要求 `dsh` 位于 `PATH`，并且 built plugin entrypoint `lib/index.js` 已存在。它通过 `dsh plugin --profile web add` 安装 plugin directory。Doctor 读取 `dsh --profile web --dump-config`，查找 exact plugin ID `powercontext-dsh`。Plugin 需要 Node.js 20 或更高版本。
+安装要求 `dsh` 位于 `PATH`，并且构建后的插件入口 `lib/index.js` 已存在。安装程序通过 `dsh plugin --profile web add` 添加插件目录。`powercontext doctor dsh` 读取 `dsh --profile web --dump-config`，寻找精确插件 ID `powercontext-dsh`。插件要求 Node.js 20 或更高版本。
 
-这个检查只能证明配置存在，不能证明真实 turn 已跑通。它不会证明 `dsh web` 已加载 plugin、触发 Hook 或显示 permission prompt。Node.js 要求和开发环境中的 Cordis dependency 都不是正式最低 DSH host version。
+这些检查只能证明配置存在，不能证明真实轮次已经跑通。它们不会启动 `dsh web`、触发 Hook 或显示权限界面。Node.js 要求和开发时使用的 Cordis 依赖，也不能当成正式最低 DSH 宿主版本。
 
-## 最小用法
+## 跑通一次宿主请求
 
-Server 启动后，再启动宿主：
+Server 启动后，再打开 DSH：
 
 ```bash
 dsh web
@@ -36,9 +36,9 @@ dsh web
 /pc review
 ```
 
-通常不需要手动 recall，照常发送 prompt 即可。用 `/pc` 查看 Scope 和 endpoint；需要区分 plugin configuration 与 Server health 时，再用 `/pc doctor`。人工命令还覆盖 search、remember、flush 与 Candidate review。Agent 则会收到 curated `pc_*` tools。
+普通召回不需要手动命令，直接发送提示词即可。`/pc` 用来查看 Scope 和端点；`/pc doctor` 可把插件配置问题与 Server 健康问题分开。人工命令还提供搜索、写入、刷新和 Candidate Review。Agent 则使用精选的 `pc_*` 工具。
 
-## 执行流程
+宿主中的执行顺序如下：
 
 ```text
 agent/pre-step
@@ -52,125 +52,88 @@ agent/pre-step
 → otherwise return the downstream result unchanged
 ```
 
-完整 message batch 有助于 recall，因为其中包含宿主和 plugin context。Capture 更严格：只有 `source.kind === "user"` 的 text 才会成为 Source。全是 plugin message 的 batch 不会被误当成 user input。
+完整消息批次会参与召回，因为宿主与插件上下文可能影响查询。采集范围更窄：只有 `source.kind === "user"` 的文本才能成为 Source；全是插件消息的批次不会被误记成用户输入。
 
-能否注入由 `next()` 的结果决定。Recall 在 `next()` 前执行，但只有 downstream 返回 `kind: "enter"`，plugin 才会追加 context。Reject、无 context、校验失败或 wrapping 失败都会原样保留下游结果。Plugin 也不会为了补救注入失败而再次调用 `next()`。
+`next()` 的结果决定能否注入。召回在调用 `next()` 前完成，但只有下游返回 `kind: "enter"` 时，插件才追加上下文。拒绝、上下文缺失、校验失败或消息封装失败都会原样保留下游结果。插件不会为了挽救注入而第二次调用 `next()`。
 
 ## Scope
 
 Scope 按以下顺序解析：
 
-1. `POWERCONTEXT_DSH_SCOPE_ID` 或 plugin `scopeId`；
-2. session workspace 的 normalized Git remote identity；
-3. 根据 workspace path 生成的稳定 SHA-256 identity。
+1. `POWERCONTEXT_DSH_SCOPE_ID` 或插件设置 `scopeId`；
+2. 会话工作区的规范化 Git 远程仓库标识；
+3. 根据工作区路径生成的稳定 SHA-256 标识。
 
-DSH 没有实现 Codex 与 Claude Code 使用的 Git-private Workstream binding 或 picker。Plugin 刻意不使用 process directory 作为 fallback。Session 没有 `cwd`，且未显式配置 Scope 时，自动路径会跳过，`/pc` 会报告 unscoped state，tool 会返回稳定的 `unscoped` result，并且不会发出 HTTP call。这样能避免无关的 DSH session 意外共享 Memory。
+DSH 没有 Codex 和 Claude Code 使用的 Git 私有 Workstream 绑定或选择器，也不会退回插件进程目录。会话没有 `cwd` 且未显式配置 Scope 时，自动路径会跳过，`/pc` 报告无 Scope 状态，工具返回稳定的 `unscoped`，并且不发出 HTTP 请求。这样可以避免无关 DSH 会话意外共享 Memory。
 
-Model tool caller 不能覆盖 Scope。Plugin 会用 runtime-resolved value 覆盖 caller 提供的 `scope_id`。显式 Scope 应来自可信部署配置，而不是 model input。
+模型不能覆盖 Scope。插件会用运行时解析出的值替换调用载荷中的 `scope_id`。显式 Scope 应来自可信部署配置，而不是模型输入。
 
-## 注入、capture 与 flush
+## 注入、采集与刷新
 
-PreparedContext 在注入前必须通过 exact v1 schema、status、integer byte count、UTF-8 byte count 与 configured size 检查。默认上限是 8,000 bytes；配置范围是 512 到 32,768 bytes。注入消息会标记为宿主提供的、不可信历史证据，只服务于本次 model entry，不会再次作为 user content 被 capture。
+PreparedContext 注入前必须通过精确的 v1 schema、状态、整数字节数、UTF-8 字节数和配置大小检查。默认上限是 8,000 字节，可配置范围为 512–32,768 字节。注入消息会标记为宿主提供的不可信历史证据，只服务当前模型调用，也不会再次作为用户内容被采集。
 
-Capture 写入确定性的 `dsh-user-prompt:` Source，并保留 DSH session 与 turn provenance。Recall 失败不影响 capture；capture 失败也不会丢掉有效 PreparedContext。超过 200,000 characters 的内容会跳过。设置 `POWERCONTEXT_DSH_CAPTURE_PROMPTS=false` 可以关闭 capture。
+采集写入具有确定性 `dsh-user-prompt:` ID 的 Source，并保留 DSH 会话与轮次来源信息。召回失败不妨碍采集，采集失败也不会丢弃已经有效的 PreparedContext。超过 200,000 字符的内容会跳过；设置 `POWERCONTEXT_DSH_CAPTURE_PROMPTS=false` 可以关闭采集。
 
-Capture 还会跳过包含 `sk-`、`api_key` 或 `BEGIN PRIVATE` 这些窄匹配 marker 的文本。这只是 guardrail，不是完整的 secret detection。如果 prompt 不应持久化，请关闭 capture。
+过滤器还会跳过包含 `sk-`、`api_key` 或 `BEGIN PRIVATE` 的文本。这只是窄范围保护，不是完整的敏感信息检测。提示词不应持久化时，请直接关闭采集。
 
-Automatic flush 可选，默认关闭。启用 `flushOnCapture` 后，positive capture position 最多触发 `flushMaxCalls` 次尝试，并在 `current_cursor >= position` 时提前停止。`/pc flush` 是显式人工路径。如果 cursor 始终追不上，loop 会用完上限，却不能证明 Source 已被处理。不能从成功的 capture log 推断 Memory：处理可能产生 Candidate，Review 可以 commit Memory，也可以 no-op。
+自动刷新默认关闭。启用 `flushOnCapture` 后，正数 Source 位置最多触发 `flushMaxCalls` 次刷新，并在 `current_cursor >= position` 时提前结束。`/pc flush` 是显式人工路径。游标始终追不上时，循环会在上限处停止，但这不能证明 Source 已处理。采集日志成功也不等于 Memory 已生成：处理可能产生 Candidate，Review 可能提交，也可能保持无变更。
 
-## 原生 tools 与 permission
+## 工具与权限
 
-Model surface 包含 19 个 curated named HTTP tools，不是 MCP。它们覆盖 Memory、prepare/capture、low-level Handoff、Experience 与 Skill generation/read，以及 read-only Candidate list/get。
+模型范围包含 19 个精选的原生 HTTP 工具。它们覆盖 Memory、准备与采集、低层 Handoff、Experience/Skill 的生成和读取，以及 Candidate 的只读列出与读取。
 
-Generic operation invocation、dangerous/admin operations 与 Candidate approve/reject/revise 在 model surface 上属于 **Unsupported**。High-level `create_work_contract`、`handoff_current_work`、`acknowledge_handoff` 与 `record_task_outcome` 也没有注册到该 surface，尽管相关 operation 存在于 generated HTTP 契约 中。
+以下能力没有进入模型范围，状态为 **Unsupported**：通用操作调用、危险或管理员操作、Candidate 批准/拒绝/修订，以及高层 `create_work_contract`、`handoff_current_work`、`acknowledge_handoff` 和 `record_task_outcome`。相关 HTTP 操作可能存在，但不会因此自动成为 DSH 工具。
 
-Read tools 会继续经过 `tools/pre-execute`。Memory write、显式 Source capture、Handoff activate/commit 与 Experience/Skill generation 这些 named mutation 会在执行前返回 `ask`。Permission UI 与 allow/deny decision 由 DSH 负责，因此这些 mutation 属于 **Host-gated**。Unit tests 已证明 `ask` classification；真实宿主中的 exact UI 与 denial path 为 **Not validated**。
+读取工具通过 `tools/pre-execute` 后继续执行。Memory 写入、显式 Source 采集、Handoff 激活或提交、Experience/Skill 生成等指定修改，会先返回 `ask`。DSH 负责权限界面和允许/拒绝决定，所以这些修改属于 **Host-gated**。单元测试已经证明 `ask` 分类；真实宿主中的界面与拒绝路径仍是 **Not validated**。
 
-Candidate review 保持人工控制。`/pc review approve` 与 `/pc review reject` 都要求 Candidate expected version。`/pc` 没有实现 Candidate revise。生成 Experience 或 Skill Candidate 是另一类 Host-gated mutation，不等同于 approval。
+Candidate Review 保持人工控制。`/pc review approve` 与 `/pc review reject` 都要求 Candidate 的预期版本；`/pc` 不提供 Candidate 修订。生成 Experience 或 Skill Candidate 只是另一类受权限控制的修改，不等于批准。
 
-## 失败行为
+## 失败语义与负向验证
 
-Automatic prepare、validation、capture、optional flush 与 message wrapping 都 fail open。HTTP client 将 response 限制在 1 MiB，拒绝 redirect，取消 timeout request，并把 transport failure 规范成稳定的 unavailable result。整体 pre-step budget 默认四秒，单个 request 默认一秒。这些 failure 不能替换 downstream Agent result。
+自动准备、校验、采集、可选刷新和消息封装都采用 fail-open。HTTP 客户端将响应限制在 1 MiB，拒绝重定向，取消超时请求，并把传输失败规范化为稳定的不可用结果。步骤前总预算默认四秒，单个请求默认一秒。这些失败不能替换下游 Agent 结果。
 
-显式 durable operation 不同。Permission denial 与 Server error 必须保持可见，不能伪装成成功。Missing `cwd` 是 unscoped state，不是 empty Memory result。
+显式持久操作不同。权限拒绝和 Server 错误必须可见，不能包装成成功。缺失 `cwd` 是无 Scope，不是 Memory 空结果。
 
-## 负向实验
+升级 DSH 或插件时，至少验证：停止 Server 后普通提示词继续而显式写入失败；召回可读取完整消息批次但采集只保存用户文本；非 `enter` 下游结果不会追加插件消息；无 Scope 时不使用插件进程目录；未知 PreparedContext 字段、错误字节数、超限响应体、重定向和慢响应都不注入；敏感标记触发采集跳过；刷新游标落后时循环有界；读取直接执行而指定修改先返回 `ask`；模型工具中没有 Candidate 决策或通用危险操作。
 
-升级 DSH 或 plugin 时，建议跑这些检查：
+当前证据边界如下：
 
-- 停止 Server，再发送普通 prompt。Agent 应继续运行，只是没有 injected context；explicit write 应报告失败。
-- 提交同时包含 user text 与 plugin text 的 batch。Recall 应看到两者，capture 只能包含 user-originated text。全是 plugin text 的 batch 不应创建 prompt Source。
-- 让 downstream 返回非 `enter` decision。Plugin 不应追加消息。这个分支已经实现，但 dedicated real-host acceptance test 仍为 **Not validated**。
-- 不配置 Scope，同时移除 session `cwd`。确认 HTTP request 不会使用 plugin process directory，command 与 tool 都报告 unscoped behavior。
-- 返回 unknown PreparedContext field、错误 byte count、oversized body、redirect 或 slow response。不得发生 injection，下游 decision 应保持不变。
-- 提交包含 `sk-`、`api_key` 或 `BEGIN PRIVATE` 的 capture text。它应被跳过。再测试另一种 credential shape，确认 filter 的覆盖范围刻意很窄。
-- 让 flush cursor 始终落后于 Source position，直到用完 call bound。Turn 应继续，但不能谎报 processing 或 Memory。
-- 分别调用 read 与 named mutation。Read 应 delegate；mutation 应在 write 前返回 `ask`。真实 permission UI 需要单独验证。
-- 检查 model tools。Candidate approve/reject/revise、generic invocation 与 dangerous/admin operations 都不应出现。
+| 状态 | 能力与影响 |
+|---|---|
+| **Unsupported** | 插件不使用 MCP；不自动采集助手最终响应或 Task Outcome；没有 Codex/Claude 风格 Workstream 绑定；模型没有通用、危险、管理员或 Candidate 决策工具；有界自动刷新不保证游标最终追上 |
+| **Not validated** | 正式最低 DSH 版本；完整真实 `dsh web` 模型端到端验证；真实权限界面和拒绝行为；真实宿主的非 `enter` 抑制与游标落后刷新行为 |
+| **Host-gated** | 指定持久修改先返回 `ask`，最终交互与决定由 DSH 控制 |
 
-## Unsupported 与 Not validated
-
-| State | Capability | Practical consequence |
-|---|---|---|
-| **Unsupported** | 此 plugin 中的 MCP transport | 使用 native HTTP client 与 `pc_*` surfaces。 |
-| **Unsupported** | automatic assistant final-response capture 与 automatic Task Outcome | 通过可用的受控 surface 显式持久化真实 completion boundary。 |
-| **Unsupported** | Codex/Claude 风格 Git-private Workstream binding 与 picker | DSH 使用 configured Scope、Git remote 或 workspace-path identity。 |
-| **Unsupported** | generic、destructive 或 admin model tools；model-driven Candidate decision | 使用 curated tools 与人工 `/pc review` approve/reject path。 |
-| **Unsupported** | bounded automatic flush 之后的 cursor-through completion guarantee | 把它视为 bounded best-effort wait，不是 Memory generation 证明。 |
-| **Not validated** | 正式最低 DSH version 或与某个 named release 的兼容性 | 不要把 development dependency 或本机 CLI version 当成支持下限。 |
-| **Not validated** | 完整真实 `dsh web` host-process/model E2E | Package E2E 与 HTTP call-through 不能证明完整 host lifecycle。 |
-| **Not validated** | 真实 host policy 下的 exact permission UI 与 denial behavior | Plugin 返回 `ask`；交互与最终 decision 由 DSH 负责。 |
-| **Not validated** | dedicated real-host non-`enter` suppression 与 cursor-behind flush behavior | 对外声明 deployment 能力前，先运行负向实验。 |
-
-`test_dsh_http_chain.py` 验证关闭 MCP 后的 native public Client/Server HTTP 契约。Cordis harness 覆盖 plugin 对 live Server 的 call-through。两者都没有启动真实 DSH host。
-
+`test_dsh_http_chain.py` 验证关闭 MCP 后的公开 Client/Server HTTP 契约；Cordis 测试覆盖插件对实时 Server 的调用。两者都没有启动真实 DSH 宿主。
 
 ## 配置默认值
 
-环境变量可以覆盖连接和 capture。`timeoutMs`、`requestTimeoutMs`、`maxBytes` 和 `flushMaxCalls` 是 plugin patch 设置，不是环境变量。
+`timeoutMs`、`requestTimeoutMs`、`maxBytes` 和 `flushMaxCalls` 是插件局部设置，不是环境变量。
 
-| Key | 默认值 | 含义 |
+| 键 | 默认值 | 含义 |
 |---|---|---|
 | `POWERCONTEXT_DSH_BASE_URL` | `http://127.0.0.1:8000` | 正在运行的 Server |
-| `POWERCONTEXT_DSH_SCOPE_ID` | 未设置 | 显式 Scope；无 workspace cwd 时必须设置 |
-| `POWERCONTEXT_DSH_AUTHORIZATION` | 未设置 | 完整 Authorization header |
-| `POWERCONTEXT_DSH_CAPTURE_PROMPTS` | `true` | 采集 user-originated prompt |
-| `POWERCONTEXT_DSH_FLUSH_ON_CAPTURE` | `false` | 测试用 flush |
-| `maxBytes` | `8000` | Recall budget，限制在 `512–32768` |
-| `timeoutMs` | `4000` | pre-step 总预算 |
-| `requestTimeoutMs` | `1000` | 单次 HTTP timeout |
+| `POWERCONTEXT_DSH_SCOPE_ID` | 未设置 | 显式 Scope；会话没有工作区 `cwd` 时必须设置 |
+| `POWERCONTEXT_DSH_AUTHORIZATION` | 未设置 | 完整 Authorization 请求头 |
+| `POWERCONTEXT_DSH_CAPTURE_PROMPTS` | `true` | 采集源自用户的提示词 |
+| `POWERCONTEXT_DSH_FLUSH_ON_CAPTURE` | `false` | 测试用刷新 |
+| `maxBytes` | `8000` | 召回预算，范围 `512–32768` |
+| `timeoutMs` | `4000` | 步骤前总预算 |
+| `requestTimeoutMs` | `1000` | 单次 HTTP 超时 |
 
-不要把 token 写进 patch 文件或 Server URL。当前工作不能落成 Source 时：
+不要把令牌写进局部设置或 Server URL。当前工作不应成为 Source 时：
 
 ```bash
 export POWERCONTEXT_DSH_CAPTURE_PROMPTS=false
 dsh web
 ```
 
+## 完成统一验证
 
-## 在这个宿主上做完统一题
+先在固定 Scope 中用 `pc_remember` 保存“修改 OpenAPI 契约后，重新生成并检查客户端”的决定。确认 `tools/pre-execute` 返回 `ask`，再取得 Citation。发送一个会进入模型的新请求并重复问题；召回内容必须带 Citation，只能出现在 `enter` 之后、以 `PowerContext host-supplied context` 开头的插件消息中。
 
-> 修改 OpenAPI 契约后，下一步应该做什么？
+随后停止 Server。普通问题应继续，非 `enter` 下游结果不得被替换。再次运行 `pc_remember` 时，失败必须可见，不能伪装成空结果或成功。
 
-1. 在固定 Scope 里用 `pc_remember` 保存答案。先过 `tools/pre-execute` 的 `ask`，再看 Citation。
-2. 换一个会 `enter` 模型的新请求，再问同一句。
-3. 召回必须带 Citation，并且只出现在 enter 之后、以 `PowerContext host-supplied context` 开头的 plugin message。
-4. 停掉 Server 后再问。自动 recall 可以失败；非 enter 的 downstream 结果不得被替换。
-5. 再跑 `pc_remember`。失败必须可见，不能伪装成 empty success。
-
-## 完成检查
-
-- [ ] `powercontext doctor dsh` 找到 exact plugin ID `powercontext-dsh`。
-- [ ] Built `lib/index.js` 已安装到目标 `web` profile，并且 Node.js 为 20 或更高版本。
-- [ ] `/pc` 显示预期 endpoint 与 runtime-resolved Scope；`/pc doctor` 能连接 Server。
-- [ ] Missing `cwd` 不发出 HTTP call，并返回稳定 unscoped result。
-- [ ] Recall 使用完整 message batch，capture 仍然只取 user content。
-- [ ] `next()` 只运行一次；仅在 `kind: "enter"` 且 exact schema/byte checks 通过后注入。
-- [ ] Capture policy 已考虑窄匹配 secret-marker filter 与 200,000-character limit。
-- [ ] Automatic flush 有明确上限；没有 cursor evidence 时，不描述成已成功处理。
-- [ ] Named mutation 触发宿主 `ask`；read 会 delegate；denial 保持可见。
-- [ ] Model 只有 read-only Candidate access，没有 generic、dangerous、admin 或 Candidate-decision tools。
-- [ ] Server-down、redirect、invalid-schema、oversized-response、non-`enter` 与 cursor-behind case 都有适合 deployment 的负向覆盖。
-- [ ] **Unsupported**、**Not validated** 与 **Host-gated** 始终分开。
+只有以下结果都能直接观察时，才算完成：安装诊断找到精确插件 ID；Node.js 和目标 `web` 配置正确；`/pc doctor` 能访问 Server；Scope 缺失不会发出 HTTP 请求；召回与采集范围不同；`next()` 只调用一次；注入通过 schema/字节校验且只发生在 `enter`；刷新有上限且不虚报 Memory；指定修改触发宿主 `ask`；上述 Unsupported、Not validated 与 Host-gated 边界保持分开。
 
 下一页是 [OpenCode](/zh/coding-agents/opencode)。

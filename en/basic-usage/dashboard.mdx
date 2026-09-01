@@ -5,7 +5,7 @@ description: "Configure the same Scope as the Client and verify active, inactive
 
 The Dashboard is the Server's read-only statistics interface. It stores no second copy of data and does not discover every Scope automatically. More importantly, the current UI does not display Memory text or Citations. It can confirm that a Scope contains data, show active/inactive/total Memory counts, and expose Source, Candidate, usage, and recall statistics.
 
-That changes this page's goal. The API tour retires its example Memory before finishing, so the Dashboard should not show “the Memory you just wrote” as active content. The correct result for that Scope is `total=1`, `active=0`, and `inactive=1`.
+That changes the goal. The API tour retires its example Memory before finishing, so the Dashboard should not show “the Memory you just wrote” as active content. The correct result for that Scope is `total=1`, `active=0`, and `inactive=1`.
 
 ## Configure the exact Scope
 
@@ -39,3 +39,5 @@ Dashboard publication sends an approved managed Skill to a preconfigured target.
 With Bearer authentication enabled, `/` still opens, but Dashboard statistics requests need the Server token. Enter it in the page prompt; never place it in the URL.
 
 The proof of success is statistical agreement between Dashboard and Client for one Scope and database, not visible Memory text. Use Client, HTTP, or MCP for exact content and history.
+
+If the counts still disagree after Scope and database settings match, stop here. Restart the Server with the intended `--env-file`, repeat the API tour against that process, and compare the printed Scope literally. An empty or mismatched Dashboard is a configuration failure, not evidence that Memory was deleted.

@@ -1,45 +1,45 @@
 ---
 title: "排错"
-description: "按已经写过的症状一条条对照，先回到原页，不要把 401、空 Dashboard 或 capture 当成另一套故障。"
+description: "按已经写过的症状一条条对照，先回到原页，不要把 401、空 Dashboard 或采集当成另一套故障。"
 icon: wrench
 ---
 
-这一页只收 101 里已经出现过的误用。每条先对症状，再回原页。不要在这里发明新案例。
+这条排错路径只收录 PowerContext 101 已经演示过的误用。每条先对症状，再回原页。不要在这里发明新案例。
 
 <Steps titleSize="h3">
   <Step title="Scope 字面值不一致" icon="split">
-    Client、Dashboard、宿主 env 和 `--scope-id` 必须逐字相同。`project:powercontext-101` 和 `project:powercontext-101:<uuid>` 不是同一个 Scope。对照 [Scope](/zh/mental-model/scope)。
+    客户端、Dashboard、宿主环境变量和 `--scope-id` 必须逐字相同。`project:powercontext-101` 和 `project:powercontext-101:<uuid>` 不是同一个 Scope。对照 [Scope](/zh/mental-model/scope)。
   </Step>
-  <Step title="换了 home 或 database URL" icon="database">
-    `POWERCONTEXT_HOME` 或 database URL 一变，你看到的是另一套库。这很像 Scope 丢了。先对[安装并运行 Server](/zh/basic-usage/install-and-run) 里的数据目录，再对 Scope。
+  <Step title="换了 home 或数据库 URL" icon="数据库">
+    `POWERCONTEXT_HOME` 或数据库 URL 一变，你看到的是另一套库。这很像 Scope 丢了。先对[安装并运行 Server](/zh/basic-usage/install-and-run) 里的数据目录，再对 Scope。
   </Step>
-  <Step title="把 401/403 当成 empty" icon="shield">
-    `empty` 表示这个 Scope 当前没有可召回内容。401/403 是认证失败。宿主应留下 content-free outcome，不能注入，也不能假装“没有 Memory”。见 [fail-open](/zh/mental-model/fail-open) 和 [MCP](/zh/basic-usage/mcp)。
+  <Step title="把 401/403 当成空结果" icon="shield">
+    `empty` 表示这个 Scope 当前没有可召回内容。401/403 是认证失败。宿主应留下不含内容 outcome，不能注入，也不能假装“没有 Memory”。见 [fail-open](/zh/mental-model/fail-open) 和 [MCP](/zh/basic-usage/mcp)。
   </Step>
-  <Step title="capture 成功但搜索不到 Memory" icon="file-plus">
-    采集 Source 只表示“这件事发生过”。它不会自动变成长期 Memory。没有 generation model 时，Source 会保持 pending。用 `remember_memory` 写你已经确认的事实，或读 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
+  <Step title="采集成功但搜索不到 Memory" icon="file-plus">
+    采集 Source 只表示“这件事发生过”。它不会自动变成长期 Memory。没有生成模型时，Source 会保持待处理。用 `remember_memory` 写你已经确认的事实，或读 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
   </Step>
-  <Step title="doctor 通过但召回失败" icon="stethoscope">
-    先确认你运行的是哪一个命令。`powercontext doctor` 会检查软件包、Server 存活状态和 readiness；`powercontext doctor <host>` 只检查该宿主 CLI 与有限的安装/激活状态，不会探测 Server，也不会发送真实 prompt。先用前者确认 Server，再按宿主页完成真实召回。见[通用 Agent 总览](/zh/common-agents/overview)。
+  <Step title="诊断通过但召回失败" icon="stethoscope">
+    先确认你运行的是哪一个命令。`powercontext doctor` 会检查软件包、Server 存活状态和就绪状态；`powercontext doctor <host>` 只检查该宿主 CLI 与有限的安装/激活状态，不会探测 Server，也不会发送真实提示词。先用前者确认 Server，再按宿主页完成真实召回。见[通用 Agent 总览](/zh/common-agents/overview)。
   </Step>
   <Step title="Dashboard 是空的，数据其实在" icon="layout-dashboard">
-    未配置 Dashboard Scope 时页面就是空的。配上和 Client 相同的 `scope_id`，并确认同一个 database URL。步骤在[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。
+    未配置 Dashboard Scope 时页面就是空的。配上和客户端相同的 `scope_id`，并确认同一个数据库 URL。步骤在[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。
   </Step>
-  <Step title="Preview adapter 当前装不上" icon="triangle-alert">
-    Pydantic AI Agent adapter 是 **Preview**。PyPI 和当前 Git subdirectory 安装都不可用。第一次接入走 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)，不要从 Preview 页开始。
+  <Step title="预览适配器当前装不上" icon="triangle-alert">
+    Pydantic AI Agent 适配器是 **预览**。PyPI 和当前 Git 子目录安装都不可用。第一次接入走 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)，不要从预览页开始。
   </Step>
-  <Step title="把 bundled Skill 当成 managed export" icon="package">
-    `project-context` 是宿主自带说明。`powercontext skill export` 才是 managed Skill。OpenCode / DSH / Pi / Hermes / OpenClaw 不能 export。见[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
+  <Step title="把内置 Skill 当成托管导出" icon="软件包">
+    `project-context` 是宿主自带说明。`powercontext skill export` 才是托管 Skill。OpenCode / DSH / Pi / Hermes / OpenClaw 不能导出。见[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
   </Step>
-  <Step title="把 Candidate version 当成 Artifact Revision" icon="git-compare">
-    Candidate `version` 和 Artifact `Revision` 不是同一套并发域。改 proposal 走 Candidate version；批准后才出现不可变 Revision。混用会出现 conflict。对照[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
+  <Step title="把 Candidate 版本当成 Artifact Revision" icon="git-compare">
+    Candidate `version` 和 Artifact `Revision` 不是同一套并发域。改提案走 Candidate 版本；批准后才出现不可变 Revision。混用会出现冲突。对照[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
   </Step>
-  <Step title="Preview and make no writes 却调用了 Handoff" icon="hand">
-    `handoff_current_work` 会写 boundary Source。讨论设计，或说 “preview and make no writes”，不要调用它。见 [Codex](/zh/coding-agents/codex) 和 [MCP](/zh/basic-usage/mcp)。
+  <Step title="预览 and make no 写入却调用了 Handoff" icon="hand">
+    `handoff_current_work` 会写边界 Source。讨论设计，或说 “预览 与 make no 写入”，不要调用它。见 [Codex](/zh/coding-agents/codex) 和 [MCP](/zh/basic-usage/mcp)。
   </Step>
-  <Step title="Server down 时期待自动 recall 报错" icon="power">
-    自动 recall、capture 和可选 flush 可以 fail-open，原任务应继续。显式 Memory 写入、Handoff commit、Review 和 Skill export 必须明确失败。见 [fail-open](/zh/mental-model/fail-open)。
+  <Step title="Server 停止 时期待自动召回报错" icon="power">
+    自动召回、采集和可选刷新可以 fail-open，原任务应继续。显式 Memory 写入、Handoff 提交、Review 和 Skill 导出必须明确失败。见 [fail-open](/zh/mental-model/fail-open)。
   </Step>
 </Steps>
 
-更完整的误用课不在这一页。先把当前路径上的那一条做完。
+不要转向无关的故障诊断。先把当前路径上的那一条做完。

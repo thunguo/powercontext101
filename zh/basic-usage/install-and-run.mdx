@@ -3,7 +3,9 @@ title: "安装并运行 Server"
 description: "安装 PowerContext CLI 和 Server，启动无模型的本地运行时，并检查实际能力。"
 ---
 
-这一页先启动最小 Server。它没有 generation 或 embedding 模型，但已经能保存显式 Memory、执行 FTS search，并通过 HTTP、Python Client 和 MCP 提供同一套持久数据。
+这一页先启动最小 Server。它没有生成或嵌入模型，但已经能保存显式 Memory、执行 FTS 搜索，并通过 HTTP、Python Client 和 MCP 提供同一套持久数据。
+
+第一次运行刻意不接模型。这样，排错范围只剩安装、持久化、Scope 和传输。等第一条闭环跑通后再加入推理，否则模型提供方故障很容易被误判成数据库或集成故障。
 
 ## 前置条件
 
@@ -25,14 +27,14 @@ uv tool install --force \
   "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@master"
 ```
 
-`uv tool` 使用隔离环境，不会在当前目录留下仓库 checkout。`--force` 也用于更新：如果同一个 Git requirement 已安装，它会重新获取所选 ref，而不是直接报告 already installed。
+`uv tool` 使用隔离环境，不会在当前目录留下仓库检出。`--force` 也用于更新：如果同一个 Git 依赖声明已安装，它会重新获取所选版本引用，而不是直接报告已安装。
 
-本地学习可以跟着你正在读的那一页里的 ref 走。本页和通用 / 编程 Agent setup 用 `@master`，方便跟上当前教程。
+本地学习可以跟着你正在读的那一页里的版本引用走。本页和通用 / 编程 Agent 安装配置用 `@master`，方便跟上当前教程。
 
-可复现部署不要跟 `master`。先选定一个经过验证的 commit，再让 CLI、Server 和宿主 plugin 使用同一个 ref。需要 pin 时写成完整 commit hash，不要在同一组命令里混用短 hash 和长 hash。
+可复现部署不要跟 `master`。先选定一个经过验证的提交，再让 CLI、Server 和宿主插件使用同一个版本引用。需要固定版本时写成完整提交哈希，不要在同一组命令里混用短哈希和长哈希。
 
 <Note>
-`uv tool` 里的 `powercontext[client]` 不能被另一个 Python 项目直接 import。需要写 Client 代码时，稍后还要把 client extra 安装到那个项目自己的环境中。
+`uv tool` 里的 `powercontext[client]` 不能被另一个 Python 项目直接导入。需要写客户端代码时，稍后还要把客户端附加依赖安装到那个项目自己的环境中。
 </Note>
 
 ## 启动本地 Server
@@ -49,9 +51,9 @@ powercontext server run
 | Dashboard | `/` |
 | Streamable HTTP MCP | `/mcp`；用法见[用 MCP 连接 Server](/zh/basic-usage/mcp) |
 | 数据库 | 用户数据目录中的持久 SQLite |
-| Bearer auth | 关闭，仅适合默认 loopback 使用 |
-| Generation / embedding | 未配置 |
-| Search | `auto`、`fts` |
+| Bearer 认证 | 关闭，仅适合默认本机回环地址使用 |
+| 生成 / 嵌入 | 未配置 |
+| 搜索 | `auto`、`fts` |
 
 macOS 上，数据库通常位于：
 
@@ -65,7 +67,7 @@ Linux 通常位于：
 ~/.local/share/powercontext/powercontext.db
 ```
 
-设置 `POWERCONTEXT_HOME` 后，默认数据库会放到该目录。切换 home 或 database URL 会看到另一套数据，这很容易被误判成 Scope 丢失。
+设置 `POWERCONTEXT_HOME` 后，默认数据库会放到该目录。切换主目录或数据库 URL 会看到另一套数据，这很容易被误判成 Scope 丢失。
 
 `Ctrl-C` 会正常关闭 Server。再次运行命令会打开同一个数据库。
 
@@ -83,17 +85,17 @@ powercontext capabilities
 
 ### `doctor`
 
-检查当前 package、Server liveness 和 readiness。全部为 `ok` 时退出码才是 0。
+检查当前软件包、Server 存活状态和就绪状态。全部为 `ok` 时退出码才是 0。
 
-如果 liveness 失败，readiness 会标为 skipped。`degraded` 也会让 doctor 返回非零，因为至少一个已配置 inference check 没通过；这不等于数据库必然不可用。
+如果存活状态失败，就绪状态会标为已跳过。`degraded` 也会让诊断返回非零，因为至少一个已配置推理检查没通过；这不等于数据库必然不可用。
 
 ### `ready`
 
 区分：
 
 - `ready`：所有已配置检查通过；
-- `degraded`：可选 inference check 失败，HTTP 仍为 200；
-- `not_ready`：Runtime 或数据库不可用，readiness endpoint 返回 HTTP 503。当前 CLI 会把这个 503 打印成 Server error，而不是完整展开 `not_ready` response；用 `doctor` 或直接检查 `/health/ready` 诊断依赖项。
+- `degraded`：可选推理检查失败，HTTP 仍为 200；
+- `not_ready`：运行时或数据库不可用，就绪状态端点返回 HTTP 503。当前 CLI 会把这个 503 打印成 Server 错误，而不是完整展开 `not_ready` 响应；用 `doctor` 或直接检查 `/health/ready` 诊断依赖项。
 
 ### `capabilities`
 
@@ -111,7 +113,7 @@ Search modes: auto, fts
 Context versions: powercontext.prepared-context.v1
 ```
 
-Artifact family 存在不代表该 family 的 model-backed generation 已开启。以对应 capability boolean 为准。
+能力列表中出现某类 Artifact，不代表相应的模型生成功能已经开启。请以对应的能力布尔值为准。
 
 打开 Dashboard：
 
@@ -119,29 +121,29 @@ Artifact family 存在不代表该 family 的 model-backed generation 已开启�
 http://127.0.0.1:8000/
 ```
 
-没有配置 Dashboard Scope 时，页面显示空状态。Dashboard 初始化失败只会记录 warning；HTTP API 和 MCP 仍可继续服务。要看见刚写入的 Memory，按[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard) 配上同一个 `scope_id`。
+没有配置 Dashboard Scope 时，页面显示空状态。Dashboard 初始化失败只会记录警告；HTTP API 和 MCP 仍可继续服务。要核对同一 Scope 的统计，按[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard) 配置相同的 `scope_id`。
 
 ## 先验证无模型能力
 
 最小 Server 可以完成：
 
-- capture Source；
-- explicit Memory remember、search、revise 和 retire；
+- 采集 Source；
+- 显式 Memory 记住、搜索、修订和停用；
 - FTS；
-- typed Experience / Skill proposal 与 Candidate Review；
-- Prepared Handoff finalize、commit 和 continue；
+- 类型化 Experience / Skill 提案与 Candidate Review；
+- 已准备 Handoff 定稿、提交和继续；
 - `PreparedContext` 构造，只要当前 Scope 有可召回内容。
 
 它不能完成：
 
 - Source 到 Memory 的模型抽取；
 - Experience / Skill / Handoff 的模型生成；
-- vector / hybrid search；
-- model-backed reranking。
+- 向量 / 混合搜索；
+- 模型驱动的重排序。
 
-所以第一条闭环从 explicit Memory 开始：写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。这样可以先验证持久化、Scope 和 Citation，不必把 provider 配置也塞进第一次排错。Source 抽取和 Handoff 生成需要模型，留到后面的页再做。
+所以第一条闭环从显式 Memory 开始：写入一条 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。这样可以先验证持久化、Scope 和 Citation，不必把模型提供方配置也塞进第一次排错。Source 抽取和 Handoff 生成需要模型，留到后面的页再做。
 
-## 为 Python 项目安装 Client
+## 为 Python 项目安装客户端
 
 在要运行示例的 Python 项目中：
 
@@ -182,17 +184,17 @@ powercontext config validate --env-file .env
 powercontext server run --env-file .env
 ```
 
-Generation 和 scheduler 是独立配置。配置 generation model 会让 extraction capability 可用，但不会自动打开定时 scheduler；你仍可手动调用 `flush_memory`。
+生成和调度器是独立配置。配置生成模型会让抽取能力可用，但不会自动打开定时调度器；你仍可手动调用 `flush_memory`。
 
-Embedding 必须成组配置 model、profile ID 和 dimension。缺少任意一项时，配置校验应失败，而不是启动一套含糊的半向量模式。
+嵌入必须成组配置模型、配置档 ID 和维度。缺少任意一项时，配置校验应失败，而不是启动一套含糊的半向量模式。
 
-## Auth 与远程访问
+## 认证与远程访问
 
-默认配置只监听 loopback，所以关闭 auth 是可接受的本地开发设置。
+默认配置只监听本机回环地址，所以关闭认证是可接受的本地开发设置。
 
-绑定非 loopback 地址时，Server 默认要求认证或显式 unsafe opt-in。Python Client 也拒绝访问非 loopback 的明文 HTTP。生产和远程部署应使用 TLS 和 Bearer token，不要把 token 放进 URL。
+绑定非本机回环地址时，Server 默认要求认证；否则必须显式启用不安全选项。Python Client 也拒绝访问非本机回环地址的明文 HTTP。生产和远程部署应使用 TLS 和 Bearer 令牌，不要把令牌放进 URL。
 
-开启 auth 后，Client 从环境读取裸 token：
+开启认证后，客户端从环境读取裸令牌：
 
 ```bash
 export POWERCONTEXT_CLIENT_API_TOKEN="replace-with-token"
@@ -208,14 +210,14 @@ Authorization: Bearer replace-with-token
 
 ### `doctor` 显示 Server 不可达
 
-确认 `powercontext server run` 仍在运行，并检查 8000 端口是否被占用。若使用自定义地址，`doctor` 使用自己的 option，放在子命令后：
+确认 `powercontext server run` 仍在运行，并检查 8000 端口是否被占用。若使用自定义地址，请把 `doctor` 自己的选项放在子命令后：
 
 ```bash
 powercontext doctor \
   --server-url http://127.0.0.1:9000
 ```
 
-根命令的 `--server-url` 用于 Client content commands，不会替代 `doctor` 的独立地址参数。
+根命令的 `--server-url` 用于客户端内容命令，不会替代 `doctor` 的独立地址参数。
 
 ### 创建了 `.env`，能力仍没变化
 
@@ -223,15 +225,15 @@ powercontext doctor \
 
 ### `capabilities` 只有 `auto, fts`
 
-Server 正常运行在 FTS-only 模式。它尚不满足 vector/hybrid 的前提。
+Server 正常运行在仅 FTS 模式，但尚不满足向量或混合搜索的前提。
 
-### `ready` 是 degraded
+### `ready` 是降级
 
-查看具体 dependency check。数据库操作如果不依赖故障 inference capability，可能仍可用；需要该 provider 的操作仍会失败。
+查看具体依赖项检查。数据库操作如果不依赖故障推理能力，可能仍可用；需要该模型提供方的操作仍会失败。
 
 ### 重启后看不到旧数据
 
-检查 `POWERCONTEXT_HOME`、database kind 和 database URL 是否变化，再检查 `scope_id`。这三处都会改变你看到的数据集。更多已记录症状见[排错](/zh/start/troubleshooting)。
+检查 `POWERCONTEXT_HOME`、数据库 类型 和数据库 URL 是否变化，再检查 `scope_id`。这三处都会改变你看到的数据集。更多已记录症状见[排错](/zh/start/troubleshooting)。
 
 ## 完成检查
 
@@ -240,7 +242,7 @@ Server 正常运行在 FTS-only 模式。它尚不满足 vector/hybrid 的前提
 - `powercontext doctor` 在最小配置下通过；
 - `powercontext capabilities` 显示 `auto, fts`；
 - Dashboard 能打开，或已明确禁用；
-- Python 示例项目能 import `PowerContextClient`；
+- Python 示例项目能导入 `PowerContextClient`；
 - 你知道本次教程使用的稳定 Scope 是 `project:powercontext-101`；
 - 你知道第一条闭环是：写入 Memory → `search_memory` → `prepare_context` 得到带 Citation 的 `PreparedContext`。
 

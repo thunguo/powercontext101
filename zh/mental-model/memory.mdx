@@ -1,20 +1,22 @@
 ---
 title: "Memory"
-description: "Memory 保存经过选择的长期项目知识，并用不可变 Revision 和 entry version 保留历史。"
+description: "Memory 保存经过选择的长期项目知识，并用不可变 Revision 和条目版本保留历史。"
 ---
 
 Memory 适合保存以后还会影响判断的内容：已经做出的决策、必须遵守的约束、当前项目状态，或者明确的下一步。
 
 它不适合装下完整聊天。聊天可以先成为 Source；只有值得跨任务复用的部分才进入 Memory。
 
+真正需要判断的是保留什么。一条范围清楚、结论明确的短条目，通常比对话式摘要更容易召回；项目变化时，它也更容易修订或停用。
+
 ## 什么应该进入 Memory
 
 下面几类内容通常值得保存：
 
-- “公开 HTTP 契约变化后，先重新生成 checked-in client。”
+- “公开 HTTP 契约变化后，先重新生成签入仓库的客户端。”
 - “这个项目要求 Python 3.11 及以上。”
-- “OpenClaw project mode 当前仍按 agent 隔离。”
-- “下一步运行 契约测试，并检查生成代码没有漂移。”
+- “OpenClaw 项目模式当前仍按 agent 隔离。”
+- “下一步运行契约测试，并检查生成代码没有漂移。”
 
 这些内容在另一个会话或几天后仍然有用。
 
@@ -32,30 +34,30 @@ Memory Artifact Revision
 
 ### Artifact Revision
 
-每次 Memory lifecycle 发生有效变化，会形成新的不可变 Artifact Revision。Revision 保存当时的 manifest 和 change set。
+每次 Memory 生命周期发生有效变化，会形成新的不可变 Artifact Revision。Revision 保存当时的清单和 change set。
 
-### Logical entry
+### Logical 条目
 
-`entry_id` 表示同一条长期知识。修订后仍是这个 logical entry。
+`entry_id` 表示同一条长期知识。修订后仍是这个逻辑条目。
 
-### Entry version
+### 条目版本
 
-`entry_version_id` 指向某次具体内容。修订会创建新 entry version，并保留 `previous_version_id`、来源和创建它的 Memory Revision。
+`entry_version_id` 指向某次具体内容。修订会创建新条目版本，并保留 `previous_version_id`、来源和创建它的 Memory Revision。
 
-因此，维护一条 Memory 时只保存 `entry_id` 不够。精确 Citation 还需要对应的 Memory Revision 和 entry-version ID。
+因此，维护一条 Memory 时只保存 `entry_id` 不够。精确 Citation 还需要对应的 Memory Revision 和条目版本 ID。
 
-## Manifest 决定当前状态
+## 清单决定当前状态
 
-某个 Memory Revision 的 manifest 是当时的权威目录。每个条目记录：
+某个 Memory Revision 的清单是当时的权威目录。每个条目记录：
 
 - stable `entry_id`；
-- exact `entry_version_id`；
-- content hash；
+- 精确 `entry_version_id`；
+- 内容哈希；
 - `active` 或 `inactive`。
 
-`retire` 把条目变成 inactive，使它退出默认召回。内容和旧 Revision 仍然保留。
+`retire` 把条目变成停用状态，使它退出默认召回。内容和旧 Revision 仍然保留。
 
-修订也不是原地覆盖。它创建下一 entry version，再让新 Memory Revision 的 manifest 指向它。
+修订也不是原地覆盖。它创建下一条目版本，再让新 Memory Revision 的清单指向它。
 
 ## 两种写入路径
 
@@ -76,11 +78,11 @@ Memory Artifact Revision
 - 不需要模型；
 - 不需要先创建 Source；
 - 可以带 `expected_revision` 保护并发更新；
-- 创建有效变化时返回 Memory ref 和精确 entry Citation；canonical duplicate no-op 只返回当前 Memory ref，`entry` 可以是 `null`。
+- 创建有效变化时返回 Memory 版本引用和精确条目 Citation；规范形式重复写入无变更只返回当前 Memory 版本引用，`entry` 可以是 `null`。
 
 ### 从 Source 抽取
 
-自动路径先 capture Source，再由 scheduler 或 `flush_memory` 处理 Source window：
+自动路径先采集 Source，再由调度器或 `flush_memory` 处理 Source 窗口：
 
 ```text
 Source window
@@ -92,19 +94,19 @@ Source window
 → cursor update
 ```
 
-模型输出只是 untrusted candidate。它只能引用当前 operation 提供的 evidence ID，不能凭空引用其他 Source 或 Artifact。
+模型输出只是不可信 Candidate。它只能引用当前操作提供的证据 ID，不能凭空引用其他 Source 或 Artifact。
 
-PowerContext 在同一 transaction 中提交 Memory Revision、entry versions 和 active search projections。任何一步失败，都不能留下“Revision 已提交但 index 没更新”的半成品。
+PowerContext 在同一 事务 中提交 Memory Revision、条目版本和启用状态搜索 投影。任何一步失败，都不能留下“Revision 已提交但 索引 没更新”的半成品。
 
-重复的 canonical content 可以变成 no-op，不必制造一个没有语义变化的新 Revision。
+重复的规范形式内容可以变成无变更，不必制造一个没有语义变化的新 Revision。
 
 <Note>
-显式写入和 Source extraction 都能产生 Memory，但 lineage 不同。要证明某条 Memory 来自刚才的 Source，检查 entry 的 exact `source_refs`，不要只看搜索文本相似。
+显式写入和 Source 抽取都能产生 Memory，但证据链不同。要证明某条 Memory 来自刚才的 Source，检查条目的精确 `source_refs`，不要只看搜索文本相似。
 </Note>
 
 ## 修订和停用
 
-修订应针对当前精确 Citation。新内容创建下一 entry version，旧版本仍可读取。
+修订应针对当前精确 Citation。新内容创建下一条目版本，旧版本仍可读取。
 
 停用同样需要精确目标：
 
@@ -114,46 +116,46 @@ Memory Revision + entry_id + entry_version_id
 
 停用后：
 
-- 默认 active list 和 recall 不再返回它；
+- 默认启用状态列出和召回不再返回它；
 - `include_inactive` 可用于审计；
-- 旧 Artifact Revision 和 entry version 仍存在。
+- 旧 Artifact Revision 和条目版本仍存在。
 
-如果其他 worker 已经更新了 Memory head，你手里的旧 Citation 会产生 conflict。重新读取当前状态，检查差异后再决定，不要机械猜下一个 Revision。
+如果其他 工作进程 已经更新了 Memory 头版本，你手里的旧 Citation 会产生冲突。重新读取当前状态，检查差异后再决定，不要机械猜下一个 Revision。
 
-## Search 如何工作
+## 搜索如何工作
 
-Memory search 不是把所有文本按一个相似度分数排序。它先确定当前 Memory head，再根据 capability 和请求选择模式。
+Memory 搜索不是把所有文本按一个相似度分数排序。它先确定当前 Memory 头版本，再根据能力和请求选择模式。
 
-| mode | 前提 | 行为 |
+| 模式 | 前提 | 行为 |
 |---|---|---|
-| `fts` | FTS projection 可用 | 使用关键词证据召回 |
-| `vector` | embedding model、profile、dimension 和 backend vector capability 完整 | 只走向量检索 |
-| `hybrid` | FTS 与 vector 都可用 | 合并两路结果 |
-| `auto` | 运行时判断 | 优先 hybrid；不可用时选择 FTS |
+| `fts` | FTS 投影可用 | 使用关键词证据召回 |
+| `vector` | 嵌入模型、配置档、维度和 backend 向量能力完整 | 只走向量检索 |
+| `hybrid` | FTS 与向量都可用 | 合并两路结果 |
+| `auto` | 运行时判断 | 优先混合；不可用时选择 FTS |
 
-如果 query embedding 暂时 unavailable 或 timeout，`auto` 在 FTS 可用时可以退回 FTS。显式请求 `vector` 或 `hybrid` 时不能静默改模式，调用者应看到 capability error。
+如果查询嵌入暂时不可用或超时，`auto` 在 FTS 可用时可以退回 FTS。显式请求 `vector` 或 `hybrid` 时不能静默改模式，调用者应看到能力错误。
 
-### Fusion 与 reranking
+### Fusion 与重排序
 
-Hybrid search 使用 reciprocal rank fusion 合并 FTS 和 vector 排名。当前实现的 RRF 常数是 60。
+混合搜索使用 reciprocal rank fusion 合并 FTS 和向量排名。当前实现的 RRF 常数是 60。
 
-向量 admission 会把 unit-normalized L2 distance 换算为 cosine similarity，并应用最低相似度门槛。命中结果会保留 `matched_by`，说明来自 FTS、vector 或两者。
+向量 admission 会把 unit-normalized L2 distance 换算为 cosine similarity，并应用最低相似度门槛。命中结果会保留 `matched_by`，说明来自 FTS、向量或两者。
 
-可选 reranking 在检索之后运行。它可以改变最终顺序，但不会改写 Memory 或 search index。Rerank 开始后使用已选定的 Revision snapshot，不应因为另一个写入推进 head 就悄悄换数据。
+可选重排序在检索之后运行。它可以改变最终顺序，但不会改写 Memory 或搜索 索引。Rerank 开始后使用已选定的 Revision 快照，不应因为另一个写入推进头版本就悄悄换数据。
 
-## PreparedContext 不是 search response 的复制
+## PreparedContext 不是搜索响应的复制
 
-`prepare_context` 会先粗召回候选，再由 builder 在共享 UTF-8 字节预算中选最终内容。
+`prepare_context` 会先粗召回候选，再由 构建器 在共享 UTF-8 字节预算中选最终内容。
 
-当前 builder 有几个明确上限：
+当前 构建器 有几个明确上限：
 
 - 最多 16 个 Memory 粗候选；
 - 最多 8 个 Experience 候选；
 - 最终合计最多 8 项；
 - 其中 Experience 最多 2 项；
-- 单项内容最多 2000 bytes。
+- 单项内容最多 2000 字节。
 
-这些是当前实现细节，可能随版本调整。稳定合同是：最终内容受 `max_bytes` 限制、带 exact Citation，并标记为 `untrusted_history`。
+这些是当前实现细节，可能随版本调整。稳定契约是：最终内容受 `max_bytes` 限制、带精确 Citation，并标记为 `untrusted_history`。
 
 结果状态：
 
@@ -192,7 +194,7 @@ PreparedContext 是本轮输入，不会自动变成新的 Memory。
 1. 命中的 `memory_ref` 是否是当前精确 Revision；
 2. 是否包含 `entry_id` 和 `entry_version_id`；
 3. `matched_by` 是否符合请求模式；
-4. `prepare_context` 的 Citation 是否指回同一个 entry version。
+4. `prepare_context` 的 Citation 是否指回同一个条目版本。
 
 然后把内容修订为：
 
@@ -200,33 +202,33 @@ PreparedContext 是本轮输入，不会自动变成新的 Memory。
 Regenerate the checked-in client, inspect the diff, and then run contract tests.
 ```
 
-旧 Citation 此后仍能用于历史读取，但不能当作当前 entry 去 revise 或 retire。
+旧 Citation 此后仍能用于历史读取，但不能当作当前条目去修订或停用。
 
 ## 容易误判的情况
 
-### `auto` 返回 FTS，不是 hybrid
+### `auto` 返回 FTS，不是混合
 
-检查 embedding model、profile ID、dimension、backend vector capability，以及当前 Memory heads 的 vector projection 是否完整。
+检查嵌入模型、配置档 ID、维度、backend 向量能力，以及当前 Memory 头版本的向量投影是否完整。
 
-### Flush 处理了 Source，但没有新 Revision
+### 刷新处理了 Source，但没有新 Revision
 
-模型可能返回 no-op，或者 candidate 经过 canonicalization 后与现有内容重复。先检查 Source lineage 和 change set。
+模型可能返回无变更，或者 Candidate 经过 规范化 后与现有内容重复。先检查 Source 证据链和 change set。
 
-### Search 有 hit，PreparedContext 却是 empty
+### 搜索有命中，PreparedContext 却是空结果
 
-PreparedContext 还有 relevance、去重和 byte budget 约束。Search hit 不保证最终一定入选。
+PreparedContext 还有 相关性、去重和字节预算约束。搜索命中不保证最终一定入选。
 
-### Rerank 时 Memory head 已更新
+### Rerank 时 Memory 头版本已更新
 
-当前 search 保持开始时选择的 Revision snapshot。下一次 search 才会读取新 head。
+当前搜索保持开始时选择的 Revision 快照。下一次搜索才会读取新头版本。
 
 ## 检查清单
 
-- Artifact Revision、entry ID、entry-version ID 是否分开？
-- retire 是否被理解成 deactivate，而不是 delete？
+- Artifact Revision、条目 ID、条目版本 ID 是否分开？
+- 停用是否被理解成停用，而不是删除？
 - 显式写入是否保持无模型、无 Source 前提？
-- extraction candidate 是否经过 evidence 和 domain validation？
-- `auto` 与 explicit vector/hybrid 的降级语义是否分开？
+- 抽取 Candidate 是否经过证据和领域校验？
+- `auto` 与显式向量/混合的降级语义是否分开？
 - PreparedContext 是否仍是临时、不可信、有预算的视图？
 
 下一页是 [Handoff](/zh/mental-model/handoff)。Memory 回答“以后还要知道什么”，Handoff 回答“谁来接着做，以及从哪里开始”。

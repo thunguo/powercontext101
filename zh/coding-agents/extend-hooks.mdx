@@ -1,30 +1,30 @@
 ---
 title: "用 Hooks 扩展"
-description: "先发现宿主能力，再定义可验证的 适配器契约，并在发布前取得 real-host 证据。"
+description: "先发现宿主能力，再定义可验证的适配器契约，并在发布前取得真实宿主证据。"
 ---
 
 <Warning>
-当前没有统一的 `HostAdapter` SDK。本页的 契约 名称是设计 checklist，不是已有 class 或稳定 public API。
+当前没有统一的 `HostAdapter` SDK。本页的契约名称是设计 checklist，不是已有 class 或稳定公开 API。
 </Warning>
 
-## 从 capability discovery 开始
+## 从能力发现开始
 
-不要先复制最相近的 integration。先记录新宿主实际能提供什么：
+不要先复制最相近的集成。先记录新宿主实际能提供什么：
 
-- 稳定的 prompt event 及其 ordering；
-- turn、message、session、workspace 和 project identity；
-- model dispatch 前的 transient injection channel；
-- tool 与 command registration；
-- permission request、confirmation UI 和 headless behavior；
-- package、plugin 与 bundled Skill installation；
-- end、compaction、switch、shutdown 与 interruption events；
-- CLI/version probe 和 activation probe。
+- 稳定的提示词事件及其 顺序；
+- 轮次、消息、会话、工作区和项目标识；
+- 模型分派前的临时注入频道；
+- 工具与命令 注册项；
+- 权限请求、确认 UI 和 无界面 行为；
+- 软件包、插件与内置 Skill 安装；
+- end、压缩、切换、关闭与中断 events；
+- CLI/版本探测和激活探测。
 
-同时查询 `GET /v1/capabilities`。它会返回 `memory_extraction`、`experience_generation`、`managed_skill_generation`、`external_skill_registry`、Handoff generation、search modes 和 context versions 等 Server capability。Host capability discovery 与 Server capability discovery 回答的问题不同，两者都需要。
+同时查询 `GET /v1/capabilities`。它会返回 `memory_extraction`、`experience_generation`、`managed_skill_generation`、`external_skill_registry`、Handoff 生成、搜索 modes 和上下文版本等 Server 能力。宿主能力发现与 Server 能力发现回答的问题不同，两者都需要。
 
-如果宿主没有稳定 prompt event、pre-dispatch injection point 或 permission surface，就直接写明。除非你实现了保证等价的另一套 契约，否则该 capability 是 **Unsupported**。如果宿主看起来提供了入口，但没有 real-host test 证明完整路径，则标为 **Not validated**。
+如果宿主没有稳定提示词事件、pre-dispatch 注入 point 或权限范围，就直接写明。除非你实现了保证等价的另一套契约，否则该能力是 **Unsupported**。如果宿主看起来提供了入口，但没有真实宿主测试证明完整路径，则标为 **Not validated**。
 
-## 编写 适配器契约
+## 编写适配器契约
 
 用以下 vocabulary 把关键决策摆到台面上：
 
@@ -41,30 +41,30 @@ Diagnostics
 Installer / Doctor
 ```
 
-这些是建议的角色。每项都要定义 input、output、failure policy、security boundary 和 observable assertion。
+这些是建议的角色。每项都要定义输入、输出、失败策略、安全性边界和可观察断言。
 
-| Role | 需要明确的 契约 |
+| Role | 需要明确的契约 |
 |---|---|
-| `PromptEvent` | 精确 host event、prompt normalization、lifecycle ordering 和稳定 turn identity。 |
-| `ScopeResolver` | Authorized override、Git identity、project fallback、normalization 与 cache lifetime。 |
-| `PreparedContextProvider` | `/v1/context/prepare`、接受的 schema versions、response-size budget 与 fail-open result。 |
-| `TransientInjector` | Context 从哪里进入、如何标记为 untrusted，以及 injection 不会持久化的证据。 |
-| `SourceCapture` | Capture 内容、deterministic Source identity、metadata、secret policy、UTF-8 byte limit 与返回的 `position`。 |
-| `FlushCoordinator` | 每个 Scope 的 pending state、boundary events、retry/deadline budget 与 `current_cursor >= position` 清除规则。 |
-| `ToolSurface` | 精确 operation allowlist、generated schema source、tool result shape 和 unsupported operations。 |
-| `PermissionGate` | Read 与 mutation、approval UX、denial、cancellation，以及无 UI 时的行为。 |
-| `Diagnostics` | Activation、version、package ownership、Server state 与不含内容的错误报告。 |
-| `Installer / Doctor` | Idempotency、ownership、rollback、activation probe 与 partial-failure status。 |
+| `PromptEvent` | 精确宿主事件、提示词规范化、生命周期 顺序 和稳定轮次标识。 |
+| `ScopeResolver` | Authorized 覆盖值、Git 标识、项目后备路径、规范化与缓存 lifetime。 |
+| `PreparedContextProvider` | `/v1/context/prepare`、接受的模式版本、响应大小预算与 fail-open 结果。 |
+| `TransientInjector` | Context 从哪里进入、如何标记为不可信，以及注入不会持久化的证据。 |
+| `SourceCapture` | 采集内容、确定性 Source 标识、元数据、敏感信息策略、UTF-8 字节上限与返回的 `position`。 |
+| `FlushCoordinator` | 每个 Scope 的待处理状态、边界 events、重试/截止时间预算与 `current_cursor >= position` 清除规则。 |
+| `ToolSurface` | 精确操作允许列表、生成的模式 source、工具结果结构和 unsupported 操作。 |
+| `PermissionGate` | 读取与修改操作、批准 UX、拒绝、cancellation，以及无 UI 时的行为。 |
+| `Diagnostics` | 激活、版本、软件包归属、Server 状态与不含内容的错误报告。 |
+| `Installer / Doctor` | Idempotency、归属、回滚、激活探测与 partial-failure 状态。 |
 
-Automatic recall、capture 和 optional flush 可以 fail-open。Explicit durable write、Review、Handoff commit 与 Skill export 必须报告失败。不能给两组操作套用同一 policy。
+自动召回、采集和可选刷新可以 fail-open。显式持久写入、Review、Handoff 提交与 Skill 导出必须报告失败。不能给两组操作套用同一策略。
 
 ## 最小用法
 
-先只实现一条 prompt path、一条 boundary path 和一个 explicit mutation。第一版不要带入任何 unsupported capability。
+先只实现一条提示词路径、一条边界路径和一个显式修改操作。第一版不要带入任何 unsupported 能力。
 
 ## 执行流程
 
-Host glue 要薄。它只负责解析 identity、调用已验证 helper，并把结果转换成宿主的 native event shape。
+宿主 glue 要薄。它只负责解析标识、调用已验证辅助程序，并把结果转换成宿主的原生事件结构。
 
 ```text
 onPrompt(event)
@@ -83,121 +83,123 @@ onMutation(call)
 → execute only after approval
 ```
 
-如果宿主无法实现其中某个箭头，就删掉对应 claim。不要用一个泛化的 adapter 名称掩盖缺口。
+如果宿主无法实现其中某个箭头，就删掉对应声明。不要用一个泛化的适配器名称掩盖缺口。
 
 ## 复用现有实现
 
-只复用 契约 与宿主一致的代码：
+只复用契约与宿主一致的代码：
 
-- `powercontext.http` 下的 generated HTTP client 与 transport models；
-- canonical `PreparedContext` 和 capability models；
-- Python capture rendering 与 redaction helpers；
-- shared loopback transport vectors；
-- Codex 与 Claude Code 的 prepared-context validation patterns；
-- host-specific Scope normalization tests；
-- Pi 的 pending-position flusher pattern；
-- DSH 等 integration 的 generated operation tables；
-- Codex 与 Claude Code managed Skill projections；
-- first-class setup/doctor catalog 与通用 `Diagnostic` value model。
+- `powercontext.http` 下的生成的 HTTP 客户端与传输层模型；
+- 规范形式 `PreparedContext` 和能力模型；
+- Python 采集 rendering 与脱敏辅助程序；
+- shared 本机回环地址传输层 测试向量；
+- Codex 与 Claude Code 的 PreparedContext 校验 patterns；
+- 宿主专用 Scope 规范化测试；
+- Pi 的 pending-position 刷新器 pattern；
+- DSH 等集成的生成的操作 tables；
+- Codex 与 Claude Code 托管 Skill 投影；
+- 一级支持的安装配置/诊断目录与通用 `诊断信息` 值模型。
 
-目前仍有不少 helper 是重复实现，而不是共享实现。Scope resolution、PreparedContext validation、deadline/redirect policy、secret detection、Source ID construction 和 bounded flush logic 仍分散在各 host package 中。文件名相似，不代表它们组成了 supported SDK。
+目前仍有不少辅助程序是重复实现，而不是共享实现。Scope 解析结果、PreparedContext 校验、截止时间/重定向策略、敏感信息 detection、Source ID construction 和有界刷新 logic 仍分散在各宿主软件包中。文件名相似，不代表它们组成了 supported SDK。
 
-## Scope、injection、capture 与 flush
+## Scope、注入、采集与刷新
 
 新宿主必须一起定义这四个边界。
 
-Scope 应来自稳定、授权后的 project data。Git remote 要去除 credential。不要信任模型提供的 `scope_id`；除非 宿主契约 证明 session identity 与 repository identity 相同，也不要混用两者。
+Scope 应来自稳定、授权后的项目数据。Git 远程要去除凭证。不要信任模型提供的 `scope_id`；除非宿主契约证明会话标识与仓库标识相同，也不要混用两者。
 
-Injection 应在 model dispatch 前使用宿主的 native transient channel，并把 `PreparedContext` 标为不可信的历史证据。只在 system guide 里告诉模型搜索 Memory，不能证明 recall 已注入。
+注入应在模型分派前使用宿主的原生临时频道，并把 `PreparedContext` 标为不可信的历史证据。只在系统 guide 里告诉模型搜索 Memory，不能证明召回已注入。
 
-Capture 要明确记录 turn 的哪一侧。Transport 前过滤 secret-shaped content，并按 UTF-8 bytes 执行 limit。Recall 与 capture 要彼此独立，避免一个失败清掉另一个的有效结果。
+采集要明确记录轮次的哪一侧。传输层 前过滤 疑似敏感信息 内容，并按 UTF-8 字节执行上限。召回与采集要彼此独立，避免一个失败清掉另一个的有效结果。
 
-Flush 要按 Scope 保存 Source `position`，且仅在 `current_cursor >= position` 时清除。每个 retry loop 都要有 call limit 和 wall-clock budget。宿主没有可靠 boundary event 时，automatic flush 为 **Unsupported**；event 存在但未在真实宿主中运行时，为 **Not validated**。
+刷新要按 Scope 保存 Source `position`，且仅在 `current_cursor >= position` 时清除。每个重试循环都要有调用上限和实际耗时预算。宿主没有可靠边界事件时，自动刷新为 **Unsupported**；事件存在但未在真实宿主中运行时，为 **Not validated**。
 
-## Permission 与 explicit writes
+## 权限与显式写入
 
-列出所有 mutating operation。明确宿主在 interactive 和 headless 模式下能否 ask、deny、cancel 或 pause，再测试实际行为。
+列出所有 mutating 操作。明确宿主在 交互式 和 无界面 模式下能否 ask、拒绝、取消 或 pause，再测试实际行为。
 
-没有 permission API 的宿主不能继承 Pi 的 `confirmation_required` 契约，也不能继承 OpenCode 的 `context.ask()` behavior。可选方案只有三种：在 adapter-controlled code 中 fail closed、只提供 read-only operation，或把 durable mutation 标为 **Unsupported**。“模型应该先问”不是 permission boundary。
+没有权限 API 的宿主不能继承 Pi 的 `confirmation_required` 契约，也不能继承 OpenCode 的 `context.ask()` 行为。可选方案只有三种：在 adapter-controlled code 中 fail closed、只提供只读操作，或把持久修改操作标为 **Unsupported**。“模型应该先问”不是权限边界。
 
-Diagnostics 不得输出 prompt content、prepared context、可识别 private repository 的 Scope details、authorization values 或含 secret 的 payload。
+诊断信息不得输出提示词内容、已准备上下文、可识别私有仓库的 Scope details、授权信息值或含敏感信息的载荷。
 
-## Setup 与 doctor
+## 安装配置与诊断
 
-Installation 与 activation 分开检查后，才能把宿主加入 setup。
+Installation 与激活分开检查后，才能把宿主加入安装配置。
 
-Setup 应保持 idempotent，不覆盖 foreign same-name files，对自己管理的文件记录 ownership；remote refresh 使用 staging，并在失败时恢复之前的状态。Multi-host setup 要隔离各宿主失败，并把每个选中项报告为 installed、failed 或 skipped。
+安装配置应保持 幂等，不覆盖外部 同名 文件，对自己管理的文件记录归属；远程 刷新 使用 暂存区，并在失败时恢复之前的状态。Multi-host 安装配置要隔离各宿主失败，并把每个选中项报告为已安装、失败或已跳过。
 
-Doctor 有三项工作：
+诊断有三项工作：
 
-1. 找到 host executable，并报告 version evidence；
-2. 确认 installed package 或 configuration 属于 PowerContext；
-3. 如果宿主提供安全且不调用模型的 probe，通过宿主验证 activation。
+1. 找到宿主可执行文件，并报告版本证据；
+2. 确认已安装软件包或配置属于 PowerContext；
+3. 如果宿主提供安全且不调用模型的探测，通过宿主验证激活。
 
-不要把 `powercontext doctor` 当作 integration scan。通用命令检查 package 与 Server；host check 属于 `powercontext doctor <host>` 和只读的 `powercontext doctor integrations` matrix。
+不要把 `powercontext doctor` 当作集成扫描。通用命令检查软件包与 Server；宿主检查属于 `powercontext doctor <host>` 和只读的 `powercontext doctor integrations` matrix。
 
-## Acceptance tiers
+## 验收层级
 
-用以下 tier 描述证据。它们是本页的分类，不是当前 test framework 中的名称。
+用以下 tier 描述证据。它们是本页的分类，不是当前测试框架中的名称。
 
-1. **契约/unit：** schema、Scope、size、secret、permission 与 failure-policy tests。
-2. **Package/load：** build、install、import、manifest、command 或 plugin registration。
-3. **Service chain：** real PowerContext Server，加上直接 hook/module execution 与 Source/Memory lineage。
-4. **Real-host E2E：** 启动实际宿主，发送 prompt，观察 lifecycle、injection、capture、flush 与 permission behavior。
-5. **Live provider journey：** 用实际 host 和 provider/model 运行，并保留 acceptance evidence。
+1. **契约/单位：** 模式、Scope、大小、敏感信息、权限与 failure-policy 测试。
+2. **软件包/加载：** 构建、安装、导入、清单、命令或插件 注册项。
+3. **Service 链路：** 真实 PowerContext Server，加上直接 Hook/module 执行与 Source/Memory 证据链。
+4. **真实宿主端到端验证：** 启动实际宿主，发送提示词，观察生命周期、注入、采集、刷新与权限行为。
+5. **Live 模型提供方 journey：** 用实际宿主和模型提供方/模型运行，并保留验收证据。
 
-Package/load 和 service-chain tests 很有用，但不能证明 host API compatibility 或 event ordering。标为 Supported 的每项 capability，都需要 real-host E2E。Provider behavior 影响 claim 时，还需要第五层证据。
+软件包/加载和服务链测试很有用，但不能证明宿主 API 兼容或事件 顺序。标为 Supported 的每项能力，都需要真实宿主端到端验证。模型提供方行为影响声明时，还需要第五层证据。
 
-## Negative matrix
+## 负向测试矩阵
 
 至少测试以下情况：
 
 | Area | Experiment | Required observation |
 |---|---|---|
-| Availability | Server down 或 request timeout | Automatic path 有界且 fail-open。 |
-| Authentication | Wrong token | 不泄露 credential、prompt、context 或 private Scope。 |
-| Transport | Redirect 或 plaintext non-loopback endpoint | 不跟随 redirect；拒绝不安全 transport。 |
-| Schema | Unknown 或 incomplete PreparedContext | 不注入任何内容。 |
-| Size | Oversized response 或 prompt | 在 configured byte budget 处停止。 |
-| Identity | Missing、stale 或 caller-supplied Scope/turn ID | 不发生 cross-project 或 stale-turn injection。 |
-| Capture | Disabled、secret-shaped 或 failed request | Recall 保持独立；不发送 forbidden Source。 |
-| Flush | Cursor lag、transient failure 或 timeout | Pending position 保留；重试在 budget 内结束。 |
-| Permission | Deny、cancel 或 no UI | 除非 declared 宿主契约 允许，否则 mutation 不运行。 |
-| Capability | `memory_extraction=false` | Capture 仍只是 Source evidence；不声称 unsupported flush/extraction。 |
-| Lifecycle | Compact、switch、shutdown、interruption | 只使用匹配的 Scope 与 turn state。 |
-| Setup | Foreign file、failed refresh 或 failed activation | Existing state 保留，并报告 partial failure。 |
+| Availability | Server 停止或请求超时 | 自动路径有界且 fail-open。 |
+| 认证 | 错误 令牌 | 不泄露凭证、提示词、上下文或私有 Scope。 |
+| 传输层 | 重定向或明文 非本机回环地址 端点 | 不跟随重定向；拒绝不安全传输层。 |
+| Schema | 未知或 incomplete PreparedContext | 不注入任何内容。 |
+| 大小 | Oversized 响应或提示词 | 在配置字节预算处停止。 |
+| Identity | 缺失、过期或 caller-supplied Scope/轮次 ID | 不发生 cross-project 或 过期轮次 注入。 |
+| 采集 | Disabled、疑似敏感信息 或失败请求 | 召回保持独立；不发送 forbidden Source。 |
+| 刷新 | 游标 lag、临时失败或超时 | 待处理位置保留；重试在预算内结束。 |
+| 权限 | Deny、取消 或 no UI | 除非 declared 宿主契约允许，否则修改操作不运行。 |
+| 能力 | `memory_extraction=false` | 采集仍只是 Source 证据；不声称 unsupported 刷新/抽取。 |
+| 生命周期 | Compact、切换、关闭、中断 | 只使用匹配的 Scope 与轮次状态。 |
+| 安装配置 | 外部文件、失败 刷新 或失败激活 | Existing 状态保留，并报告 部分完成 失败。 |
 
-宿主有 private/group session 等概念时，再加入对应的 host-specific privacy case。
+宿主有私有/群组会话等概念时，再加入对应的 宿主专用 隐私 情况。
 
-## Managed Skill export
+## 托管 Skill 导出
 
-Managed Skill export 当前只支持 Codex 和 Claude Code。其他 plugin 安装 bundled `project-context` Skill，不会改变这个 matrix。
+托管 Skill 导出当前只支持 Codex 和 Claude Code。其他插件安装内置 `project-context` Skill，不会改变这个 matrix。
 
-新增 export target 时，需要实现 projection 契约、target enum 与 OpenAPI surface、ownership rules、validation、rollback 和 drift tests。在这些工作完成前，该宿主的 managed export 为 **Unsupported**。如果 implementation 已存在，但未运行 real install/refresh test，则标为 **Not validated**。
+新增导出目标时，需要实现投影契约、目标 enum 与 OpenAPI 范围、归属 规则、校验、回滚和漂移测试。在这些工作完成前，该宿主的托管导出为 **Unsupported**。如果实现已存在，但未运行 真实 安装/刷新 测试，则标为 **Not validated**。
 
 ## Unsupported 与 Not validated
 
 | 状态 | 使用条件 | Example |
 |---|---|---|
-| **Unsupported** | Code 明确拒绝、排除，或无法安全实现 capability。 | 没有 host permission API，也没有 adapter-controlled fail-closed mutation path。 |
-| **Not validated** | 路径可能工作，但现有证据没有到达 claimed host/provider boundary。 | Hook 通过 unit 和 service-chain tests，但没有 test 启动真实宿主。 |
+| **Unsupported** | Code 明确拒绝、排除，或无法安全实现能力。 | 没有宿主权限 API，也没有 adapter-controlled 失败时关闭修改操作路径。 |
+| **Not validated** | 路径可能工作，但现有证据没有到达已声明 宿主/模型提供方边界。 | Hook 通过单位和服务链测试，但没有测试启动真实宿主。 |
 
-不要把这两个 label 合并成“limited support”。一个是 product boundary，另一个是 evidence gap。
+不要把这两个 label 合并成“limited 支持”。一个是 product 边界，另一个是证据 gap。
 
 ## 完成 checklist
 
-- [ ] Host 与 Server capability discovery 分开记录。
-- [ ] 每个 proposed 契约 role 都有 input、output、failure policy 与 observable assertion。
-- [ ] Host version gate 或 compatibility evidence，以及 activation probe 已存在。
-- [ ] Scope 来自稳定、授权后的 identity，并去除 credential。
-- [ ] PreparedContext 已校验、临时注入，并标为 untrusted。
-- [ ] Capture 明确 content、Source identity、UTF-8 size limit 与 secret policy。
-- [ ] Flush 按 Scope 保存 position，只在 `current_cursor >= position` 时清除。
-- [ ] Explicit writes 已测试 allow、deny、cancel 与 no-UI behavior。
-- [ ] Diagnostics 不输出 content 或 credential。
-- [ ] Setup 保留 foreign config，并报告 rollback 或 partial failure。
-- [ ] 除非完整 projection target 已存在，否则 managed Skill export 为 **Unsupported**。
-- [ ] Real-host E2E 覆盖每项 Supported lifecycle 与 permission claim。
-- [ ] **Unsupported** 与 **Not validated** 在 docs、tests 和 release notes 中保持区分。
+只有以下结果都能直接观察时，才算完成：
 
-完成这些，才把宿主加入 first-class catalog。
+- 宿主与 Server 能力发现分开记录。
+- 每个拟定的契约角色都有输入、输出、失败策略与可观察断言。
+- 宿主版本准入规则或兼容证据，以及激活探测已存在。
+- Scope 来自稳定、授权后的标识，并去除凭证。
+- PreparedContext 已校验、临时注入，并标为不可信。
+- 采集明确内容、Source 标识、UTF-8 大小上限与敏感信息策略。
+- 刷新按 Scope 保存位置，只在 `current_cursor >= position` 时清除。
+- 显式写入已测试允许、拒绝、取消 与无界面行为。
+- 诊断信息不输出内容或凭证。
+- 安装配置保留外部配置，并报告回滚或 部分完成 失败。
+- 除非完整投影目标已存在，否则托管 Skill 导出为 **Unsupported**。
+- 真实宿主端到端验证覆盖每项 Supported 生命周期与权限声明。
+- **Unsupported** 与 **Not validated** 在 docs、测试和发布 备注 中保持区分。
+
+完成这些，才把宿主加入一级支持的目录。

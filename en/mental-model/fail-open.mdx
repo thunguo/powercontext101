@@ -58,6 +58,8 @@ A statistics failure should not roll back a successful domain write.
 
 ## Operations that must report failure
 
+These operations change or publish state. Continuing silently would tell the caller that a mutation happened when it did not.
+
 | Operation | Why silent continuation is wrong |
 |---|---|
 | `remember`, revise, or retire | The caller explicitly requested a durable Memory change |

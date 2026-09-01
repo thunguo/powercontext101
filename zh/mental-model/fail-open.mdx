@@ -5,28 +5,28 @@ description: "自动上下文增强失败时继续原任务；显式持久操作
 
 PowerContext 是宿主任务旁边的一层上下文能力。Server 暂时不可用时，写代码、回答问题或继续工作不应该一起停下。
 
-这就是 fail-open 的用途。但它只适用于自动、辅助性的路径。用户明确要求保存、批准、commit 或 export 时，失败不能被藏起来。
+这就是 fail-open 的用途。但它只适用于自动、辅助性的路径。用户明确要求保存、批准、提交或导出时，失败不能被藏起来。
 
 ## PreparedContext 是一次请求的临时值
 
 宿主调用 `prepare_context` 时会提供：
 
 - `scope_id`；
-- 当前 query；
+- 当前查询；
 - `max_bytes` 字节预算。
 
-Server 从当前 active Memory 和 approved current Experience 中选择相关内容，再返回一个 `PreparedContext`。
+Server 从当前启用状态 Memory 和已批准当前 Experience 中选择相关内容，再返回一个 `PreparedContext`。
 
 正常结果有两种：
 
-| status | 含义 | 宿主行为 |
+| 状态 | 含义 | 宿主行为 |
 |---|---|---|
 | `ready` | 有非空内容，且 `content_bytes` 与实际 UTF-8 字节数一致 | 将内容作为不可信历史证据临时注入 |
 | `empty` | 没有合适内容 | 不注入，继续原任务 |
 
 `empty` 不是 Server 故障，也不是认证失败。
 
-PreparedContext 带精确 Citation，并使用明确的 trust marker：
+PreparedContext 带精确 Citation，并使用明确的信任标记：
 
 ```text
 BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
@@ -34,23 +34,23 @@ BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
 END_POWERCONTEXT_PREPARED_CONTEXT_V1
 ```
 
-宿主不能因为这段内容来自 PowerContext，就把它提升为 system instruction。Citation 说明来源与版本，不保证内容仍然符合当前文件、能力和授权。
+宿主不能因为这段内容来自 PowerContext，就把它提升为系统指令。Citation 说明来源与版本，不保证内容仍然符合当前文件、能力和授权。
 
 ## 哪些路径可以 fail-open
 
-### 自动 recall
+### 自动召回
 
-Server down、超时、schema 不认识或响应过大时，宿主跳过注入，继续原来的模型请求。它应记录有界诊断，但不能输出 query、Scope、准备好的内容、token 或 response body。
+Server 停止、超时、模式不认识或响应过大时，宿主跳过注入，继续原来的模型请求。它应记录有界诊断，但不能输出查询、Scope、准备好的内容、令牌或响应体。
 
-### 自动 prompt 或 turn capture
+### 自动提示词或轮次采集
 
-capture 失败不应中止宿主任务。它也不能删除已经准备好的有效 context。
+采集失败不应中止宿主任务。它也不能删除已经准备好的有效上下文。
 
-反过来也一样：recall 失败时，支持 capture 的宿主仍可尝试保存 Source。这两条路径不是一个事务。
+反过来也一样：召回失败时，支持采集的宿主仍可尝试保存 Source。这两条路径不是一个事务。
 
-### 可选 boundary flush
+### 可选边界刷新
 
-有些宿主会在 capture 后或会话边界尝试 flush，帮助新 Source 尽快进入 extraction pipeline。flush 追不上 cursor 或 Server 暂时不可用时，当前 turn 仍可继续。
+有些宿主会在采集后或会话边界尝试刷新，帮助新 Source 尽快进入抽取流程。刷新追不上游标或 Server 暂时不可用时，当前轮次仍可继续。
 
 ### 统计和 telemetry
 
@@ -58,18 +58,20 @@ capture 失败不应中止宿主任务。它也不能删除已经准备好的有
 
 ## 哪些操作必须明确失败
 
+这些操作会改变或发布状态。静默继续会让调用方误以为修改已经发生。
+
 | 操作 | 为什么不能静默继续 |
 |---|---|
-| `remember` / revise / retire | 调用者明确要求改变长期 Memory |
-| Handoff commit | 失败后不存在新的 durable milestone |
-| Candidate revise / approve / reject | Review 必须绑定已检查的 Candidate version |
-| Skill export / publish | 冲突或本地 drift 时不能覆盖宿主目录 |
-| 鉴权与 transport 检查 | fail-open 不能绕过访问控制或把 token 发给其他地址 |
+| `remember` / 修订 / 停用 | 调用者明确要求改变长期 Memory |
+| Handoff 提交 | 失败后不存在新的持久里程碑 |
+| Candidate 修订 / 批准 / 拒绝 | Review 必须绑定已检查的 Candidate 版本 |
+| Skill 导出 / 发布 | 冲突或本地漂移时不能覆盖宿主目录 |
+| 鉴权与传输层检查 | fail-open 不能绕过访问控制或把令牌发给其他地址 |
 
 显式操作失败后，宿主的对话本身可以继续，但必须说明这次动作没有完成。
 
 <Warning>
-不要写“已保存”再在日志里记录失败。对于显式 mutation，用户看到的结果必须和持久状态一致。
+不要写“已保存”再在日志里记录失败。对于显式修改操作，用户看到的结果必须和持久状态一致。
 </Warning>
 
 ## 一次对照实验
@@ -80,62 +82,62 @@ capture 失败不应中止宿主任务。它也不能删除已经准备好的有
 What should I do after changing the OpenAPI contract?
 ```
 
-Hook 会分别尝试 recall 和 prompt capture。
+Hook 会分别尝试召回和提示词采集。
 
-### Recall 失败，capture 成功
+### 召回失败，采集成功
 
 - 不注入 PreparedContext；
-- 原 prompt 继续交给 Claude Code；
-- prompt Source 仍可能保存成功；
+- 原提示词继续交给 Claude Code；
+- 提示词 Source 仍可能保存成功；
 - 诊断标记 `server_unavailable` 或对应的失败类别。
 
-### Recall 成功，capture 失败
+### 召回成功，采集失败
 
 - 已验证的 `additionalContext` 仍然注入；
-- capture 错误不会抹掉 recall 结果；
+- 采集错误不会抹掉召回结果；
 - 当前任务继续。
 
-### 显式 retire 失败
+### 显式停用失败
 
-用户随后通过 MCP 要求 retire 一条精确 Memory。此时 Server 已停止：
+用户随后通过 MCP 要求停用一条精确 Memory。此时 Server 已停止：
 
-- MCP operation 返回 unavailable/error；
+- MCP 操作返回不可用/错误；
 - 宿主不能声称 Memory 已停用；
 - 用户可以继续其他工作，等 Server 恢复后重试。
 
 这三种情况都“不中断宿主”，但只有前两种属于自动 fail-open。
 
-## 安全边界仍然 fail-closed
+## 安全边界仍然失败时关闭
 
 ### 认证失败不是空召回
 
 401/403 表示配置或授权有问题。把它当成 `empty` 会掩盖故障，也可能让用户误以为当前 Scope 没有历史。
 
-### 不跟随 redirect
+### 不跟随重定向
 
-Hook 不应携带 Authorization header 跟随 30x 到另一个 host。重定向目标拿不到凭证比“尽量完成 recall”更重要。
+Hook 不应携带授权信息请求头跟随 30x 到另一个宿主。重定向目标拿不到凭证比“尽量完成召回”更重要。
 
-### 不接受未知 schema
+### 不接受未知模式
 
-响应能解析成 JSON，不代表宿主理解它。schema version 不匹配时跳过注入，记录 `version_mismatch` 或 `invalid_response`。
+响应能解析成 JSON，不代表宿主理解它。模式版本不匹配时跳过注入，记录 `version_mismatch` 或 `invalid_response`。
 
 ### 不接受无限响应
 
 Hook 对响应大小和总墙钟时间设上限。超过限制就中止自动路径，不读取到内存后再处理。
 
-### 不放行不安全 transport
+### 不放行不安全传输层
 
-PowerContext Client 拒绝非 loopback 的明文 HTTP。Server 绑定非 loopback 地址时，默认也要求认证或显式 unsafe opt-in。fail-open 不能取消这些检查。
+PowerContext 客户端拒绝非本机回环地址的明文 HTTP。Server 绑定非本机回环地址时，默认也要求认证；否则必须显式启用不安全选项。fail-open 不能取消这些检查。
 
 ## `degraded` 不等于 `not_ready`
 
-Readiness 把数据库故障和可选 inference 故障分开：
+就绪探测 把数据库故障和可选推理故障分开：
 
-- database/runtime 不可用：`not_ready`，HTTP 503；
-- 已配置的 generation 或 embedding probe 失败：`degraded`，HTTP 200；
-- 不依赖故障 inference capability 的数据库操作仍可继续；需要该 generation 或 embedding provider 的具体操作仍可能失败。
+- 数据库/运行时不可用：`not_ready`，HTTP 503；
+- 已配置的生成或嵌入探测失败：`degraded`，HTTP 200；
+- 不依赖故障推理能力的数据库操作仍可继续；需要该生成或嵌入模型提供方的具体操作仍可能失败。
 
-因此，看到 `degraded` 时先检查具体 capability，不要把整个 Server 当成离线。
+因此，看到 `degraded` 时先检查具体能力，不要把整个 Server 当成离线。
 
 ## 诊断应告诉你什么
 
@@ -150,7 +152,7 @@ Readiness 把数据库故障和可选 inference 故障分开：
 }
 ```
 
-它不应包含 prompt、Scope、Memory 文本、Citation、token 或 provider response body。
+它不应包含提示词、Scope、Memory 文本、Citation、令牌或模型提供方响应体。
 
 常见 outcome 包括：
 

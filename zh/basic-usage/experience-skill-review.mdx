@@ -1,24 +1,26 @@
 ---
 title: "Experience、Skill 与 Review"
-description: "从 exact evidence 创建 Candidate，审核精确版本，再显式导出 approved Skill Revision。"
+description: "从精确证据创建 Candidate，审核精确版本，再显式导出已批准 Skill Revision。"
 ---
 
-这一页把已完成工作的证据变成 Experience，再把 approved Experience 写成 managed Skill。重点不在模型写得多漂亮，而在 Review 有没有检查精确 evidence 和 Candidate version。
+这一页把已完成工作的证据变成 Experience，再把已批准 Experience 写成托管 Skill。重点不在模型写得多漂亮，而在 Review 有没有检查精确证据和 Candidate 版本。
 
 ## 两条创建路径
 
-| 路径 | 需要 generation model | 结果 |
+按已有证据选择路径。类型化提案不需要模型，结果也更容易复现；只有 Server 已有可用生成模型时，才使用生成路径。
+
+| 路径 | 需要生成模型 | 结果 |
 |---|---:|---|
-| Python Client `propose_experience` / `propose_skill` | 否 | pending Candidate |
-| CLI `experience generate` / `skill generate` | 是 | pending Candidate 或 `no_op` |
+| Python Client `propose_experience` / `propose_skill` | 否 | 待处理 Candidate |
+| CLI `experience generate` / `skill generate` | 是 | 待处理 Candidate 或 `no_op` |
 
-CLI 当前没有 `experience propose` 或 `skill propose` 子命令。无模型 typed proposal 使用 Python Client 或 HTTP API。
+CLI 当前没有 `experience propose` 或 `skill propose` 子命令。无模型类型化提案使用 Python Client 或 HTTP API。
 
-本教程先用 typed proposal 建立确定的 Review 闭环，再列出 model generation 命令。
+本教程先用类型化提案建立确定的 Review 闭环，再列出模型生成命令。
 
-## 1. 准备 exact evidence
+## 1. 准备精确证据
 
-先 capture 一条任务结果 Source。新建 `propose_experience.py`：
+先采集一条任务结果 Source。新建 `propose_experience.py`：
 
 ```python
 import asyncio
@@ -104,7 +106,7 @@ uv run python propose_experience.py
 
 ## 2. 检查 Candidate
 
-默认 Inbox 只列 pending heads：
+默认收件箱只列待处理头版本：
 
 ```bash
 powercontext candidate list \
@@ -123,14 +125,14 @@ powercontext candidate show \
 决定前检查：
 
 - `proposal` 四个字段；
-- exact `source_refs` 和 `artifact_refs`；
-- replacement 才有的 `target`；
+- 精确 `source_refs` 和 `artifact_refs`；
+- 替换内容才有的 `目标`；
 - `status`、`family`、`reason`；
 - 当前 `version`。
 
-不要只读模型总结。打开 evidence，确认它真的支持 proposed action、outcome 和 lesson。
+不要只读模型总结。打开证据，确认它真的支持 proposed 动作、outcome 和 lesson。
 
-## 3. Revise 是完整替换
+## 3. 修订是完整替换
 
 ```bash
 powercontext candidate revise experience \
@@ -144,11 +146,11 @@ powercontext candidate revise experience \
   CANDIDATE_ID
 ```
 
-`SOURCE_ID` 使用 capture response 中的值。
+`SOURCE_ID` 使用采集响应中的值。
 
-成功后 Candidate 仍是 pending，version 变成 2。再次 show 并检查完整 proposal。
+成功后 Candidate 仍是待处理，版本变成 2。再次显示并检查完整提案。
 
-故意用旧版本 approve：
+故意用旧版本批准：
 
 ```bash
 powercontext candidate approve \
@@ -157,9 +159,9 @@ powercontext candidate approve \
   CANDIDATE_ID
 ```
 
-应返回 HTTP 409 `candidate_conflict`。不要把 expected version 改成 2 就直接重试；先确认当前 v2 正是你要批准的内容。
+应返回 HTTP 409 `Candidate_conflict`。不要把预期版本改成 2 就直接重试；先确认当前 v2 正是你要批准的内容。
 
-## 4. Approve 或 reject
+## 4. 批准或拒绝
 
 批准刚检查的 v2：
 
@@ -170,13 +172,13 @@ powercontext candidate approve \
   CANDIDATE_ID
 ```
 
-保存 exact `result_artifact`：
+保存精确 `result_artifact`：
 
 ```text
 experience/EXPERIENCE_ID@1
 ```
 
-Reject 是另一条终局分支，需使用另一个 pending Candidate：
+拒绝是另一条终局分支，需使用另一个待处理 Candidate：
 
 ```bash
 powercontext candidate reject \
@@ -186,9 +188,9 @@ powercontext candidate reject \
   OTHER_CANDIDATE_ID
 ```
 
-approved 和 rejected 都是 terminal，不能再次 revise、approve 或 reject。
+已批准和已拒绝都是终态，不能再次修订、批准或拒绝。
 
-## 5. 验证 Experience recall
+## 5. 验证 Experience 召回
 
 当前没有 `powercontext context prepare` CLI 命令。用 Python Client：
 
@@ -224,11 +226,11 @@ if __name__ == "__main__":
 
 将脚本里的 `SCOPE_ID` 替换成真实值。
 
-Approve 让 current Experience head 具备 recall 资格，但不保证每个 query 都选中它。Scope、query relevance 和 byte budget 仍然生效。pending、rejected 和 historical Experience Revision 不进入默认 recall。
+批准让当前 Experience 头版本具备召回资格，但不保证每个查询都选中它。Scope、查询 相关性 和字节预算仍然生效。待处理、已拒绝和历史 Experience Revision 不进入默认召回。
 
 ## 6. 创建 Skill Candidate
 
-最稳妥的新 Skill lineage 是引用刚批准的 Experience。新建 `propose_skill.py`：
+最稳妥的新 Skill 证据链是引用刚批准的 Experience。新建 `propose_skill.py`：
 
 ```python
 import asyncio
@@ -293,9 +295,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-替换 `SCOPE_ID` 和 `EXPERIENCE_ID` 后运行。然后用同一组 Candidate 命令 list、show、revise 和 approve。
+替换 `SCOPE_ID` 和 `EXPERIENCE_ID` 后运行。然后用同一组 Candidate 命令列出、显示、修订和批准。
 
-较长 instructions 建议放进 UTF-8 文件：
+较长指令建议放进 UTF-8 文件：
 
 ```bash
 powercontext candidate revise skill \
@@ -312,7 +314,7 @@ powercontext candidate revise skill \
 
 `--instructions` 和 `--instructions-file` 必须二选一。
 
-Approve 后得到：
+批准后得到：
 
 ```text
 skill/SKILL_ID@1
@@ -320,7 +322,7 @@ skill/SKILL_ID@1
 
 Skill 不会进入 PreparedContext。这是预期行为。
 
-## 7. 读取并导出 exact Skill Revision
+## 7. 读取并导出精确 Skill Revision
 
 先读取：
 
@@ -353,7 +355,7 @@ powercontext skill export \
   SKILL_ID
 ```
 
-注意 target 是 `claude_code`，不是 `claude-code`。
+注意目标是 `claude_code`，不是 `claude-code`。
 
 输出目录包含：
 
@@ -362,13 +364,13 @@ SKILL.md
 powercontext.json
 ```
 
-检查 `powercontext.json` 是否引用 exact `skill/SKILL_ID@1`。CLI export 是 create-only，destination 已存在时退出，不会覆盖。
+检查 `powercontext.json` 是否引用精确 `skill/SKILL_ID@1`。CLI 导出是 仅创建，目标目录已存在时退出，不会覆盖。
 
-当前 managed Skill export 只支持 Codex 和 Claude Code。插件自带 bundled Skill 不等于支持 managed export。
+当前托管 Skill 导出只支持 Codex 和 Claude Code。插件自带内置 Skill 不等于支持托管导出。
 
-## Model generation 路径
+## 模型生成路径
 
-配置 generation model 后，也可以从 exact evidence 生成 Candidate：
+配置生成模型后，也可以从精确证据生成 Candidate：
 
 ```bash
 powercontext experience generate \
@@ -377,7 +379,7 @@ powercontext experience generate \
   --reason "Extract a reusable lesson from the completed task."
 ```
 
-从 approved Experience 生成 Skill：
+从已批准 Experience 生成 Skill：
 
 ```bash
 powercontext skill generate \
@@ -399,35 +401,37 @@ status: pending, candidate: {...}
 status: no_op, candidate: null
 ```
 
-`no_op` 不进入 Inbox，也没有 Candidate 可以 approve。没配置 generation model 时，generate 返回 503 `generation_unavailable`。
+`no_op` 不进入收件箱，也没有 Candidate 可以批准。没配置生成模型时，生成返回 503 `generation_unavailable`。
 
-其他 Skill origin：
+其他 Skill 来源：
 
-- `source`：只能提供 one or more exact Source refs，不能带 Artifact refs 或 target；
-- `usage`：提供 exact target Skill 和至少一条 bounded Source。Server 只校验引用形状，reviewer 仍要判断 Source 是否真的记录了使用效果。
+- `source`：只能提供一条或多条精确 Source 引用，不能带 Artifact 引用或目标；
+- `usage`：提供精确目标 Skill 和至少一条有界 Source。Server 只校验引用形状，审核者仍要判断 Source 是否真的记录了使用效果。
 
-## Conflict 处理
+Review 路径只有在失败可见时才完整。Candidate 版本过期或替换目标发生漂移时，Candidate 必须保持待处理；系统不能留下半个 Artifact，也不能静默批准更新后的内容。
+
+## 冲突处理
 
 | 情况 | 结果 | 处理 |
 |---|---|---|
-| `expected_version` 过期 | 409 `candidate_conflict` | 重新 show，审阅 current version |
-| Candidate 已 terminal | 409 `candidate_terminal` | 不再修改该 Candidate |
-| replacement target head 已推进 | 409 `artifact_conflict` | Candidate 保持 pending，重新评估 target |
-| evidence/lineage 不合法 | 422 `invalid_request` | 修正 evidence，不是 CAS 重试 |
-| export destination 已存在 | CLI exit 2 | 检查 foreign/current/drifted 状态，不覆盖 |
+| `expected_version` 过期 | 409 `Candidate_conflict` | 重新显示，审阅当前版本 |
+| Candidate 已终态 | 409 `Candidate_终态` | 不再修改该 Candidate |
+| 替换内容目标头版本已推进 | 409 `artifact_conflict` | Candidate 保持待处理，重新评估目标 |
+| 证据/证据链不合法 | 422 `invalid_request` | 修正证据，不是 CAS 重试 |
+| 导出目标目录已存在 | CLI exit 2 | 检查外部/当前/发生漂移的 状态，不覆盖 |
 
-同一个 replacement Candidate 的 target 不能在 revise 时换成另一个 Revision。
+同一个替换内容 Candidate 的目标不能在修订时换成另一个 Revision。
 
 ## 完成检查
 
-- typed propose 无模型也能创建 pending Candidate；
-- generate 可能 pending，也可能 no-op；
-- Review 始终先 show，再使用 inspected `expected_version`；
-- stale version 会 409；
-- approve 返回 exact `result_artifact`；
-- approved current Experience 可以参与相关 recall；
-- Skill approval 不 export，也不执行；
-- export package 包含 `SKILL.md` 和 `powercontext.json`；
-- 现有 destination 和 local drift 不会被静默覆盖。
+- 类型化提案无模型也能创建待处理 Candidate；
+- 生成可能待处理，也可能无变更；
+- Review 始终先显示，再使用已检查的 `expected_version`；
+- 过期版本会 409；
+- 批准返回精确 `result_artifact`；
+- 已批准当前 Experience 可以参与相关召回；
+- Skill 批准不导出，也不执行；
+- 导出软件包包含 `SKILL.md` 和 `powercontext.json`；
+- 现有目标目录和本地漂移不会被静默覆盖。
 
 Basic Usage 到这里完成。下一步按你的运行环境进入[框架集成](/zh/frameworks/overview)、[通用 Agent](/zh/common-agents/overview)或[编程 Agent](/zh/coding-agents/overview)。

@@ -4,16 +4,16 @@ description: "加载便携的 project-context Skill 与 MCP 配置，用显式 M
 ---
 
 <Warning>
-Agent Plugin 没有专用的 setup 或 doctor 命令。这个 package 不实现自动 recall、capture 或 Runtime。仓库有软件包契约测试；真实 host-process E2E 是 **Not validated**。Permission 属于 **Host-gated**。managed Skill export 是 **Unsupported**。
+Agent Plugin 没有专用的安装配置或诊断命令。这个软件包不实现自动召回、采集或运行时。仓库有软件包契约测试；真实宿主进程端到端验证是 **Not validated**。权限属于 **Host-gated**。托管 Skill 导出是 **Unsupported**。
 </Warning>
 
-Agent Plugin 是一份便携包，给能加载 Agent Plugin Skill 和 MCP 配置的宿主使用。它指向正在运行的 PowerContext Server，不嵌入存储，不启动 Server，也不添加 MCP tools。Memory、Handoff 和持久化仍由 Server 上已有的 MCP tools 负责。
+Agent Plugin 是一份便携包，给能加载 Agent Plugin Skill 和 MCP 配置的宿主使用。它指向正在运行的 PowerContext Server，不嵌入存储，不启动 Server，也不添加 MCP 工具。Memory、Handoff 和持久化仍由 Server 上已有的 MCP 工具负责。
 
-完整加载步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure Agent Plugin how-to。本页只写 101 的验证契约。
+完整加载步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure Agent Plugin 操作指南。这里验证 PowerContext 101 的可运行边界。
 
-## 取得 package 并加载
+## 取得软件包并加载
 
-先 clone 含有 integration package 的仓库，再单独启动 Server：
+先 克隆 含有集成软件包的仓库，再单独启动 Server：
 
 ```bash
 git clone https://github.com/oceanbase/powercontext.git
@@ -22,7 +22,7 @@ cd powercontext
 uv run powercontext server run
 ```
 
-Package 根目录是：
+软件包根目录是：
 
 ```text
 integrations/agent-plugin/powercontext/
@@ -36,7 +36,7 @@ integrations/agent-plugin/powercontext/
 | `mcp.json` | Streamable HTTP 配置，指向 `http://127.0.0.1:8000/mcp` |
 | `skills/project-context/SKILL.md` | 显式 Memory 与 Handoff 的可复用说明 |
 
-VS Code 用 `chat.pluginLocations` 加载本地目录。把路径换成你自己的 clone，指向含 `plugin.json` 的 package 根：
+VS Code 用 `chat.pluginLocations` 加载本地目录。把路径换成你自己的仓库检出，指向含 `plugin.json` 的软件包根目录：
 
 ```json
 {
@@ -47,11 +47,11 @@ VS Code 用 `chat.pluginLocations` 加载本地目录。把路径换成你自己
 }
 ```
 
-Reload VS Code。确认 Agent Plugins 视图里出现 PowerContext，并且 chat 能看到 `project-context` Skill 和 `powercontext` MCP server。
+Reload VS Code。确认 Agent Plugins 视图里出现 PowerContext，并且对话能看到 `project-context` Skill 和 `powercontext` MCP server。
 
 ## 配置边界
 
-`mcp.json` 是这份 package 的全部连接配置：
+`mcp.json` 是这份软件包的全部连接配置：
 
 ```json
 {
@@ -65,9 +65,9 @@ Reload VS Code。确认 Agent Plugins 视图里出现 PowerContext，并且 chat
 }
 ```
 
-Agent Plugins 1.0.0 没有为远程 MCP 定义可移植的 credential-reference 字段。签入的 `mcp.json` 因此不含 static credentials、token placeholder 或 `POWERCONTEXT_*` 变量。需要鉴权时，在加载它的宿主或 client 里配置，不要改这份文件去塞 Bearer token。
+Agent Plugins 1.0.0 没有为远程 MCP 定义可移植的 credential-reference 字段。签入的 `mcp.json` 因此不含 static 凭证、令牌 占位符 或 `POWERCONTEXT_*` 变量。需要鉴权时，在加载它的宿主或客户端里配置，不要改这份文件去塞 Bearer 令牌。
 
-这个 package 没有 host-specific 环境变量表，也没有 `setup` 写入的 owned 路径。
+这个软件包没有 宿主专用 环境变量表，也没有 `setup` 写入的归属当前集成的路径。
 
 ## 最小验证
 
@@ -79,9 +79,9 @@ powercontext ready
 powercontext capabilities
 ```
 
-Agent Plugin 没有专用的 doctor 命令。加载成功只表示宿主看见了 Skill 和 MCP 条目，不证明 Server 可达，也不证明 recall。
+Agent Plugin 没有专用的诊断命令。加载成功只表示宿主看见了 Skill 和 MCP 条目，不证明 Server 可达，也不证明召回。
 
-在已加载 package 的 chat 里显式保存学习路径那道题的答案：
+在已加载软件包的对话里显式保存学习路径那道题的答案：
 
 ```text
 Use PowerContext to remember this decision:
@@ -89,7 +89,7 @@ after changing the OpenAPI contract, regenerate the client and inspect the diff.
 Return the Memory Citation. Do not store secrets.
 ```
 
-这是 MCP `remember_memory`，不需要 generation model。宿主应返回 exact Citation。
+这是 MCP `remember_memory`，不需要生成模型。宿主应返回精确 Citation。
 
 换一个请求，使用同一个 `scope_id` 提问：
 
@@ -97,11 +97,11 @@ Return the Memory Citation. Do not store secrets.
 What should happen after the OpenAPI contract changes?
 ```
 
-这里没有自动注入通道。模型必须调用 `search_memory`（或 `get_memory_entry`）才能读到刚才的 Memory。召回内容带 Citation，并且只是 untrusted historical evidence。
+这里没有自动注入通道。模型必须调用 `search_memory`（或 `get_memory_entry`）才能读到刚才的 Memory。召回内容带 Citation，并且只是不可信历史证据。
 
 ## Scope 解析
 
-这份 Skill 不读 `.git/powercontext/codex-workspace.json`，也不从 Git remote 自动推导 Scope。第一次 PowerContext 调用前，为当前任务选定一个 `scope_id`，并在该任务的所有 Memory / Handoff 调用中复用。
+这份 Skill 不读 `.git/powercontext/codex-workspace.json`，也不从 Git 远程自动推导 Scope。第一次 PowerContext 调用前，为当前任务选定一个 `scope_id`，并在该任务的所有 Memory / Handoff 调用中复用。
 
 优先使用跨兼容宿主稳定的项目标识。已知 GitHub 仓库时：
 
@@ -121,34 +121,34 @@ compatible host loads plugin.json + mcp.json + Skill
 → no Source capture
 ```
 
-自动 recall / capture / flush 在这里是 **Unsupported**，不是 fail-open 的辅助路径。MCP 不可用时，Skill 要求说一次然后继续任务：不要反复重试，不要编造已恢复的上下文，也不要声称 Memory 或 Handoff 已成功。
+自动召回 / 采集 / 刷新在这里是 **Unsupported**，不是 fail-open 的辅助路径。MCP 不可用时，Skill 要求说一次然后继续任务：不要反复重试，不要编造已恢复的上下文，也不要声称 Memory 或 Handoff 已成功。
 
-显式 Memory 与 Handoff 仍走 Server MCP。Skill 使用 model-free 的 `handoff_current_work`，再让接收方用 `continue_handoff` 且 `selection: "prepared"`。它不调用 `activate_handoff` 或 `finalize_handoff`。
+显式 Memory 与 Handoff 仍走 Server MCP。Skill 使用无模型的 `handoff_current_work`，再让接收方用 `continue_handoff` 且 `selection: "prepared"`。它不调用 `activate_handoff` 或 `finalize_handoff`。
 
-Bundled Skill 不是 managed Skill export。Agent Plugin 也不是当前 export target。
+内置 Skill 不是托管 Skill 导出。Agent Plugin 也不是当前导出目标。
 
 ## 负向检查
 
 - 停掉 Server 后再调用 `remember_memory`。MCP 必须报告失败，不能假装写入成功。
-- 停掉 Server 后再问普通问题。没有自动 recall 可失败；宿主应继续，并在需要 PowerContext 时说明 MCP 不可用。
-- 打开签入的 `mcp.json`。它必须没有 `headers`、token 或 `POWERCONTEXT_*`。
-- 把 `chat.pluginLocations` 指到仓库根而不是 package 根。宿主不应把它当成有效 Agent Plugin。
+- 停掉 Server 后再问普通问题。没有自动召回可失败；宿主应继续，并在需要 PowerContext 时说明 MCP 不可用。
+- 打开签入的 `mcp.json`。它必须没有 `headers`、令牌或 `POWERCONTEXT_*`。
+- 把 `chat.pluginLocations` 指到仓库根而不是软件包根目录。宿主不应把它当成有效 Agent Plugin。
 
 ## 当前限制
 
-- 没有 setup / doctor 命令。
-- 真实 VS Code 或其他 Agent Plugin 宿主的 host-process E2E 是 **Not validated**。`tests/agent_plugin/test_contract.py` 只检查 package 与文档合同。
-- 自动 recall、capture 与 flush 是 **Unsupported**。
-- managed Skill export 是 **Unsupported**。
-- 鉴权不可移植；1.0.0 schema 没有远程 MCP 的 credential-reference。
+- 没有安装配置 / 诊断命令。
+- 真实 VS Code 或其他 Agent Plugin 宿主的宿主进程端到端验证是 **Not validated**。`tests/agent_plugin/test_contract.py` 只检查软件包与文档契约。
+- 自动召回、采集与刷新是 **Unsupported**。
+- 托管 Skill 导出是 **Unsupported**。
+- 鉴权不可移植；1.0.0 模式没有远程 MCP 的 credential-reference。
 
 ## 完成检查
 
-- Package 根同时包含 `plugin.json`、`mcp.json` 和 `skills/project-context/SKILL.md`。
+- 软件包根目录同时包含 `plugin.json`、`mcp.json` 和 `skills/project-context/SKILL.md`。
 - 宿主能看到 `project-context` Skill 和 `powercontext` MCP server。
-- Server health、readiness、capabilities 已单独检查。
-- 显式 `remember_memory` 返回 OpenAPI decision 的 Citation。
-- 下一次提问通过 MCP search/get 找到它，而不是指望自动注入。
-- MCP 失败可见；你没有把 bundled Skill 当成 managed export。
+- Server 健康状态、就绪状态、能力已单独检查。
+- 显式 `remember_memory` 返回 OpenAPI 决定的 Citation。
+- 下一次提问通过 MCP 搜索/读取 找到它，而不是指望自动注入。
+- MCP 失败可见；你没有把内置 Skill 当成托管导出。
 
 下一页是[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。

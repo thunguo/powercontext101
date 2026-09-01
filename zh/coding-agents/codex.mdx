@@ -1,19 +1,19 @@
 ---
 title: "Codex"
-description: "组合 UserPromptSubmit Hook、HTTP MCP 与 project-context Skill，实现 automatic recall 和显式 Handoff。"
+description: "组合 UserPromptSubmit Hook、HTTP MCP 与 project-context Skill，实现自动召回和显式 Handoff。"
 ---
 
 <Note>
-当前 integration 有 契约 与 HTTP service-chain coverage。正式最低 Codex version 尚未声明；完整的真实 Codex host-process E2E 仍是 **Not validated**。
+当前集成有契约与 HTTP 服务链 coverage。正式最低 Codex 版本尚未声明；完整的真实 Codex 宿主进程端到端验证仍是 **Not validated**。
 </Note>
 
 ## 成熟度与安装
 
-完整的 Codex 安装需要 plugin 的三个部分：
+完整的 Codex 安装需要插件的三个部分：
 
-- `UserPromptSubmit` Hook，用于 automatic recall、prompt capture 与 optional flush；
-- HTTP MCP Server，用于显式 operations；
-- bundled `project-context` Skill，用于 Scope、Handoff 与 write-intent 规则。
+- `UserPromptSubmit` Hook，用于自动召回、提示词采集与可选刷新；
+- HTTP MCP Server，用于显式操作；
+- 内置 `project-context` Skill，用于 Scope、Handoff 与 write-intent 规则。
 
 ```bash
 powercontext setup codex --source oceanbase/powercontext --ref master
@@ -21,17 +21,17 @@ powercontext server run
 powercontext doctor codex
 ```
 
-Setup 会让 Codex 添加 marketplace 与 plugin，然后验证 installed entry。与 Claude Code setup 不同，当前 Codex installer 不会打印 no-write preview plan，也没有 transactional rollback。这里的 setup preview/rollback 契约 属于 **Unsupported**，不能当成所有宿主共享的能力。
+安装配置会让 Codex 添加插件市场与插件，然后验证已安装条目。与 Claude Code 安装配置不同，当前 Codex 安装程序 不会打印不写入预览 计划，也没有事务式回滚。这里的安装配置预览/回滚契约属于 **Unsupported**，不能当成所有宿主共享的能力。
 
 ## 最小用法
 
-新开一个 Codex session。在 `/hooks` 查看 `UserPromptSubmit`，再到 `/mcp` 确认 PowerContext Server。之后分别试三条路径：
+新开一个 Codex 会话。在 `/hooks` 查看 `UserPromptSubmit`，再到 `/mcp` 确认 PowerContext Server。之后分别试三条路径：
 
-1. 提一个普通 repository question。Hook 可以注入 recalled context，但只会把这条 prompt capture 为 Source。
-2. 让 Codex 搜索或维护 Memory。Bundled Skill 会引导它使用 MCP tools。
-3. 确实想在同一 turn prepare 并 commit durable Handoff 时，说 `handoff this work`。
+1. 提一个普通仓库 question。Hook 可以注入召回的上下文，但只会把这条提示词采集为 Source。
+2. 让 Codex 搜索或维护 Memory。内置 Skill 会引导它使用 MCP 工具。
+3. 确实想在同一轮次准备并提交持久 Handoff 时，说 `handoff this work`。
 
-只有 Hook 的 plugin 可以 recall，却没有显式 operation surface 和使用规则。只有 MCP 而没有 Skill，则缺少宿主专用约束。受支持的组合是 Hook + MCP + Skill。
+只有 Hook 的插件可以召回，却没有显式操作范围和使用规则。只有 MCP 而没有 Skill，则缺少宿主专用约束。受支持的组合是 Hook + MCP + Skill。
 
 ## 执行流程
 
@@ -45,90 +45,89 @@ UserPromptSubmit
 → hook stdout additionalContext
 ```
 
-Hook 是 short process，不会在 turn 之间保留 conversation object，也不会 capture Codex final response。
+Hook 是 short 进程，不会在轮次之间保留对话 object，也不会采集 Codex 最终响应。
 
-## Scope 与 Workstream binding
+## Scope 与 Workstream 绑定
 
-Scope resolver 按以下顺序检查：
+Scope 解析器按以下顺序检查：
 
 1. 如果设置了 `POWERCONTEXT_CODEX_SCOPE_ID`，优先使用它；
-2. Git-private Workstream binding；
-3. normalized Git remote identity，再回退到 normalized project path。
+2. Git 私有 Workstream 绑定；
+3. 规范化的 Git 远程仓库标识，再回退到规范化的项目路径。
 
-Binding 存在 checkout 的 Git directory 下，因此跟随本地 checkout，又不会进入 commit。Codex 与 Claude Code 使用同一套 binding 和 remote normalization。这样，两边读写的是同一个 project Memory，而不是各自产生平行 Scope。
+Binding 存在检出的 Git 目录下，因此跟随本地检出，又不会进入提交。Codex 与 Claude Code 使用同一套绑定和远程规范化。这样，两边读写的是同一个项目 Memory，而不是各自产生平行 Scope。
 
-在 durable Handoff 或没有 exact Workstream 的 `latest` Continue 之前，如果 `select_handoff_workstream` 可用，Skill 会先调用它。存在多个候选时，必须由用户选择。Codex 随后绑定返回的 `scope_id`，重新解析，并在 Handoff write 前要求 exact match。Picker 本身是 read-only。
+在持久 Handoff 或没有精确 Workstream 的 `latest` 继续之前，如果 `select_handoff_workstream` 可用，Skill 会先调用它。存在多个候选时，必须由用户选择。Codex 随后绑定返回的 `scope_id`，重新解析，并在 Handoff 写入前要求精确 match。Picker 本身是只读。
 
-## Injection 与 API-base derivation
+## 注入与 API 基础地址推导
 
-Hook 从 installed plugin 的 `.mcp.json` 读取 `powercontext` HTTP MCP URL，要求它是安全且无歧义的 `/mcp` URL，再移除该 path 得到 HTTP API base。Automatic HTTP calls 与 MCP 因此始终使用同一 endpoint，不存在另一份可能与 MCP config 漂移的 Hook URL。
+Hook 从已安装插件的 `.mcp.json` 读取 `powercontext` HTTP MCP URL，要求它是安全且无歧义的 `/mcp` URL，再移除该路径得到 HTTP API 基础。自动 HTTP calls 与 MCP 因此始终使用同一端点，不存在另一份可能与 MCP 配置漂移的 Hook URL。
 
-Prepared context 通过 schema check 和 size bound 后，才会作为 `additionalContext` 写到 Hook stdout。Empty result 不输出内容。Unknown schema、redirect、oversized response、authentication failure、Server error 或 wall-clock deadline 都采用 fail-open，并只留下 content-free diagnostics。Authorization 绝不会跨 redirect 转发。
+已准备上下文通过模式检查和大小上限后，才会作为 `additionalContext` 写到 Hook 标准输出。Empty 结果不输出内容。未知模式、重定向、超限响应、认证失败、Server 错误或实际耗时截止时间都采用 fail-open，并只留下不含内容诊断信息。授权信息绝不会跨重定向转发。
 
-## Capture 与 flush
+## 采集与刷新
 
-Automatic capture 只把当前 prompt 写入 `/v1/sources/content`，Source ID 使用稳定的 `codex-user-prompt:` 前缀，并保留 provenance。它不 capture assistant final response，也不创建 Task Outcome。
+自动采集只把当前提示词写入 `/v1/sources/content`，Source ID 使用稳定的 `codex-user-prompt:` 前缀，并保留来源信息。它不采集助手最终响应，也不创建 Task Outcome。
 
-Expected recall failure 会被隔离，因此 capture 仍可继续。但 unexpected recall exception 可能到达 outer fail-open handler，并跳过这次 capture，所以不能声称两者无条件独立。设置 `POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false` 可关闭 capture。设置 `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE=true` 可启用 optional flush；`POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` 限制尝试次数。只有 `current_cursor >= position` 后，Hook 才结束等待。若 cursor 始终追不上，turn 仍继续，但不能声称已经生成 Memory。
+预期召回失败会被隔离，因此采集仍可继续。但意外召回异常可能到达 outer fail-open handler，并跳过这次采集，所以不能声称两者无条件独立。设置 `POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false` 可关闭采集。设置 `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE=true` 可启用可选刷新；`POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` 限制尝试次数。只有 `current_cursor >= position` 后，Hook 才结束等待。若游标始终追不上，轮次仍继续，但不能声称已经生成 Memory。
 
-Captured prompt 只是 Source evidence。超过 200,000 characters 的 prompt 会跳过。Codex capture 没有 DSH 的窄匹配 secret-marker filter；prompt 不应持久化时，请关闭 capture。Scheduler/flush 处理可能生成 Candidate，Review 最终可以 commit Memory，也可以 no-op。
+已采集提示词只是 Source 证据。超过 200,000 字符的提示词会跳过。Codex 采集没有 DSH 的窄匹配 secret-marker 过滤器；提示词不应持久化时，请关闭采集。调度器/刷新处理可能生成 Candidate，Review 最终可以提交 Memory，也可以无变更。
 
-## MCP、Skill、Handoff 与 permission
+## MCP、Skill、Handoff 与权限
 
-MCP 提供显式 Memory maintenance、工作契约、Handoff、acknowledgement、Outcome 与 Review operations。`POWERCONTEXT_CODEX_AUTHORIZATION` 可以通过 `.mcp.json` 的 `env_http_headers` 提供完整 Authorization value；public local Server 可以不设置。Remote endpoint 必须使用 HTTPS。
+MCP 提供显式 Memory 维护、工作契约（Work Contract）、Handoff、确认、结果与 Review 操作。`POWERCONTEXT_CODEX_AUTHORIZATION` 可以通过 `.mcp.json` 的 `env_http_headers` 提供完整授权信息值；公开本地 Server 可以不设置。远程端点必须使用 HTTPS。
 
-Skill 为 `handoff this work` 定义 one-turn semantics。Codex 检查当前 conversation 与 repository，只调用一次 `handoff_current_work` 并使用 unique `source_id`，在同一 turn 将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到 exact Revision 后报告成功。Imperative 已经授权 Handoff 时，不会再索要第二次确认。
+Skill 为 `handoff this work` 定义单轮次语义。Codex 检查当前对话与仓库，只调用一次 `handoff_current_work` 并使用 unique `source_id`，在同一轮次将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到精确 Revision 后报告成功。明确命令已经授权 Handoff 时，不会再索要第二次确认。
 
-Preview boundary 很明确。Handoff 问题、设计讨论、draft request 或 `preview and make no writes` 都不授权 write。Codex 只在 chat 中展示拟议字段，不能调用 `handoff_current_work`，因为 preparation 本身就会记录 boundary Source。Prepared Handoff 可以不 commit，但它不是 zero-write preview。
+预览边界很明确。Handoff 问题、设计讨论、draft 请求或 `preview and make no writes` 都不授权写入。Codex 只在对话中展示拟议字段，不能调用 `handoff_current_work`，因为准备本身就会记录边界 Source。已准备 Handoff 可以不提交，但它不是 zero-write 预览。
 
-显式 durable mutation 失败必须可见。MCP tool annotations 会描述 read/write、destructive 与 idempotent intent，但 tool visibility 本身不是 authorization boundary。宿主 permission UI 与 enforcement 属于 **Host-gated** 和 **Not validated**；不要从其他 adapter 借用更强的 no-UI 保证。
+显式持久修改操作失败必须可见。MCP 工具 annotations 会描述读取/写入、destructive 与 幂等 意图，但工具 visibility 本身不是授权信息边界。宿主权限 UI 与 enforcement 属于 **Host-gated** 和 **Not validated**；不要从其他适配器借用更强的无界面保证。
 
 ## Unsupported 与 Not validated
 
 | 状态 | 能力 | 实际影响 |
 |---|---|---|
-| **Unsupported** | automatic assistant final-response capture | 需要通过 MCP 显式持久化 final result。 |
-| **Unsupported** | automatic Task Outcome | 在真实 boundary 调用 `record_task_outcome`。 |
-| **Unsupported** | 通过 `handoff_current_work` 做 zero-write preview | 只在 chat 展示 preview fields，不调用该 tool。 |
-| **Unsupported** | Codex setup no-write plan 与 transactional rollback | 运行前自行检查命令；partial failure 后可能需要手动清理。 |
-| **Not validated** | 正式最低 Codex version | 不要把 development 中测试过的版本写成支持下限。 |
-| **Not validated** | 完整真实 Codex host-process E2E | 契约 与 HTTP service-chain tests 不能证明完整 host lifecycle。 |
-| **Not validated** | 真实宿主执行 one-turn Handoff 与 preview no-write policy | 这些是 bundled Skill 规则，底层 MCP primitives 已存在，但还没有完整 Codex behavioral acceptance test。 |
-| **Not validated** | exact Codex permission UI 与 enforcement | MCP annotations 只表达 intent；authorization behavior 由宿主负责。 |
+| **Unsupported** | 自动助手最终响应采集 | 需要通过 MCP 显式持久化最终结果。 |
+| **Unsupported** | 自动 Task Outcome | 在真实边界调用 `record_task_outcome`。 |
+| **Unsupported** | 通过 `handoff_current_work` 做 zero-write 预览 | 只在对话展示预览字段，不调用该工具。 |
+| **Unsupported** | Codex 安装配置不写入 计划 与事务式回滚 | 运行前自行检查命令；部分完成 失败后可能需要手动清理。 |
+| **Not validated** | 正式最低 Codex 版本 | 不要把开发中测试过的版本写成支持下限。 |
+| **Not validated** | 完整真实 Codex 宿主进程端到端验证 | 契约与 HTTP 服务链测试不能证明完整宿主生命周期。 |
+| **Not validated** | 真实宿主执行 one-turn Handoff 与预览不写入策略 | 这些是内置 Skill 规则，底层 MCP primitives 已存在，但还没有完整 Codex behavioral 验收测试。 |
+| **Not validated** | 精确 Codex 权限 UI 与 enforcement | MCP annotations 只表达 意图；授权信息行为由宿主负责。 |
 
-Managed Skill export 支持 Codex，但 exported managed Skill 与 bundled plugin Skill 是不同对象。安装其中一个，不能替代另一个。
+托管 Skill 导出支持 Codex，但已导出托管 Skill 与内置插件 Skill 是不同对象。安装其中一个，不能替代另一个。
 
 ## 负向实验
 
-- 停掉 Server 后提交普通 prompt。Codex 应继续运行；explicit write 应报告失败。
-- 触发 expected recall failure，确认 capture 仍运行。再单独注入 unexpected recall exception，确认整个 Hook 仍 fail-open；这次 capture 可能被跳过。
-- 把 MCP URL 改成 unsafe、ambiguous 或非 `/mcp` value。Settings 应拒绝，而不是猜测 API base。
-- 让 Hook request redirect。Authorization 不得到达目标端。
-- 返回 unknown schema 或 oversized response。不得发生 injection。
-- 让 flush 用完 attempt/deadline budget，同时 cursor 始终落后。Turn 应继续，且不能谎报 Memory。
-- 让 Handoff preparation 成功、commit 失败。报告 boundary Source 已写入、durable milestone 不存在；不要为了重试再创建第二个 boundary。
-- 请求 `preview and make no writes`。确认没有 PowerContext call 写入 Source 或 Handoff。
-- 用 old Citation revise 或 retire Memory。应返回 conflict；刷新 head，不能盲目覆盖。
-
+- 停掉 Server 后提交普通提示词。Codex 应继续运行；显式写入应报告失败。
+- 触发预期召回失败，确认采集仍运行。再单独注入意外召回异常，确认整个 Hook 仍 fail-open；这次采集可能被跳过。
+- 把 MCP URL 改成 unsafe、ambiguous 或非 `/mcp` 值。设置应拒绝，而不是猜测 API 基础。
+- 让 Hook 请求重定向。授权信息不得到达目标端。
+- 返回 未知 模式或超限响应。不得发生注入。
+- 让刷新用完 attempt/截止时间预算，同时游标始终落后。轮次应继续，且不能谎报 Memory。
+- 让 Handoff 准备成功、提交失败。报告边界 Source 已写入、持久里程碑不存在；不要为了重试再创建第二个边界。
+- 请求 `preview and make no writes`。确认没有 PowerContext 调用写入 Source 或 Handoff。
+- 用 old Citation 修订或停用 Memory。应返回冲突；刷新头版本，不能盲目覆盖。
 
 ## 配置默认值
 
-Hook 从 plugin `.mcp.json` 推导 API base，默认连到 `http://127.0.0.1:8000/mcp`。其余行为由 `POWERCONTEXT_CODEX_` 环境变量控制：
+Hook 从插件 `.mcp.json` 推导 API 基础，默认连到 `http://127.0.0.1:8000/mcp`。其余行为由 `POWERCONTEXT_CODEX_` 环境变量控制：
 
-| Key | 默认值 | 含义 |
+| 键 | 默认值 | 含义 |
 |---|---|---|
-| MCP `url` | `http://127.0.0.1:8000/mcp` | 写在 plugin `.mcp.json`，不要改成带凭证的 URL |
-| `POWERCONTEXT_CODEX_SCOPE_ID` | 未设置 | 显式 Scope；未设置则按 Workstream / Git / path 推导 |
-| `POWERCONTEXT_CODEX_AUTHORIZATION` | 未设置 | 完整 Bearer header；Hook 和 MCP 都读它 |
-| `POWERCONTEXT_CODEX_CAPTURE_PROMPTS` | `true` | 采集当前 user prompt 为 Source |
-| `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE` | `false` | 测试用：capture 后等待 flush |
-| `POWERCONTEXT_CODEX_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP timeout |
-| `POWERCONTEXT_CODEX_HTTP_BUDGET_SECONDS` | `4` | 一轮 prepare/capture 总预算 |
-| `POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` | `4` | flush 最多调用次数；允许 `1–16` |
-| Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
-| Hook timeout | `10` | Codex 外层 hook timeout，单位秒 |
+| MCP `url` | `http://127.0.0.1:8000/mcp` | 写在插件 `.mcp.json`，不要改成带凭证的 URL |
+| `POWERCONTEXT_CODEX_SCOPE_ID` | 未设置 | 显式 Scope；未设置则按 Workstream / Git / 路径推导 |
+| `POWERCONTEXT_CODEX_AUTHORIZATION` | 未设置 | 完整 Bearer 请求头；Hook 和 MCP 都读它 |
+| `POWERCONTEXT_CODEX_CAPTURE_PROMPTS` | `true` | 采集当前用户提示词为 Source |
+| `POWERCONTEXT_CODEX_FLUSH_ON_CAPTURE` | `false` | 测试用：采集后等待刷新 |
+| `POWERCONTEXT_CODEX_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP 超时 |
+| `POWERCONTEXT_CODEX_HTTP_BUDGET_SECONDS` | `4` | 一轮准备/采集总预算 |
+| `POWERCONTEXT_CODEX_FLUSH_MAX_CALLS` | `4` | 刷新最多调用次数；允许 `1–16` |
+| 召回预算 | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应环境变量 |
+| Hook 超时 | `10` | Codex 外层 Hook 超时，单位秒 |
 
-Plugin `.mcp.json` 至少要有这些字段。token 只写环境变量名，不写值：
+插件 `.mcp.json` 至少要有这些字段。令牌只写环境变量名，不写值：
 
 ```json
 {
@@ -145,42 +144,47 @@ Plugin `.mcp.json` 至少要有这些字段。token 只写环境变量名，不�
 }
 ```
 
-新 session 里对照：
+新会话里对照：
 
 1. `/hooks` 列出 PowerContext `UserPromptSubmit`。提示信任时再信任。
-2. `/mcp` 看到名为 `powercontext` 的 Server。Server 已启动时应是 connected。
+2. `/mcp` 看到名为 `powercontext` 的 Server。Server 已启动时应是 已连接。
 3. `/mcp` 工具列表里有 `remember_memory`，没有 `prepare_context`。
 
-`POWERCONTEXT_CODEX_SERVER_URL` 会被忽略。`server_url` 只来自 plugin `.mcp.json`。不要把 token 写进 `.mcp.json`、Server URL 或静态 MCP header。当前工作不能落成 Source 时：
+`POWERCONTEXT_CODEX_SERVER_URL` 会被忽略。`server_url` 只来自插件 `.mcp.json`。不要把令牌写进 `.mcp.json`、Server URL 或静态 MCP 请求头。当前工作不能落成 Source 时：
 
 ```bash
 export POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false
 codex
 ```
 
-
 ## 在这个宿主上做完统一题
 
 > 修改 OpenAPI 契约后，下一步应该做什么？
 
-1. 在固定 Scope 里用 MCP `remember_memory` 保存答案。不要只靠自动 capture。
-2. 开一个新 Codex session，用 `/mcp` 确认仍连着 Server，再问同一句。
+1. 在固定 Scope 里用 MCP `remember_memory` 保存答案。不要只靠自动采集。
+2. 开一个新 Codex 会话，用 `/mcp` 确认仍连着 Server，再问同一句。
 3. 召回必须带 Citation，并且只出现在 `UserPromptSubmit` 的 `additionalContext`。
 4. 停掉 Server 后再问普通编码问题。Hook 可以 fail-open，编码应继续。
 5. 再调用 MCP `remember_memory`。失败必须可见，不能假装保存成功。
 
 ## 完成检查表
 
-- [ ] `powercontext doctor codex` 能找到 installed/enabled plugin；Server liveness/readiness 由单独的 `powercontext doctor` 检查。
-- [ ] `/hooks` 显示 `UserPromptSubmit`；`/mcp` 显示 PowerContext Server。
-- [ ] Bundled `project-context` Skill 与 Hook、MCP 同时存在。
-- [ ] Hook 从 MCP 使用的同一个 `.mcp.json` URL 推导 API base。
-- [ ] Codex 与 Claude Code 对同一 repository/Workstream 解析出一个 Scope。
-- [ ] Automatic Source 只包含 user prompt，不包含 assistant final response；必须保持私密的 prompt 已关闭 capture。
-- [ ] Optional flush 有明确上限，并在成功前证明 `current_cursor >= position`。
-- [ ] `preview and make no writes` 不产生 write。
-- [ ] Imperative Handoff 在一 turn 内完成，并返回 exact committed Revision。
-- [ ] Explicit write failure 保持可见；automatic recall/capture failure 仍 fail-open。
-- [ ] 上面的 **Unsupported**、**Not validated** 与 **Host-gated** 状态始终分开，包括真实宿主的 Handoff、preview 与 permission validation。
+只有以下结果都能直接观察时，才算完成：
+
+- `powercontext doctor codex` 能找到已安装/已启用插件。
+- Server 存活状态/就绪状态由单独的 `powercontext doctor` 检查。
+- `/hooks` 显示 `UserPromptSubmit`。
+- `/mcp` 显示 PowerContext Server。
+- 内置 `project-context` Skill 与 Hook、MCP 同时存在。
+- Hook 从 MCP 使用的同一个 `.mcp.json` URL 推导 API 基础。
+- Codex 与 Claude Code 对同一仓库/Workstream 解析出一个 Scope。
+- 自动 Source 只包含用户提示词，不包含助手最终响应。
+- 必须保持私密的提示词已关闭采集。
+- 可选 刷新有明确上限，并在成功前证明 `current_cursor >= position`。
+- `preview and make no writes` 不产生写入。
+- Imperative Handoff 在一轮次内完成，并返回精确已提交 Revision。
+- 显式写入失败保持可见。
+- 自动召回/采集失败仍 fail-open。
+- 上面的 **Unsupported**、**Not validated** 与 **Host-gated** 状态始终分开，包括真实宿主的 Handoff、预览与权限校验。
 
 下一页是 [Claude Code](/zh/coding-agents/claude-code)。

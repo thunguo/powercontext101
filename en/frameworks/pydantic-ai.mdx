@@ -7,7 +7,7 @@ description: "Review the future-facing Capability and Toolset API; neither PyPI 
 Preview and not installable by ordinary users: `powercontext-pydantic-ai` is not on PyPI. Its source metadata requires final `powercontext[client]>=0.0.3`, while the repository is still pre-0.0.3. A Git subdirectory install therefore fails dependency resolution too. There is no working standalone install command to run today.
 </Warning>
 
-This page documents the API for review and future use. Repository contributors can exercise it through the root development environment, but that is not a supported consumer installation path. Real provider calls and durable-execution hosts were not validated for this page.
+The API is available for review and future use. Repository contributors can exercise it through the root development environment, but that is not a supported consumer installation path. Real provider calls and durable-execution hosts were not validated in this verification.
 
 ## Choose the integration surface
 
@@ -56,6 +56,7 @@ It has no automatic recall, capture, checkpoint flush, or final flush.
 
 The tools preserve the full public Client response as JSON, including statuses, Citations, and revision fields. They do not return an empty success when the Client fails.
 
+This is a preview interface, not a package you can install today. The examples explain the intended Capability, Toolset, and Scope binding. To complete an integration now, use LangGraph, LangChain, or MCP. The outcome here is an accurate boundary assessment, not a successful installation of an unpublished package.
 ## Follow one bound run
 
 ```text
@@ -77,6 +78,8 @@ Recalled content is evidence, not instruction authority. Verify it against curre
 </Warning>
 
 ## Understand the three tools
+
+Each tool has a deliberately bounded input. The limit constrains what reaches PowerContext; it does not grant the model permission to persist that content.
 
 | Tool | Purpose | Input bounds |
 |---|---|---|
@@ -154,6 +157,8 @@ powercontext.pydantic-ai-capture-event/v1
 Capture creates Sources, not approved Memory. A successful checkpoint or final flush may run extraction if the Server has generation configured, but generated durable knowledge still follows PowerContext's domain and Review rules.
 
 ## Distinguish automatic and explicit failures
+
+The same transport error has different user-visible consequences depending on who requested the operation. Use the table to preserve that distinction.
 
 | Path | Failure behavior |
 |---|---|

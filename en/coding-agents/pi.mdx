@@ -139,7 +139,6 @@ Run these before treating a Pi deployment as complete:
 - Use plaintext on a non-loopback host and confirm configuration is rejected; use HTTPS remotely.
 - Inspect tools and commands and confirm Task Outcome, Candidate Review, Experience/Skill generation, and generic API surfaces are absent.
 
-
 ## Configuration defaults
 
 | Key | Default | Meaning |
@@ -160,7 +159,6 @@ export POWERCONTEXT_PI_CAPTURE_PROMPTS=false
 pi
 ```
 
-
 ## Finish the shared check on this host
 
 > What should happen after the OpenAPI contract changes?
@@ -173,21 +171,25 @@ pi
 
 ## Completion checklist
 
-- [ ] PowerContext and the Pi package come from the same reviewed Git ref; Node is `>=22.19`.
-- [ ] Pi 0.82.1 is recorded as compatibility evidence, not a formal minimum or complete 0.82.x promise.
-- [ ] Both `powercontext doctor` and `powercontext doctor pi` pass for their separate boundaries.
-- [ ] `pi list` points to a package manifest named `powercontext-pi`, and a new Pi process exposes `/pc`.
-- [ ] `/pc doctor` reaches the intended Server.
-- [ ] Scope is the explicit override, sanitized Git identity, or local-root hash; caller Scope cannot replace it.
-- [ ] Valid PreparedContext is strictly checked and appended to the existing `systemPrompt` as untrusted evidence.
-- [ ] Capture stores the trimmed prompt with `cwd`, `session_id`, and derived `turn_id`, but no project or branch field.
-- [ ] Secret and over-200,000-byte prompts are not captured.
-- [ ] Pending work clears only at `current_cursor >= position` and stays within the call and closing budgets.
-- [ ] Every gated tool and `/pc` mutation confirms or returns a stable no-write error.
-- [ ] Remote transport uses HTTPS, rejects redirects, and enforces JSON and response-size bounds.
-- [ ] Source, position, flush, Candidate, Review, and Memory remain distinct stages.
-- [ ] Package-load evidence stays separate from bundled-Skill discovery and a full real-host turn.
-- [ ] Pi-native Task Outcome and the other absent surfaces remain **Unsupported**.
-- [ ] Bundled Skill presence does not imply managed Skill export.
+Treat the integration as complete only when these results are observable:
+
+- PowerContext and the Pi package come from the same reviewed Git ref.
+- Node is `>=22.19`.
+- Pi 0.82.1 is recorded as compatibility evidence, not a formal minimum or complete 0.82.x promise.
+- Both `powercontext doctor` and `powercontext doctor pi` pass for their separate boundaries.
+- `pi list` points to a package manifest named `powercontext-pi`, and a new Pi process exposes `/pc`.
+- `/pc doctor` reaches the intended Server.
+- Scope is the explicit override, sanitized Git identity, or local-root hash.
+- Caller Scope cannot replace it.
+- Valid PreparedContext is strictly checked and appended to the existing `systemPrompt` as untrusted evidence.
+- Capture stores the trimmed prompt with `cwd`, `session_id`, and derived `turn_id`, but no project or branch field.
+- Secret and over-200,000-byte prompts are not captured.
+- Pending work clears only at `current_cursor >= position` and stays within the call and closing budgets.
+- Every gated tool and `/pc` mutation confirms or returns a stable no-write error.
+- Remote transport uses HTTPS, rejects redirects, and enforces JSON and response-size bounds.
+- Source, position, flush, Candidate, Review, and Memory remain distinct stages.
+- Package-load evidence stays separate from bundled-Skill discovery and a full real-host turn.
+- Pi-native Task Outcome and the other absent surfaces remain **Unsupported**.
+- Bundled Skill presence does not imply managed Skill export.
 
 Continue with [Extend hooks](/en/coding-agents/extend-hooks).

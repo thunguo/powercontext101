@@ -4,12 +4,12 @@ description: "安装 UserPromptSubmit Hook、MCP 与 project-context Skill，验
 ---
 
 <Warning>
-WorkBuddy 有独立的 `setup` / `doctor` 命令，但不在 `setup select` 与 `doctor integrations` 的 first-class catalog 里。真实 host-process E2E 是 **Not validated**；仓库只有 service-chain 测试。Permission 属于 **Host-gated**。managed Skill export 是 **Unsupported**。无正式最低 WorkBuddy version。
+WorkBuddy 有独立的 `setup` / `doctor` 命令，但不在 `setup select` 与 `doctor integrations` 的一级支持的目录里。真实宿主进程端到端验证是 **Not validated**；仓库只有服务链测试。权限属于 **Host-gated**。托管 Skill 导出是 **Unsupported**。无正式最低 WorkBuddy 版本。
 </Warning>
 
-WorkBuddy 的接入面接近 Codex：短进程 `UserPromptSubmit` Hook 自动 prepare/capture，HTTP MCP 做显式 Memory 与 Handoff，bundled `project-context` Skill 绑定这两条路径。Setup 不会启动 Server，也不会打开 WorkBuddy。
+WorkBuddy 的接入面接近 Codex：短进程 `UserPromptSubmit` Hook 自动准备/采集，HTTP MCP 做显式 Memory 与 Handoff，内置 `project-context` Skill 绑定这两条路径。安装配置不会启动 Server，也不会打开 WorkBuddy。
 
-完整安装步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure WorkBuddy how-to。本页只写 101 的验证合同。
+完整安装步骤看 [官方文档](https://oceanbase.github.io/powercontext/) 的 Configure WorkBuddy 操作指南。这里验证 PowerContext 101 的可运行边界。
 
 ## 安装并激活
 
@@ -19,7 +19,7 @@ Hook 进程需要 Python 3.11 或更新版本在 `PATH` 上。先在一个终端
 powercontext server run
 ```
 
-在另一个终端安装 hooks、MCP 与 Skill：
+在另一个终端安装 Hook、MCP 与 Skill：
 
 ```bash
 powercontext setup workbuddy --source oceanbase/powercontext --ref master
@@ -28,7 +28,7 @@ powercontext doctor
 powercontext doctor workbuddy
 ```
 
-Setup 写入 `WORKBUDDY_HOME`（未设置时是 `~/.workbuddy`）下的这些 owned 路径，并在失败时回滚 snapshot：
+安装配置写入 `WORKBUDDY_HOME`（未设置时是 `~/.workbuddy`）下的这些归属当前集成的路径，并在失败时回滚快照：
 
 ```text
 hooks/workbuddy_powercontext_hook.py
@@ -40,31 +40,31 @@ mcp.json
 skills/project-context/
 ```
 
-它会合并 `UserPromptSubmit` hook，保留无关 settings 和其他 MCP server，并解析 Skill 里的 command placeholder。它不会启动 Server，也不会打开 WorkBuddy。
+它会合并 `UserPromptSubmit` Hook，保留无关设置和其他 MCP server，并解析 Skill 里的命令 占位符。它不会启动 Server，也不会打开 WorkBuddy。
 
-`doctor workbuddy` 检查 hooks 文件、settings 是否注册 PowerContext hook、`mcp.json` 是否有 `powercontext` server，以及 owned Skill 是否还留着未解析 placeholder。它不启动 WorkBuddy，不联系 Server，不测 recall。`doctor integrations` 不会列出它。
+`doctor workbuddy` 检查 Hook 文件、设置是否注册 PowerContext Hook、`mcp.json` 是否有 `powercontext` server，以及归属当前集成的 Skill 是否还留着未解析 占位符。它不启动 WorkBuddy，不联系 Server，不测召回。`doctor integrations` 不会列出它。
 
-装完后重启 WorkBuddy。每次 prompt 时，hook 状态应显示 `Syncing PowerContext`。
+装完后重启 WorkBuddy。每次提示词时，Hook 状态应显示 `Syncing PowerContext`。
 
 ## 配置默认值
 
 Hook 读 `POWERCONTEXT_WORKBUDDY_` 环境变量。MCP 条目使用同一套模板，由 WorkBuddy 从环境展开：
 
-| Key | 默认值 | 含义 |
+| 键 | 默认值 | 含义 |
 |---|---|---|
-| MCP `url` | `${POWERCONTEXT_WORKBUDDY_SERVER_URL:-http://127.0.0.1:8000}/mcp` | setup 写入 `mcp.json` 的模板 |
-| `POWERCONTEXT_WORKBUDDY_SERVER_URL` | `http://127.0.0.1:8000` | Hook 与 MCP 共用的 Server base |
-| `POWERCONTEXT_WORKBUDDY_AUTHORIZATION` | 未设置 | 完整 Bearer header |
-| `POWERCONTEXT_WORKBUDDY_SCOPE_ID` | 未设置 | 显式 Scope；未设置则按 Workstream / Git / path 推导 |
-| `POWERCONTEXT_WORKBUDDY_CAPTURE_PROMPTS` | `true` | 采集当前 user prompt 为 Source |
-| `POWERCONTEXT_WORKBUDDY_FLUSH_ON_CAPTURE` | `false` | 测试用：capture 后等待 flush |
-| `POWERCONTEXT_WORKBUDDY_REQUEST_TIMEOUT_SECONDS` | `1.0` | 单次 HTTP timeout |
-| `POWERCONTEXT_WORKBUDDY_HTTP_BUDGET_SECONDS` | `4.0` | 一轮 prepare/capture 总预算 |
-| `POWERCONTEXT_WORKBUDDY_FLUSH_MAX_CALLS` | `4` | flush 最多调用次数；允许 `1–16` |
-| Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
-| Hook timeout | `10` | WorkBuddy 外层 hook timeout，单位秒 |
+| MCP `url` | `${POWERCONTEXT_WORKBUDDY_SERVER_URL:-http://127.0.0.1:8000}/mcp` | 安装配置写入 `mcp.json` 的模板 |
+| `POWERCONTEXT_WORKBUDDY_SERVER_URL` | `http://127.0.0.1:8000` | Hook 与 MCP 共用的 Server 基础 |
+| `POWERCONTEXT_WORKBUDDY_AUTHORIZATION` | 未设置 | 完整 Bearer 请求头 |
+| `POWERCONTEXT_WORKBUDDY_SCOPE_ID` | 未设置 | 显式 Scope；未设置则按 Workstream / Git / 路径推导 |
+| `POWERCONTEXT_WORKBUDDY_CAPTURE_PROMPTS` | `true` | 采集当前用户提示词为 Source |
+| `POWERCONTEXT_WORKBUDDY_FLUSH_ON_CAPTURE` | `false` | 测试用：采集后等待刷新 |
+| `POWERCONTEXT_WORKBUDDY_REQUEST_TIMEOUT_SECONDS` | `1.0` | 单次 HTTP 超时 |
+| `POWERCONTEXT_WORKBUDDY_HTTP_BUDGET_SECONDS` | `4.0` | 一轮准备/采集总预算 |
+| `POWERCONTEXT_WORKBUDDY_FLUSH_MAX_CALLS` | `4` | 刷新最多调用次数；允许 `1–16` |
+| 召回预算 | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应环境变量 |
+| Hook 超时 | `10` | WorkBuddy 外层 Hook 超时，单位秒 |
 
-不要把 token 写进 `mcp.json` 或 Server URL。URL 不能带 credentials、query 或 fragment；明文 HTTP 只接受 loopback。改环境变量后必须重启 WorkBuddy。当前工作不能落成 Source 时：
+不要把令牌写进 `mcp.json` 或 Server URL。URL 不能带凭证、查询或片段；明文 HTTP 只接受本机回环地址。改环境变量后必须重启 WorkBuddy。当前工作不能落成 Source 时：
 
 ```bash
 export POWERCONTEXT_WORKBUDDY_CAPTURE_PROMPTS=false
@@ -88,7 +88,7 @@ after changing the OpenAPI contract, regenerate the client and inspect the diff.
 Return the Memory Citation. Do not store secrets.
 ```
 
-这是 MCP `remember_memory`，不需要 generation model。WorkBuddy 应返回 exact Citation。
+这是 MCP `remember_memory`，不需要生成模型。WorkBuddy 应返回精确 Citation。
 
 换一个新会话，在同一项目目录提问：
 
@@ -96,18 +96,18 @@ Return the Memory Citation. Do not store secrets.
 What should happen after the OpenAPI contract changes?
 ```
 
-自动 recall 成功时，`UserPromptSubmit` 通过 hook-stdout `additionalContext` 注入有界 `PreparedContext`。内容带 Citation，并标成 untrusted historical evidence。它只服务当前 prompt，不会把 assistant final response 采成 Source。
+自动召回成功时，`UserPromptSubmit` 通过 hook-stdout `additionalContext` 注入有界 `PreparedContext`。内容带 Citation，并标成不可信历史证据。它只服务当前提示词，不会把助手最终响应采成 Source。
 
 ## Scope 解析
 
-WorkBuddy 与 Codex / Claude Code 共用同一套顺序和同一份 binding：
+WorkBuddy 与 Codex / Claude Code 共用同一套顺序和同一份绑定：
 
 1. 非空的 `POWERCONTEXT_WORKBUDDY_SCOPE_ID`。
-2. Git-private Workstream binding：`.git/powercontext/codex-workspace.json`。
+2. Git 私有 Workstream 绑定：`.git/powercontext/codex-workspace.json`。
 3. 规范化后的 Git `remote.origin.url`，写成 `git:...`。
 4. 项目根目录的 `local:<sha256>`。
 
-这份 binding 在 Git 目录里，不进 worktree，也不会被提交。共享 Memory 需要同一个 Server，以及两边完全相同的 `scope_id`。
+这份绑定在 Git 目录里，不进工作树，也不会被提交。共享 Memory 需要同一个 Server，以及两边完全相同的 `scope_id`。
 
 ## 自动路径与显式工具
 
@@ -120,34 +120,34 @@ UserPromptSubmit
 → independently capture the prompt
 ```
 
-Recall、capture 与 flush 独立 fail-open。外层 hook timeout 到 10 秒后，WorkBuddy 继续当前 prompt。自动 capture 只保存 prompt，不保存 final response 或 Task Outcome。
+召回、采集与刷新独立 fail-open。外层 Hook 超时到 10 秒后，WorkBuddy 继续当前提示词。自动采集只保存提示词，不保存最终响应或 Task Outcome。
 
-MCP 提供显式 Memory 与 Handoff。bundled Skill 把 `交接`、`交接当前工作` 或 `handoff this work` 当成一次 durable Handoff 的显式授权；只讨论设计或要求 preview 时，不得调用 `handoff_current_work`。
+MCP 提供显式 Memory 与 Handoff。内置 Skill 把 `交接`、`交接当前工作` 或 `handoff this work` 当成一次持久 Handoff 的显式授权；只讨论设计或要求预览时，不得调用 `handoff_current_work`。
 
-Bundled Skill 不是 managed Skill export。WorkBuddy 也不是当前 export target。
+内置 Skill 不是托管 Skill 导出。WorkBuddy 也不是当前导出目标。
 
 ## 负向检查
 
 - 停掉 Server 后再问普通编码问题。Hook 应 fail-open；WorkBuddy 继续。
 - 停掉 Server 后再做显式 `remember_memory`。MCP 必须报告失败，不能假装写入成功。
-- Server auth 已开启时去掉 `POWERCONTEXT_WORKBUDDY_AUTHORIZATION`。Hook fail-open 并写出 `authentication_failed`；MCP 不可用，但会话不中断。
-- 把 token 写进 `mcp.json`。不要这样做；文件里只应保留环境变量模板。
+- Server 认证已开启时去掉 `POWERCONTEXT_WORKBUDDY_AUTHORIZATION`。Hook fail-open 并写出 `authentication_failed`；MCP 不可用，但会话不中断。
+- 把令牌写进 `mcp.json`。不要这样做；文件里只应保留环境变量模板。
 
 ## 当前限制
 
-- 真实 WorkBuddy host-process E2E 是 **Not validated**。`test_workbuddy_service_chain.py` 只证明 hook 与 MCP 能共用一份 service 配置。
-- WorkBuddy 不在 first-class bulk catalog 里。`setup select` 和 `doctor integrations` 都不会列出它。
-- 无正式最低 WorkBuddy version。
-- managed Skill export 是 **Unsupported**。
-- Doctor 是安装检查，不是 recall 或 permission UI 证明。
+- 真实 WorkBuddy 宿主进程端到端验证是 **Not validated**。`test_workbuddy_service_chain.py` 只证明 Hook 与 MCP 能共用一份服务配置。
+- WorkBuddy 不在一级支持的 bulk 目录里。`setup select` 和 `doctor integrations` 都不会列出它。
+- 无正式最低 WorkBuddy 版本。
+- 托管 Skill 导出是 **Unsupported**。
+- 诊断是安装检查，不是召回或权限 UI 证明。
 
 ## 完成检查
 
-- `doctor workbuddy` 看到 hooks、settings、MCP 和 owned Skill。
-- Server health、readiness、capabilities 已单独检查。
-- 新会话能从 `additionalContext` 召回你显式保存的 OpenAPI decision，并看到 Citation。
-- 自动 recall 失败时，普通任务仍继续。
+- `doctor workbuddy` 看到 Hook、设置、MCP 和归属当前集成的 Skill。
+- Server 健康状态、就绪状态、能力已单独检查。
+- 新会话能从 `additionalContext` 召回你显式保存的 OpenAPI 决定，并看到 Citation。
+- 自动召回失败时，普通任务仍继续。
 - 显式 Memory 或 Handoff 失败时，WorkBuddy 把错误告诉你。
-- 你没有把 bundled Skill 当成 managed export。
+- 你没有把内置 Skill 当成托管导出。
 
 下一页是 [Agent Plugin](/zh/common-agents/agent-plugin)。

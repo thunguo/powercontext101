@@ -1,40 +1,41 @@
 ---
-title: "Pydantic AI Server inference"
-description: "配置 Server 相互独立的 generation 与 embedding provider，并理解其生命周期和失败边界。"
+title: "Pydantic AI Server 推理"
+description: "配置 Server 相互独立的生成与嵌入模型提供方，并理解其生命周期和失败边界。"
 ---
 
-这里的 Pydantic AI 运行在 PowerContext Server 内部，负责 schema-bound generation 和独立的 embedding provider。它不会安装 [Pydantic AI Agent adapter](/zh/frameworks/pydantic-ai)，不会给 Agent 增加工具，也不共享 Agent adapter 的生命周期。
+这里的 Pydantic AI 运行在 PowerContext Server 内部，负责 schema-bound 生成和独立的嵌入模型提供方。它不会安装 [Pydantic AI Agent 适配器](/zh/frameworks/pydantic-ai)，不会给 Agent 增加工具，也不共享 Agent 适配器的生命周期。
 
 <Note>
-状态：本页所用上游 revision 的 built-in runtime 已提供这项能力。in-process composition 安装 `powercontext[builtin]`，运行 Server 安装 `powercontext[server]`；要求 Python 3.11 或更高版本。本页没有验证真实 provider 调用、credential 和生产环境 latency。
+状态：本页所用上游 Revision 的 built-in 运行时已提供这项能力。in-process 组合安装 `powercontext[builtin]`，运行 Server 安装 `powercontext[server]`；要求 Python 3.11 或更高版本。文档验证没有验证真实模型提供方调用、凭证和生产环境延迟。
 </Note>
 
-## 选择四种 runtime 状态之一
+## 选择四种运行时状态之一
 
-Generation 和 embedding 都是可选项，彼此独立。无模型 Server 仍有实际用途：explicit Memory 和 FTS 都不依赖 provider。
+生成和嵌入都是可选项，彼此独立。无模型 Server 仍有实际用途：显式 Memory 和 FTS 都不依赖模型提供方。
 
 | 状态 | 配置 | 可用能力 |
 |---|---|---|
-| 无模型 | 两种 model 都不配置 | Explicit Memory、FTS、typed proposal 与 Review，以及 typed Handoff operation |
-| 仅 generation | `generation_model` | Source extraction、Experience incubation/generation、Skill generation、Handoff generation 和可选 Memory reranking |
-| 仅 embedding | 完整 embedding profile | Vector/hybrid indexing 与 search；explicit Memory write 仍可用 |
-| 两者都有 | generation 加完整 embedding profile | 以上全部能力；两个 provider 仍各自独立失败 |
+| 无模型 | 两种模型都不配置 | 显式 Memory、FTS、类型化提案与 Review，以及类型化 Handoff 操作 |
+| 仅生成 | `generation_model` | Source 抽取、Experience incubation/生成、Skill 生成、Handoff 生成和可选 Memory 重排序 |
+| 仅嵌入 | 完整嵌入配置档 | 向量/混合 索引 与搜索；显式 Memory 写入仍可用 |
+| 两者都有 | 生成加完整嵌入配置档 | 以上全部能力；两个模型提供方仍各自独立失败 |
 
-Generation 不会自动启用 Scheduler。可以手动调用 `flush_memory`，也可以另行配置 `POWERCONTEXT_SERVER_RUNTIME_SCHEDULE_SECONDS`。
+生成不会自动启用调度器。可以手动调用 `flush_memory`，也可以另行配置 `POWERCONTEXT_SERVER_RUNTIME_SCHEDULE_SECONDS`。
 
 ## 配置 Server
 
-按运行方式安装其中一个 role。此处 pin 与 [LangGraph](/zh/frameworks/langgraph) / [LangChain](/zh/frameworks/langchain) 页相同，写成完整 commit hash：
+按运行方式安装其中一个 role。此处固定版本与 [LangGraph](/zh/frameworks/langgraph) / [LangChain](/zh/frameworks/langchain) 页相同，写成完整提交哈希：
 
 ```bash
-uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
-uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
+uv add "powercontext[builtin] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
+uv add "powercontext[server] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
 ```
 
-Server settings 使用 Pydantic AI model string。Credential、base URL 等 provider 专用环境变量由所选 provider 读取。
+Server 设置使用 Pydantic AI 模型字符串。凭证、基础 URL 等模型提供方专用环境变量由所选模型提供方读取。`POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL_SETTINGS` 接受 JSON 对象，生成流程、重排序和就绪探测会共用这些设置。模型提供方的请求字段应放在 `extra_body` 下；凭证和静态请求头仍放在模型提供方配置中。只配置非空 settings 而不配置生成模型，或在 settings 中加入 `extra_headers`，都会导致配置校验失败。
 
 ```bash
 export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL="openai:gpt-5.2"
+export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MODEL_SETTINGS='{}'
 export POWERCONTEXT_SERVER_INFERENCE_GENERATION_TIMEOUT_SECONDS="30"
 export POWERCONTEXT_SERVER_INFERENCE_GENERATION_MAX_REQUESTS="2"
 
@@ -48,15 +49,15 @@ export POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_BATCH_SIZE="10"
 uv run powercontext server run
 ```
 
-`EMBEDDING_MODEL`、`EMBEDDING_PROFILE_ID`、`EMBEDDING_DIMENSION` 必须全部配置或全部省略。配置不完整时，Server 会在启动前拒绝。Profile 属于持久化 向量配置契约；应先确定 ID、dimension 和 normalization，不要在原 profile 上随意改动。
+`EMBEDDING_MODEL`、`EMBEDDING_PROFILE_ID`、`EMBEDDING_DIMENSION` 必须全部配置或全部省略。配置不完整时，Server 会在启动前拒绝。Profile 属于持久化向量配置契约；应先确定 ID、维度和规范化，不要在原配置档上随意改动。
 
 <Warning>
-Model string 只是配置，不代表 provider 已经可用。Readiness 会发送一次很小的真实请求，但本页不保证 provider account、credential、quota、regional endpoint、model dimension 或 latency 符合你的部署要求。
+模型字符串只是配置，不代表模型提供方已经可用。就绪探测 会发送一次很小的真实请求，但文档验证不保证模型提供方 账户、凭证、配额、区域 端点、模型维度或延迟符合你的部署要求。
 </Warning>
 
-## 直接使用 structured generator
+## 直接使用 结构化 generator
 
-底层 generator 只接受已经构造并打开的 Pydantic AI `Model`，传 model string 会被拒绝。Model 生命周期由 caller 管理。
+底层 generator 只接受已经构造并打开的 Pydantic AI `Model`，传模型字符串会被拒绝。模型生命周期由调用方管理。
 
 ```python
 from pydantic import BaseModel
@@ -85,11 +86,11 @@ async def generate_summary() -> ExtractionOutput:
         return result.output
 ```
 
-Server composition 的接口不同：`InferenceConfig.generation_model` 接受 model string，在 runtime 存活期间打开 provider model，复用于各条 generation pipeline，并随 runtime 一起关闭。
+Server 组合的接口不同：`InferenceConfig.generation_model` 接受模型字符串，在运行时存活期间打开模型提供方模型，复用于各条生成流程，并随运行时一起关闭。
 
-## 跟踪 execution flow
+## 跟踪执行流程
 
-### Generation flow
+### 生成流程
 
 ```text
 model string
@@ -100,9 +101,9 @@ model string
 → explicit durable write or Candidate Review boundary
 ```
 
-Pydantic AI 先校验声明的 output schema，但这只是第一层检查。生成数据进入权威状态前，PowerContext 还会校验 domain rule、evidence reference、current version 和其他 invariant。生成的 Experience 与 Skill 仍要经过 Candidate Review；structured output 不等于批准。
+Pydantic AI 先校验声明的输出模式，但这只是第一层检查。生成数据进入权威状态前，PowerContext 还会校验领域 规则、证据 reference、当前版本和其他 invariant。生成的 Experience 与 Skill 仍要经过 Candidate Review；结构化 输出不等于批准。
 
-### Embedding flow
+### 嵌入流程
 
 ```text
 embedding model + profile ID + dimension
@@ -112,63 +113,65 @@ embedding model + profile ID + dimension
 → best-effort write projection or vector/hybrid query
 ```
 
-Generation 和 embedding 不会互相 fallback，也没有跨 provider fallback。一个正常时，另一个仍可能 degraded。
+生成和嵌入不会互相后备路径，也没有跨模型提供方后备路径。一个正常时，另一个仍可能降级。
 
-## 理解 search 与 write failure
+## 理解搜索与写入失败
 
-| 路径 | Provider failure 行为 | 权威数据 |
+模型提供方故障只影响依赖它的路径。下表把这些路径与数据库中仍然有效的持久状态分开。
+
+| 路径 | 模型提供方失败行为 | 权威数据 |
 |---|---|---|
-| `mode="auto"` search | query embedding 暂时失败时，如果 FTS 可用，可以回退到 FTS | 不改变持久状态 |
-| `mode="vector"` 或 `mode="hybrid"` search | 返回错误，不会静默改用 FTS | 不改变持久状态 |
-| write-time projection embedding | best effort；projection 失败不会丢弃已提交的 Memory | Memory 仍是权威数据，也可由 FTS 找到 |
-| generation-backed operation | timeout 或 unavailable 会返回给 operation | invalid 或缺失的生成结果不会被当成成功写入 |
+| `mode="auto"` 搜索 | 查询嵌入暂时失败时，如果 FTS 可用，可以回退到 FTS | 不改变持久状态 |
+| `mode="vector"` 或 `mode="hybrid"` 搜索 | 返回错误，不会静默改用 FTS | 不改变持久状态 |
+| write-time 投影嵌入 | best effort；投影失败不会丢弃已提交的 Memory | Memory 仍是权威数据，也可由 FTS 找到 |
+| generation-backed 操作 | 超时或不可用会返回给操作 | 无效或缺失的生成结果不会被当成成功写入 |
 
-Provider timeout 和 temporary unavailable 会映射为 PowerContext inference error，并由 Server 返回 HTTP 503。重排 embedding、vector 数量或 dimension 错误、非有限值等 invalid output 会被拒绝，不会写入 index。
+模型提供方超时和 temporary 不可用会映射为 PowerContext 推理错误，并由 Server 返回 HTTP 503。重排嵌入、向量数量或维度错误、非有限值等无效输出会被拒绝，不会写入 索引。
 
 <Warning>
-FTS fallback 成功不能证明 vector search 正常。验证 embedding 时，应发起显式 vector request，并要求 source-linked hit 的 `matched_by` 包含 `vector`。
+FTS 后备路径成功不能证明向量搜索正常。验证嵌入时，应发起显式向量请求，并要求关联 Source 的命中的 `matched_by` 包含 `vector`。
 </Warning>
 
-## 准确解读 readiness
+## 准确解读就绪状态
 
-配置 generation 或 embedding 后，会分别增加 non-blocking readiness probe。Inference probe 失败时是 HTTP 200 的 `degraded`，不是 `not_ready`。Runtime 或 database failure 才是 blocking failure，会返回 HTTP 503 的 `not_ready`。
+配置生成或嵌入后，会分别增加 non-blocking 就绪状态探测。推理探测失败时是 HTTP 200 的 `degraded`，不是 `not_ready`。运行时或数据库失败才是 blocking 失败，会返回 HTTP 503 的 `not_ready`。
 
 ```bash
 powercontext ready
 powercontext capabilities
 ```
 
-Server degraded 时，不依赖故障 provider 的 database-backed operation 仍可执行；需要该 provider 的 operation 可能返回 503。
+Server 降级时，不依赖故障模型提供方的 database-backed 操作仍可执行；需要该模型提供方的操作可能返回 503。
 
-Readiness 只检查当时是否可调用。它不验证生产 quota、pipeline 使用的每一种 schema、持续并发、数据质量或完整的 end-to-end latency。
+就绪探测 只检查当时是否可调用。它不验证生产 配额、流程使用的每一种模式、持续并发、数据质量或完整的 end-to-end 延迟。
 
-## 设定 privacy 与 Scope 边界
+## 设定隐私与 Scope 边界
 
-Provider 会收到 operation 的序列化输入。根据 pipeline 不同，内容可能包括 Source、Memory candidate、query、Handoff evidence 或 Candidate generation evidence。Provider usage 会记录 request/token 计数；启用 instrumentation 后还可能发出 inference span。发送敏感项目内容前，应先确认 provider 的 data handling 和 tracing 配置。
+模型提供方会收到操作的序列化输入。根据流程不同，内容可能包括 Source、Memory Candidate、查询、Handoff 证据或 Candidate 生成证据。模型提供方 usage 会记录请求/令牌计数；启用 instrumentation 后还可能发出推理 span。发送敏感项目内容前，应先确认模型提供方的数据处理和 tracing 配置。
 
-Scope 仍只负责选择 PowerContext 数据。它不能阻止已选内容离开 Server 发往配置的 model，不能证明用户身份、授予 model 权限或批准生成内容。如果 provider 不应看到某个 secret，就不要把它放进 Source 或 Memory。
+Scope 仍只负责选择 PowerContext 数据。它不能阻止已选内容离开 Server 发往配置的模型，不能证明用户身份、授予模型权限或批准生成内容。如果模型提供方不应看到某个敏感信息，就不要把它放进 Source 或 Memory。
 
 ## 当前不支持或尚未验证
 
 | 项目 | 状态 |
 |---|---|
-| Pydantic AI Agent tool 或 lifecycle hook | **Unsupported**；使用独立的 Agent adapter |
-| generation-to-embedding failover 或跨 provider failover | **Unsupported** |
-| 显式 vector/hybrid search 静默 fallback | **Unsupported** |
-| 用 schema validation 代替 domain invariant 或 Review | **Unsupported** |
-| 真实 provider credential、quota、regional endpoint 和 latency | **Not validated**；本页未做真实 provider 验证 |
-| generation 配置自动启用 Scheduler | **Unsupported**；需单独配置 scheduling |
+| Pydantic AI Agent 工具或生命周期 Hook | **Unsupported**；使用独立的 Agent 适配器 |
+| generation-to-embedding failover 或跨模型提供方 failover | **Unsupported** |
+| 显式向量/混合搜索静默后备路径 | **Unsupported** |
+| 用模式校验代替领域 invariant 或 Review | **Unsupported** |
+| 真实模型提供方凭证、配额、区域 端点和延迟 | **Not validated**；本页未做真实模型提供方验证 |
+| 生成配置自动启用调度器 | **Unsupported**；需单独配置 scheduling |
 
 ## 完成检查
 
-依赖 inference 前，确认：
+依赖推理前，确认：
 
 - 已有意选择四种状态之一；
-- 三个必填 embedding 字段全部设置或全部省略；
+- 三个必填嵌入字段全部设置或全部省略；
 - `powercontext ready` 能正确区分 `ready`、`degraded` 和 `not_ready`；
-- `powercontext capabilities` 只列出实际配置的 search 与 generation capability；
-- 显式 vector 验证失败时错误可见，不会被误认为 FTS fallback；
-- provider privacy、tracing、retention 设置适合各 pipeline 发送的数据；
-- schema validation 后仍保留 downstream domain validation 与 Candidate Review。
+- `powercontext capabilities` 只列出实际配置的搜索与生成能力；
+- 显式向量验证失败时错误可见，不会被误认为 FTS 后备路径；
+- 模型提供方隐私、tracing、保留策略设置适合各流程发送的数据；
+- 模式校验后仍保留下游领域校验与 Candidate Review。
 
-第一次接入请回到 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)。[Pydantic AI Agent adapter](/zh/frameworks/pydantic-ai) 仍是 Preview，当前没有可用安装命令，需要时再读。
+第一次接入请回到 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)。[Pydantic AI Agent 适配器](/zh/frameworks/pydantic-ai) 仍是预览，当前没有可用安装命令，需要时再读。

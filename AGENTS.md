@@ -47,9 +47,9 @@ Keep these product words in both Chinese and English pages. Do not replace them 
 - `fail-open`
 - `Task Outcome`
 
-English pages use `Work Contract`. On each Chinese page, write `工作契约（Work Contract）` on first reader-visible use and `工作契约` afterwards. Keep API identifiers, schemas, JSON fields, and code literals such as `create_work_contract`, `CreateWorkContractRequest`, `powercontext.work-contract.v1`, and `"contract"` unchanged.
+English pages use `Work Contract`. On each Chinese page, write `工作契约（Work Contract）` on first reader-visible use and `工作契约` afterwards. Generic software and API contracts are always `契约`, never `合同`. Keep API identifiers, schemas, JSON fields, and code literals such as `create_work_contract`, `CreateWorkContractRequest`, `powercontext.work-contract.v1`, and `"contract"` unchanged.
 
-In Chinese prose, translate ordinary technical language when no exact identifier is involved: adapter → 适配器, plugin → 插件, recall → 召回, capture → 采集, commit → 提交, export → 导出, approve/reject/revise → 批准/拒绝/修订, current head → 当前头版本, stale → 过期, durable → 持久, boundary → 边界, receipt → 回执, lineage → 证据链, no-op → 无变更, fallback → 后备路径, provider → 模型提供方, real-host E2E → 真实宿主端到端验证, drift → 漂移. Do not force these translations inside code, API names, environment variables, or exact status values.
+Chinese prose should read as Chinese, not as English terminology joined by Chinese particles. Translate ordinary engineering language whenever no exact identifier or proper product name is involved: adapter → 适配器, plugin → 插件, recall → 召回, capture → 采集, commit → 提交, export → 导出, approve/reject/revise → 批准/拒绝/修订, current head → 当前头版本, stale → 过期, durable → 持久, boundary → 边界, receipt → 回执, lineage → 证据链, no-op → 无变更, fallback → 后备路径, provider → 模型提供方, real-host E2E → 真实宿主端到端验证, drift → 漂移. Also translate setup, package, client, host, runtime, tool, timeout, prompt, transcript, session, snapshot, smoke test, source install, and round trip when they are ordinary prose. Keep exact commands, API/tool names, environment variables, schemas, maturity labels, UI labels, and proper component names such as PowerContext Server and Python Client unchanged.
 
 Say `PowerContext 101` for this site. Say `official docs` / `官方文档` for https://powercontext.oceanbase.io/.
 

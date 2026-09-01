@@ -3,11 +3,13 @@ title: "Source and Memory in practice"
 description: "Compare explicit Memory with Source extraction and verify real lineage through position, cursor, and source_refs."
 ---
 
-The previous page wrote already-curated Memory directly. This page follows the other path: capture Source first, then let a generation pipeline extract durable knowledge from the evidence.
+The previous page wrote already-curated Memory directly. Now follow the other path: capture Source first, then let a generation pipeline extract durable knowledge from the evidence.
 
 Both paths may produce Memory. Their prerequisites, lineage, and failure behavior differ.
 
 ## Compare the two paths
+
+Both paths end in Memory, but they establish different evidence. An explicit write records a fact you have already decided to keep; extraction starts with Source and may produce no Memory.
 
 | Path | Model required | Creates Source first | Best fit |
 |---|---:|---:|---|
@@ -44,7 +46,7 @@ powercontext config validate --env-file .env
 powercontext server run --env-file .env
 ```
 
-Scheduling is a separate setting. This page calls `flush_memory` directly and does not depend on the periodic scheduler.
+Scheduling is a separate setting. The procedure calls `flush_memory` directly and does not depend on the periodic scheduler.
 
 ## Complete lineage script
 
@@ -319,7 +321,7 @@ Content or metadata bytes changed under one `source_id`. Use a new ID for a new 
 
 ## Completion check
 
-This page should prove that:
+The observable result is:
 
 - capture creates Source, not Memory;
 - replay keeps the original position;

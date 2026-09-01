@@ -18,20 +18,20 @@ Source install only: `powercontext-langchain==0.0.1` is not published to PyPI. T
 | Runtime | Python `>=3.11,<4.0`; LangChain `>=1.3,<2` |
 | Invocation | Sync and async |
 | Mutable-branch reproducibility | **Not validated** |
-| Real model-provider round trip in this guide | **Not validated** |
+| Real model-provider round trip in the documented evidence | **Not validated** |
 
 Install the Server and middleware from the reviewed source commit:
 
 ```bash
-uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10"
-uv pip install "powercontext-langchain @ git+https://github.com/oceanbase/powercontext.git@4213d32d672a6fb16e74730eb50b9be6a38bcb10#subdirectory=integrations/langchain"
+uv tool install --force "powercontext[cli,server] @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977"
+uv pip install "powercontext-langchain @ git+https://github.com/oceanbase/powercontext.git@3e629eb163ba0ddf2935ce3b3fbaced0f9371977#subdirectory=integrations/langchain"
 powercontext server run
 ```
 
 For a local checkout at the same commit:
 
 ```bash
-git -C /path/to/powercontext checkout 4213d32d672a6fb16e74730eb50b9be6a38bcb10
+git -C /path/to/powercontext checkout 3e629eb163ba0ddf2935ce3b3fbaced0f9371977
 uv pip install /path/to/powercontext/integrations/langchain
 ```
 
@@ -40,6 +40,8 @@ The middleware is independent of `powercontext-langgraph`. LangChain may install
 </Note>
 
 ## Minimum use
+
+The example assumes your application already owns an initialized chat model and its normal agent or model-call loop. PowerContext supplies middleware; it does not choose or create that model. Verify Scope and recall first with the focused middleware tests or a model-free fake, then place the middleware around the real call.
 
 ```python
 from langchain.agents import create_agent
@@ -156,9 +158,11 @@ The middleware does not add explicit PowerContext tools. If the application wrap
 Recall can contain old user or model text. Treat it as untrusted evidence, not an instruction, identity proof, or permission grant. Scope chooses a data partition; derive it from an authenticated tenant/project mapping when isolation matters.
 </Warning>
 
-Capture can store ordinary prompts, code, business data, and final model output. This adapter does not promise comprehensive secret redaction. Keep `auto_capture=False` until the application has content filtering, consent, retention, and deletion rules. Tool output is excluded, but that alone is not a privacy policy.
+Capture can store ordinary prompts, code, business data, and final model output. This adapter does not promise complete secret redaction. Keep `auto_capture=False` until the application has content filtering, consent, retention, and deletion rules. Tool output is excluded, but that alone is not a privacy policy.
 
 ## Compare with LangGraph
+
+The difference is where recall lives. Pick the lifecycle already owned by your application rather than wrapping one framework to imitate the other.
 
 | Capability | LangChain | LangGraph |
 |---|---|---|
@@ -179,9 +183,9 @@ Capture can store ordinary prompts, code, business data, and final model output.
 | Handoff and Candidate Review | **Unsupported** |
 | Experience and Skill operations | **Unsupported** |
 | Failed or aborted-run capture | **Unsupported** |
-| Comprehensive secret redaction | **Unsupported** |
+| Complete secret redaction | **Unsupported** |
 | Reproducible install from mutable `master` | **Not validated** |
-| Real external-provider round trip in this guide | **Not validated** |
+| Real external-provider round trip in the documented evidence | **Not validated** |
 
 ## Completion checklist
 

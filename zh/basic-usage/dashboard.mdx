@@ -1,11 +1,11 @@
 ---
 title: "用 Dashboard 核对 Scope 统计"
-description: "给 Dashboard 配置与 Client 相同的 Scope，并核对 active、inactive 和 total 统计。"
+description: "给 Dashboard 配置与客户端相同的 Scope，并核对启用状态、停用状态和总数统计。"
 ---
 
 Dashboard 是 Server 自带的只读统计界面。它不会保存第二份数据，也不会自动发现所有 Scope；更重要的是，它当前不展示 Memory 正文或 Citation。你可以用它确认某个 Scope 是否有数据、Memory 条目总数如何分布，以及 Source、Candidate 和召回统计是否变化。
 
-这一区别会影响本页的目标。上一页 API 串讲最后把示例 Memory 设为 inactive，所以 Dashboard 不应该显示“刚写入的 Memory 正文”。正确结果是同一 Scope 下 `total=1`、`active=0`、`inactive=1`。
+这一区别会影响本页的目标。上一页 API 串讲最后把示例 Memory 设为停用状态，所以 Dashboard 不应该显示“刚写入的 Memory 正文”。正确结果是同一 Scope 下 `total=1`、`active=0`、`inactive=1`。
 
 ## 配置同一个 Scope
 
@@ -28,14 +28,16 @@ powercontext server run --env-file .env
 http://127.0.0.1:8000/
 ```
 
-选择刚配置的 Scope。统计中应看到一条 Memory，并且它已经 inactive。Dashboard 只显示统计数；需要核对正文时，回到 Python Client，使用 `list_memory_entries(include_inactive=True)` 或精确 Citation 读取。
+选择刚配置的 Scope。统计中应看到一条 Memory，并且它已经停用状态。Dashboard 只显示统计数；需要核对正文时，回到 Python Client，使用 `list_memory_entries(include_inactive=True)` 或精确 Citation 读取。
 
-如果页面能打开但 Scope 列表为空，先检查 `POWERCONTEXT_SERVER_DASHBOARD_SCOPES` 是否被当前 Server 进程加载。如果列表有 Scope、统计却全是零，再检查 Client 和 Dashboard 是否连接同一个 database URL / `POWERCONTEXT_HOME`。更换数据目录与更换 Scope 都会产生“数据消失”的表象。
+如果页面能打开但 Scope 列表为空，先检查 `POWERCONTEXT_SERVER_DASHBOARD_SCOPES` 是否被当前 Server 进程加载。如果列表有 Scope、统计却全是零，再检查客户端和 Dashboard 是否连接同一个数据库 URL / `POWERCONTEXT_HOME`。更换数据目录与更换 Scope 都会产生“数据消失”的表象。
 
 <Warning>
-Dashboard publication 用于把 approved managed Skill 发布到预先配置的目标，与本页的统计核对无关，也不同于 `powercontext skill export`。
+Dashboard 发布用于把已批准托管 Skill 发布到预先配置的目标，与本页的统计核对无关，也不同于 `powercontext skill export`。
 </Warning>
 
-开启 Bearer 后，`/` 仍可打开，但 Dashboard 请求统计时需要同一个 Server token。页面会提示输入 token；不要把它拼进 URL。
+开启 Bearer 后，`/` 仍可打开，但 Dashboard 请求统计时需要同一个 Server 令牌。页面会提示输入令牌；不要把它拼进 URL。
 
-到这里，成功证据不是“看见 Memory 文本”，而是 Dashboard 与 Client 对同一 Scope 和数据库给出一致统计。正文与历史仍由 Client、HTTP 或 MCP 精确读取。
+成功证据不是“看见 Memory 文本”，而是 Dashboard 与客户端对同一 Scope 和数据库给出一致统计。正文与历史仍由客户端、HTTP 或 MCP 精确读取。
+
+如果 Scope 和数据库设置已经一致，统计仍然不同，就先停在这里。使用目标 `--env-file` 重启 Server，对这个进程重新运行 API 串讲，再逐字比较脚本打印的 Scope。Dashboard 为空或统计不一致属于配置失败，不能据此判断 Memory 已被删除。

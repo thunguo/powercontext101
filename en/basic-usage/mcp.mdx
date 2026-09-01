@@ -34,6 +34,8 @@ Some hosts spell the type as `streamable-http`. Point them at the same `/mcp`. C
 
 ## What it can and cannot do
 
+MCP deliberately exposes a smaller tool surface than HTTP. Use this table to decide whether to stay in the agent host or switch to the Client/API for the next operation.
+
 | Can | Cannot |
 |---|---|
 | `remember_memory`, `search_memory`, exact get / list / revise / retire | `prepare_context`. A hook or adapter normally prepares the final `PreparedContext` |

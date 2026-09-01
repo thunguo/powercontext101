@@ -3,9 +3,11 @@ title: "Experience, Skill, and Review"
 description: "Create a Candidate from exact evidence, review the exact version, and export an approved Skill Revision explicitly."
 ---
 
-This page turns completed-work evidence into Experience, then turns the approved Experience into a managed Skill. The important part is not how polished the model output sounds. Review must inspect exact evidence and the exact Candidate version.
+The procedure turns completed-work evidence into Experience, then turns the approved Experience into a managed Skill. The important part is not how polished the model output sounds. Review must inspect exact evidence and the exact Candidate version.
 
 ## Two creation paths
+
+Choose the path by the evidence you already have. The typed path is model-free and reproducible; generation is useful only when the Server has a working generation provider.
 
 | Path | Generation model required | Result |
 |---|---:|---|
@@ -405,6 +407,8 @@ Other Skill origins:
 
 - `source`: one or more exact Source refs only, with no Artifact refs or target;
 - `usage`: an exact target Skill and at least one bounded Source. The Server validates reference shape; the reviewer decides whether the Source truly records useful observed behavior.
+
+A Review path is incomplete until its failure is visible. A stale Candidate version or a drifted replacement target must leave the Candidate pending; it must not create a partial Artifact or silently approve newer content.
 
 ## Conflict handling
 

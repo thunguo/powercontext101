@@ -7,15 +7,17 @@ PowerContext 的大部分操作都要求 `scope_id`。它决定这次请求读�
 
 把 Scope 设错，最常见的结果不是报错，而是“明明写过，为什么查不到”。更糟的情况是两个本应隔离的项目用了同一个 Scope。
 
+Scope 解析应是应用决策，而不是随手使用的后备值。多租户服务要先通过认证与授权确定允许访问的租户和项目，再把对应的 `scope_id` 交给适配器。
+
 ## Scope 隔离什么
 
 同一个 `scope_id` 下，PowerContext 维护一组相互关联的状态：
 
-- Source journal 和处理 cursor；
-- Memory lifecycle 与 active search projection；
-- Experience / Skill Candidate Inbox；
-- Handoff history 与 Work continuity；
-- scope-local runtime cache、lock 和统计。
+- Source 日志和处理游标；
+- Memory 生命周期与启用状态搜索投影；
+- Experience / Skill Candidate 收件箱；
+- Handoff 历史内容与 Work 连续性；
+- Scope 内部运行时缓存、锁和统计。
 
 另一个 Scope 看不到这些数据，除非应用把同样的内容再次写入。
 
@@ -36,9 +38,9 @@ flowchart LR
 
 Scope 不是安全身份。
 
-知道 `scope_id="project:payments"` 不代表调用者属于 payments 团队，也不代表它可以调用写工具。Bearer token、Server 部署边界和宿主 permission gate 负责访问控制。
+知道 `scope_id="project:payments"` 不代表调用者属于 payments 团队，也不代表它可以调用写工具。Bearer 令牌、Server 部署边界和宿主权限准入规则负责访问控制。
 
-Scope 也不会授予执行权限。召回结果即使来自正确 Scope，仍然是历史证据。Agent 必须遵守当前 system/user instructions，并检查实时工作区。
+Scope 也不会授予执行权限。召回结果即使来自正确 Scope，仍然是历史证据。Agent 必须遵守当前系统/用户指令，并检查实时工作区。
 
 <Warning>
 不要把用户可控的字符串直接当成已授权 Scope。先完成身份验证和授权，再由应用决定这个请求可以使用哪个 `scope_id`。
@@ -50,37 +52,37 @@ Scope 也不会授予执行权限。召回结果即使来自正确 Scope，仍�
 
 | 场景 | 推荐 | 不推荐 |
 |---|---|---|
-| 单个代码仓库 | 规范化的 Git remote，或显式 project ID | 临时 worktree 路径 |
-| 多租户服务 | 由已认证 tenant/project 映射出的显式 Scope | 服务进程的当前目录 |
-| 本地无 Git 项目 | adapter 支持时使用稳定路径哈希，或显式 Scope | 每次运行生成随机 ID |
-| 跨宿主共享 | 为各宿主配置同一个稳定值 | 使用各自的 session ID |
+| 单个代码仓库 | 规范化的 Git 远程，或显式项目 ID | 临时工作树路径 |
+| 多租户服务 | 由已认证租户/项目映射出的显式 Scope | 服务进程的当前目录 |
+| 本地无 Git 项目 | 适配器支持时使用稳定路径哈希，或显式 Scope | 每次运行生成随机 ID |
+| 跨宿主共享 | 为各宿主配置同一个稳定值 | 使用各自的会话 ID |
 
 Scope 字符串区分大小写。`project:PowerContext` 和 `project:powercontext` 是两个 Scope。
 
 ## 没有统一的自动推导顺序
 
-各 integration 会根据宿主能提供的信息推导 Scope，但策略并不相同。
+各集成会根据宿主能提供的信息推导 Scope，但策略并不相同。
 
-| Integration | 当前推导方式 |
+| 集成 | 当前推导方式 |
 |---|---|
-| Pydantic AI Agent adapter | constructor string/callback → environment → normalized Git remote → local path hash |
-| LangGraph | invocation Scope/environment → normalized network Git remote → 缺失时报错 |
-| LangChain | invocation Scope/environment → normalized network Git remote → 缺失时报错 |
-| Codex / Claude Code | Workstream binding（适用时）、Git remote 或项目路径；具体顺序以各宿主页为准 |
-| OpenClaw | 可信 agent identity；project mode 还加入 project hash，但仍保留 agent 维度 |
+| Pydantic AI Agent 适配器 | constructor 字符串/回调 → 环境 → 规范化的 Git 远程 → 本地路径哈希 |
+| LangGraph | 调用 Scope/环境 → 规范化的网络 Git 远程 → 缺失时报错 |
+| LangChain | 调用 Scope/环境 → 规范化的网络 Git 远程 → 缺失时报错 |
+| Codex / Claude Code | Workstream 绑定（适用时）、Git 远程或项目路径；具体顺序以各宿主页为准 |
+| OpenClaw | 可信 agent 标识；项目模式还加入项目哈希，但仍保留 agent 维度 |
 
-因此，Mental Model 只给选择原则。具体 precedence 放在对应 adapter 页面。不要把某个 adapter 的 fallback 复制到所有宿主。
+因此，Mental 模型只给选择原则。具体优先顺序放在对应适配器页面。不要把某个适配器的后备路径复制到所有宿主。
 
-### Git remote 会先规范化
+### Git 远程会先规范化
 
-推导 Scope 时，integration 会去掉 remote URL 中的凭证。下面两个地址不应该形成两个项目，也不应该把 token 写进 Scope：
+推导 Scope 时，集成会去掉远程 URL 中的凭证。下面两个地址不应该形成两个项目，也不应该把令牌写进 Scope：
 
 ```text
 https://user:token@example.com/org/repo.git
 https://example.com/org/repo.git
 ```
 
-LangGraph 和 LangChain 会识别 Windows drive-letter path，避免把它误判为 SCP 风格 remote。其他 adapter 的 guard 并不一致；在 Windows 或自定义 Git 环境里，优先使用显式 Scope，并检查最终派生值。
+LangGraph 和 LangChain 会识别 Windows drive-letter 路径，避免把它误判为 SCP 风格远程。其他适配器的保护规则并不一致；在 Windows 或自定义 Git 环境里，优先使用显式 Scope，并检查最终派生值。
 
 ## 跨宿主共享
 
@@ -95,46 +97,46 @@ Codex 和 Claude Code 可以对同一仓库推导出相同项目 Scope。这样�
 只满足“目录看起来一样”还不够。排查共享问题时，先打印或检查最终 Scope，再看 Memory 搜索。
 
 <Note>
-OpenClaw 的 project mode 当前仍把 agent ID 放进 Scope。相同 project、不同 agent 不会自动共享一个纯 project Scope。
+OpenClaw 的项目模式当前仍把 agent ID 放进 Scope。相同项目、不同 agent 不会自动共享一个纯项目 Scope。
 </Note>
 
 ## Server 内的 ScopeCache
 
-Server 为活跃 Scope 缓存 runtime composition 和一把 scope-local write lock。默认容量是 128 个 inactive entries。
+Server 为活跃 Scope 缓存运行时组合和一把 Scope 内部写入锁。默认容量是 128 个停用状态条目。
 
 这不是数据缓存：
 
-- eviction 不会删除数据库中的 Source、Memory 或 Handoff；
-- 正在使用或等待同一 Scope lock 的 entry 不会被驱逐；
-- 如果所有 entries 都处于 active 状态，缓存可以暂时超过容量；
-- operation 完成后，Server 再清理最久未使用的 inactive entry。
+- 淘汰不会删除数据库中的 Source、Memory 或 Handoff；
+- 正在使用或等待同一 Scope 锁的条目不会被驱逐；
+- 如果所有条目都处于启用状态，缓存可以暂时超过容量；
+- 操作完成后，Server 再清理最久未使用的停用状态条目。
 
-同一 Scope 的写操作需要串行化，以保护 head 和 cursor 更新。只读 search 和已经开始的 rerank 不应全部被这把写锁串行。
+同一 Scope 的写操作需要串行化，以保护头版本和游标更新。只读搜索和已经开始的 rerank 不应全部被这把写锁串行。
 
 ## 常见故障
 
 ### 写入成功，但 Dashboard 看不到
 
-检查 Dashboard 和客户端使用的 Scope 是否逐字相同。切换 database URL 也会让你看到另一套数据，这和 Scope 问题表现相似。逐步对照见[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard)。
+检查 Dashboard 和客户端使用的 Scope 是否逐字相同。切换数据库 URL 也会让你看到另一套数据，这和 Scope 问题表现相似。逐步对照见[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard)。
 
-### 两个 tenant 看到了同一条 Memory
+### 两个租户看到了同一条 Memory
 
-确认应用没有把服务进程 cwd 或固定字符串当成所有 tenant 的 Scope。Scope 必须来自已经授权的 tenant/project 映射。
+确认应用没有把服务进程 cwd 或固定字符串当成所有租户的 Scope。Scope 必须来自已经授权的租户/项目映射。
 
 ### LangGraph 在本地目录报 MissingScope
 
-LangGraph 不会在缺少 network Git remote 时自动回退到本地路径哈希。为这次 invocation 提供 `PowerContextScope(scope_id=...)`。
+LangGraph 不会在缺少网络 Git 远程时自动回退到本地路径哈希。为这次调用提供 `PowerContextScope(scope_id=...)`。
 
 ### 每次新会话都像第一次使用
 
-通常是把 session ID 当成 Scope。改用稳定 project 或 tenant Scope。
+通常是把会话 ID 当成 Scope。改用稳定项目或租户 Scope。
 
 ## 检查清单
 
 - Scope 是否稳定，并且不包含凭证？
 - 多租户应用是否先授权，再选择 Scope？
 - 需要共享的宿主是否得到完全相同的值？
-- 是否错误地假设所有 adapter 都有相同 fallback？
-- 是否把缓存 eviction 误认为持久数据删除？
+- 是否错误地假设所有适配器都有相同后备路径？
+- 是否把缓存淘汰误认为持久数据删除？
 
 接下来读 [fail-open](/zh/mental-model/fail-open)，了解 Scope 解析、Server 调用或召回失败后，哪些操作可以继续，哪些必须明确报错。

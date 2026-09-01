@@ -110,7 +110,6 @@ Managed Skill export supports Codex, but an exported managed Skill and the bundl
 - Request `preview and make no writes`. Confirm no PowerContext call writes a Source or Handoff.
 - Revise or retire Memory with an old Citation. Expect conflict, refresh the head, and do not overwrite blindly.
 
-
 ## Configuration defaults
 
 The hook derives its API base from plugin `.mcp.json`, which defaults to `http://127.0.0.1:8000/mcp`. Other behavior comes from `POWERCONTEXT_CODEX_` environment variables:
@@ -158,7 +157,6 @@ export POWERCONTEXT_CODEX_CAPTURE_PROMPTS=false
 codex
 ```
 
-
 ## Finish the shared check on this host
 
 > What should happen after the OpenAPI contract changes?
@@ -171,16 +169,21 @@ codex
 
 ## Completion checklist
 
-- [ ] `powercontext doctor codex` finds the installed, enabled plugin; separate `powercontext doctor` checks Server liveness/readiness.
-- [ ] `/hooks` shows `UserPromptSubmit`; `/mcp` shows the PowerContext Server.
-- [ ] The bundled `project-context` Skill is present alongside Hook and MCP.
-- [ ] The Hook derives the API base from the same `.mcp.json` URL used by MCP.
-- [ ] Codex and Claude Code resolve one repository/Workstream Scope.
-- [ ] Automatic Source contains the user prompt only, never the assistant final response; prompts that must remain private have capture disabled.
-- [ ] Optional flush is bounded and proves `current_cursor >= position` before success.
-- [ ] `preview and make no writes` produces no write.
-- [ ] An imperative Handoff completes in one turn and returns an exact committed Revision.
-- [ ] Explicit write failure remains visible while automatic recall/capture failures remain fail-open.
-- [ ] **Unsupported**, **Not validated**, and **Host-gated** claims above remain separate, including real-host Handoff, preview, and permission validation.
+Treat the integration as complete only when these results are observable:
+
+- `powercontext doctor codex` finds the installed, enabled plugin.
+- Separate `powercontext doctor` checks Server liveness/readiness.
+- `/hooks` shows `UserPromptSubmit`.
+- `/mcp` shows the PowerContext Server.
+- The bundled `project-context` Skill is present alongside Hook and MCP.
+- The Hook derives the API base from the same `.mcp.json` URL used by MCP.
+- Codex and Claude Code resolve one repository/Workstream Scope.
+- Automatic Source contains the user prompt only, never the assistant final response.
+- Prompts that must remain private have capture disabled.
+- Optional flush is bounded and proves `current_cursor >= position` before success.
+- `preview and make no writes` produces no write.
+- An imperative Handoff completes in one turn and returns an exact committed Revision.
+- Explicit write failure remains visible while automatic recall/capture failures remain fail-open.
+- **Unsupported**, **Not validated**, and **Host-gated** claims above remain separate, including real-host Handoff, preview, and permission validation.
 
 Continue with [Claude Code](/en/coding-agents/claude-code).

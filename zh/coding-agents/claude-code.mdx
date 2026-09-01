@@ -1,15 +1,15 @@
 ---
 title: "Claude Code"
-description: "安装 UserPromptSubmit + MCP + Skill plugin，并守住 v1 的 capture 与 permission 边界。"
+description: "安装 UserPromptSubmit + MCP + Skill 插件，并守住 v1 的采集与权限边界。"
 ---
 
 <Note>
-本页描述 v1 integration。Claude Code 2.1.133 只是经过测试的兼容性证据，不是正式声明的最低版本。没有 permission UI 时，宿主是否会明确拒绝 durable mutation，目前仍是 **Not validated**。
+这里记录 v1 集成。Claude Code 2.1.133 只是经过测试的兼容性证据，不是正式声明的最低版本。没有权限 UI 时，宿主是否会明确拒绝持久修改操作，目前仍是 **Not validated**。
 </Note>
 
 ## 成熟度与安装
 
-当前 integration 有 契约测试，以及 public/authenticated service-chain tests。它的自动路径刻意保持很窄：只运行 `UserPromptSubmit`。Setup 会安装 user-scope marketplace plugin，其中包含 Hook、HTTP MCP 配置与 bundled `project-context` Skill。
+当前集成有契约测试，以及公开与认证服务链测试。它的自动路径刻意保持很窄：只运行 `UserPromptSubmit`。安装配置会安装用户级插件市场插件，其中包含 Hook、HTTP MCP 配置与内置 `project-context` Skill。
 
 ```bash
 powercontext setup claude-code \
@@ -21,17 +21,17 @@ powercontext server run
 powercontext doctor claude-code
 ```
 
-Setup 会先打印 mutation plan，再开始改动。它会为现有 Claude Code settings 建 snapshot，保留安装前已经存在的 marketplace/plugin；安装或验证失败时，再恢复这份 snapshot。
+安装配置会先打印修改操作 计划，再开始改动。它会为现有 Claude Code 设置建快照，保留安装前已经存在的插件市场/插件；安装或验证失败时，再恢复这份快照。
 
 ## 最小用法
 
-新开一个 Claude Code session。先在 `/hooks` 查看 `UserPromptSubmit`，再到 `/mcp` 确认 PowerContext Server 已连接。之后把两条路径分开使用：
+新开一个 Claude Code 会话。先在 `/hooks` 查看 `UserPromptSubmit`，再到 `/mcp` 确认 PowerContext Server 已连接。之后把两条路径分开使用：
 
-1. 正常提一个 coding question。Hook 可以 recall context，但自动 capture 的只有你的 prompt Source。
+1. 正常提一个编码问题。Hook 可以召回上下文，但自动采集的只有你的提示词 Source。
 2. 需要精确操作时，让 Agent 通过 MCP 搜索或维护 Memory。
-3. 只有确实想在当前 turn prepare 并 commit durable Handoff 时，才说 `handoff this work`。
+3. 只有确实想在当前轮次准备并提交持久 Handoff 时，才说 `handoff this work`。
 
-Bundled Skill 会提供这些使用规则。Hook 不会把每条 prompt 直接变成 Memory；MCP write 也不能替代用户的明确意图。
+内置 Skill 会提供这些使用规则。Hook 不会把每条提示词直接变成 Memory；MCP 写入也不能替代用户的明确意图。
 
 ## 执行流程
 
@@ -44,86 +44,85 @@ UserPromptSubmit
 → additionalContext
 ```
 
-v1 没有第二个 automatic event。尤其是 turn 结束时，plugin 不会读取 transcript。
+v1 没有第二个自动事件。尤其是轮次结束时，插件不会读取对话记录。
 
 ## Scope
 
-第一次调用 Memory operation 前，Skill 会运行 project Scope resolver。解析顺序如下：
+第一次调用 Memory 操作前，Skill 会运行项目 Scope 解析器。解析顺序如下：
 
 1. 如果设置了 `POWERCONTEXT_CLAUDE_SCOPE_ID`，优先使用它；
-2. 使用与 Codex 共享的 Git-private Workstream binding；
-3. 使用 normalized Git remote identity，再回退到 normalized project path。
+2. 使用与 Codex 共享的 Git 私有 Workstream 绑定；
+3. 使用规范化的 Git 远程仓库标识，再回退到规范化的项目路径。
 
-Workstream binding 存在 checkout 的 Git directory 下，不会提交到仓库。若多个 Workstream 都可能影响结果，Agent 必须让你选择，不能自行猜测。选定后，它会绑定返回的 `scope_id`，重新解析，并在写入 Handoff 前要求结果完全一致。
+Workstream 绑定存在检出的 Git 目录下，不会提交到仓库。若多个 Workstream 都可能影响结果，Agent 必须让你选择，不能自行猜测。选定后，它会绑定返回的 `scope_id`，重新解析，并在写入 Handoff 前要求结果完全一致。
 
-## Injection
+## 注入
 
-Hook 会验证 prepared-context schema，再通过 `hookSpecificOutput.additionalContext` 返回临时上下文。这些内容只影响当前 turn；它不是 transcript capture，也不会因为 Claude 看过就自动持久化。
+Hook 会验证 PreparedContext 模式，再通过 `hookSpecificOutput.additionalContext` 返回临时上下文。这些内容只影响当前轮次；它不是对话记录采集，也不会因为 Claude 看过就自动持久化。
 
-Recall 采用 fail-open。Server 不可用、response 无效、schema 未知、body 过大、发生 redirect 或 wall-clock budget 用尽时，都不注入，但也不阻塞宿主任务。Diagnostics 不包含 prompt、Scope、prepared content 或 authorization value。
+召回采用 fail-open。Server 不可用、响应无效、模式未知、响应体过大、发生重定向或实际耗时预算用尽时，都不注入，但也不阻塞宿主任务。诊断信息不包含提示词、Scope、已准备内容或授权信息值。
 
-## Capture 与 flush
+## 采集与刷新
 
-Automatic capture 会把当前 user prompt 写入 `/v1/sources/content`，Source ID 使用稳定的 `claude-code-user-prompt:` 前缀。它不会 capture Claude final response，也不会记录 Task Outcome。
+自动采集会把当前用户提示词写入 `/v1/sources/content`，Source ID 使用稳定的 `claude-code-user-prompt:` 前缀。它不会采集 Claude 的最终响应，也不会记录 Task Outcome。
 
-Recall 与 capture 彼此独立。Recall 失败不妨碍 capture；capture 失败也不会删掉有效的 `additionalContext`。设置 `POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false` 可关闭 capture。设置 `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE=true` 可启用 optional flush；Hook 会重试 `/v1/memory/flush`，直到 `current_cursor >= position`，同时受 `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` 和共享 HTTP deadline 限制。
+召回与采集彼此独立。召回失败不妨碍采集；采集失败也不会删掉有效的 `additionalContext`。设置 `POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false` 可关闭采集。设置 `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE=true` 可启用可选刷新；Hook 会重试 `/v1/memory/flush`，直到 `current_cursor >= position`，同时受 `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` 和共享 HTTP 截止时间限制。
 
-Capture 仍只是 Source evidence。最终是否生成或更新 Memory，由 Source window Trigger 与 candidate pipeline 决定。
+采集仍只是 Source 证据。最终是否生成或更新 Memory，由 Source 窗口触发器与 Candidate 处理流程决定。
 
-## MCP、Skill 与 permission
+## MCP、Skill 与权限
 
-`.mcp.json` 连接 HTTP MCP Server。`headersHelper` 从环境读取完整的 `POWERCONTEXT_CLAUDE_AUTHORIZATION` value，只在它存在时输出 `Authorization` header。Token 不会进入 plugin config、prompt 或 diagnostics。远程 endpoint 必须使用 HTTPS。
+`.mcp.json` 连接 HTTP MCP Server。`headersHelper` 从环境读取完整的 `POWERCONTEXT_CLAUDE_AUTHORIZATION` 值，只在它存在时输出 `Authorization` 请求头。令牌不会进入插件配置、提示词或诊断信息。远程端点必须使用 HTTPS。
 
-MCP 提供精确的 Memory maintenance、工作契约、Prepared/committed Handoff、acknowledgement、Outcome 与 Review operations。Skill 把直接的 `handoff this work` imperative 视为一次 durable Handoff 的授权：检查 live state，只调用一次 `handoff_current_work`，在同一 turn 将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到 exact Revision 后报告成功。
+MCP 提供精确的 Memory 维护、工作契约（Work Contract）、已准备/已提交 Handoff、确认、结果与 Review 操作。Skill 把直接的 `handoff this work` 明确命令视为一次持久 Handoff 的授权：检查实时状态，只调用一次 `handoff_current_work`，在同一轮次将返回的 `handoff` 原样传给 `commit_handoff`，并且只在拿到精确 Revision 后报告成功。
 
-问题、设计讨论或 preview request 都不构成 write 授权。做 preview 时，只在 chat 中展示拟议字段，不能产生 PowerContext write。不要用 `handoff_current_work` 实现 no-write preview：即使不调用 `commit_handoff`，它仍会记录 boundary Source。
+问题、设计讨论或预览请求都不构成写入授权。做预览时，只在对话中展示拟议字段，不能产生 PowerContext 写入。不要用 `handoff_current_work` 实现不写入预览：即使不调用 `commit_handoff`，它仍会记录边界 Source。
 
-Durable MCP mutation 需要 approval、但 Claude Code 没有 permission UI 时，宿主会如何处理，目前是 **Not validated**。不要在这里声称它具有 Pi 稳定的 `confirmation_required` 行为。
+持久 MCP 修改操作需要批准、但 Claude Code 没有权限 UI 时，宿主会如何处理，目前是 **Not validated**。不要在这里声称它具有 Pi 稳定的 `confirmation_required` 行为。
 
 ## Unsupported 与 Not validated
 
 | 状态 | 能力 | 实际影响 |
 |---|---|---|
-| **Unsupported** | v1 `Stop` Hook | Session stop 时不会运行 automatic work。 |
-| **Unsupported** | transcript 或 assistant final-response capture | 如需持久化 final result，必须显式调用 MCP operation。 |
-| **Unsupported** | automatic Task Outcome | 在真实 completion 或 interruption boundary 调用 `record_task_outcome`。 |
-| **Not validated** | 正式最低 Claude Code version | 2.1.133 是兼容性证据，不是版本下限。 |
-| **Not validated** | 无 UI 时拒绝 durable mutation | 保留这项不确定性，不承诺宿主一定拒绝。 |
+| **Unsupported** | v1 `Stop` Hook | 会话停止时不会运行自动工作。 |
+| **Unsupported** | 对话记录或助手最终响应采集 | 如需持久化最终结果，必须显式调用 MCP 操作。 |
+| **Unsupported** | 自动 Task Outcome | 在真实完成或中断边界调用 `record_task_outcome`。 |
+| **Not validated** | 正式最低 Claude Code 版本 | 2.1.133 是兼容性证据，不是版本下限。 |
+| **Not validated** | 无 UI 时拒绝持久修改操作 | 保留这项不确定性，不承诺宿主一定拒绝。 |
 
 ## 负向实验
 
-在认定 integration 完成前，跑一遍这些实验：
+在认定集成完成前，跑一遍这些实验：
 
-- 停掉 Server，提交普通 prompt，确认 Claude Code 仍继续运行。
-- 让 recall 失败而 capture 成功；再反过来，确认有效 `additionalContext` 仍保留。
-- 返回未知 PreparedContext schema，确认不发生 injection。
-- 让 Hook request redirect，确认 Authorization 不会被转发。
-- 超过 response-size 或 deadline budget，确认 turn 能在有限时间内结束。
-- 启用 flush，让 `current_cursor` 一直落后于 Source position，确认重试会停止，也不会声称 Memory 已存在。
-- 让 Handoff preparation 成功、commit 失败；报告 boundary Source 已写入，但 durable milestone 不存在。
-- 请求 preview，确认没有 PowerContext write。
-
+- 停掉 Server，提交普通提示词，确认 Claude Code 仍继续运行。
+- 让召回失败而采集成功；再反过来，确认有效 `additionalContext` 仍保留。
+- 返回未知 PreparedContext 模式，确认不发生注入。
+- 让 Hook 请求重定向，确认授权信息不会被转发。
+- 超过响应大小或截止时间预算，确认轮次能在有限时间内结束。
+- 启用刷新，让 `current_cursor` 一直落后于 Source 位置，确认重试会停止，也不会声称 Memory 已存在。
+- 让 Handoff 准备成功、提交失败；报告边界 Source 已写入，但持久里程碑不存在。
+- 请求预览，确认没有 PowerContext 写入。
 
 ## 配置默认值
 
-非敏感选项可以写进 setup，也可以用环境变量覆盖这一次启动：
+非敏感选项可以写进安装配置，也可以用环境变量覆盖这一次启动：
 
-| Key | 默认值 | 含义 |
+| 键 | 默认值 | 含义 |
 |---|---|---|
 | `--server-url` / `POWERCONTEXT_CLAUDE_SERVER_URL` | `http://127.0.0.1:8000` | Hook 使用的 Server；也可来自 `pluginConfigs` 或 `CLAUDE_PLUGIN_OPTION_SERVER_URL` |
 | `POWERCONTEXT_CLAUDE_SCOPE_ID` | 未设置 | 显式 Scope；未设置则与 Codex 同一套推导 |
-| `POWERCONTEXT_CLAUDE_AUTHORIZATION` | 未设置 | 完整 Bearer header；Hook 和 MCP `headersHelper` 都读它 |
+| `POWERCONTEXT_CLAUDE_AUTHORIZATION` | 未设置 | 完整 Bearer 请求头；Hook 和 MCP `headersHelper` 都读它 |
 | `POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS` | `true` | 也可被 `CLAUDE_PLUGIN_OPTION_CAPTURE_PROMPTS` 覆盖 |
-| `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE` | `false` | 测试用 flush |
-| `POWERCONTEXT_CLAUDE_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP timeout |
-| `POWERCONTEXT_CLAUDE_HTTP_BUDGET_SECONDS` | `4` | 一轮 prepare/capture 总预算 |
-| `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` | `4` | flush 最多调用次数；允许 `1–16` |
-| Recall budget | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应 env |
-| Hook timeout | `10` | Claude Code 外层 hook timeout，单位秒 |
+| `POWERCONTEXT_CLAUDE_FLUSH_ON_CAPTURE` | `false` | 测试用刷新 |
+| `POWERCONTEXT_CLAUDE_REQUEST_TIMEOUT_SECONDS` | `1` | 单次 HTTP 超时 |
+| `POWERCONTEXT_CLAUDE_HTTP_BUDGET_SECONDS` | `4` | 一轮准备/采集总预算 |
+| `POWERCONTEXT_CLAUDE_FLUSH_MAX_CALLS` | `4` | 刷新最多调用次数；允许 `1–16` |
+| 召回预算 | `8000` | Hook 发给 `prepare_context` 的 `max_bytes`；没有对应环境变量 |
+| Hook 超时 | `10` | Claude Code 外层 Hook 超时，单位秒 |
 
-`POWERCONTEXT_CLAUDE_*` 优先于 `CLAUDE_PLUGIN_OPTION_*` 和 plugin options。不要把 token 写进 Server URL、plugin options、`.mcp.json` 或日志。`headersHelper` 只从环境读取完整 Authorization。远程 endpoint 使用 HTTPS。
+`POWERCONTEXT_CLAUDE_*` 优先于 `CLAUDE_PLUGIN_OPTION_*` 和插件 选项。不要把令牌写进 Server URL、插件 选项、`.mcp.json` 或日志。`headersHelper` 只从环境读取完整授权信息。远程端点使用 HTTPS。
 
-Setup 写入的 `.mcp.json` 字段是：
+安装配置写入的 `.mcp.json` 字段是：
 
 ```json
 {
@@ -134,12 +133,12 @@ Setup 写入的 `.mcp.json` 字段是：
 }
 ```
 
-真实文件还会带 `headersHelper`，从 `POWERCONTEXT_CLAUDE_AUTHORIZATION` 组装 header；URL 也可以来自 `user_config.server_url`。对照时只看这三项：`type`、`url` 指向 `/mcp`、文件里没有 token。
+真实文件还会带 `headersHelper`，从 `POWERCONTEXT_CLAUDE_AUTHORIZATION` 组装请求头；URL 也可以来自 `user_config.server_url`。对照时只看这三项：`type`、`url` 指向 `/mcp`、文件里没有令牌。
 
-新 session 里对照：
+新会话里对照：
 
 1. `/hooks` 有 `UserPromptSubmit`。
-2. `/mcp` 显示 `powercontext` Server connected。
+2. `/mcp` 显示 `powercontext` Server 已连接。
 3. 工具列表有 `remember_memory`，没有 `prepare_context`。
 
 ```bash
@@ -147,27 +146,31 @@ export POWERCONTEXT_CLAUDE_CAPTURE_PROMPTS=false
 claude
 ```
 
-
 ## 在这个宿主上做完统一题
 
 > 修改 OpenAPI 契约后，下一步应该做什么？
 
-1. 在固定 Scope 里用 MCP `remember_memory` 保存答案。不要只靠 prompt Source。
-2. 开一个新 session，用 `/hooks` 和 `/mcp` 确认激活，再问同一句。
-3. 召回必须带 Citation，并且只出现在 `additionalContext`。v1 不会自动采集 assistant final response。
+1. 在固定 Scope 里用 MCP `remember_memory` 保存答案。不要只靠提示词 Source。
+2. 开一个新会话，用 `/hooks` 和 `/mcp` 确认激活，再问同一句。
+3. 召回必须带 Citation，并且只出现在 `additionalContext`。v1 不会自动采集助手最终响应。
 4. 停掉 Server 后再问普通编码问题。Claude Code 应继续。
-5. 再做一次显式 MCP write。失败必须可见。
+5. 再做一次显式 MCP 写入。失败必须可见。
 
 ## 完成检查表
 
-- [ ] `powercontext doctor claude-code` 报告 plugin installation/enabled 状态；Server liveness/readiness 由单独的 `powercontext doctor` 检查。
-- [ ] `/hooks` 只显示 v1 `UserPromptSubmit` automatic path。
-- [ ] `/mcp` 显示 PowerContext Server connected，且不暴露 credential。
-- [ ] Recall 成功时，普通 prompt 能收到有效 `additionalContext`。
-- [ ] Prompt Source 存在；assistant final response 与 automatic Task Outcome 不存在。
-- [ ] Claude Code 与 Codex 对同一 repository 或 Workstream 解析出相同 Scope。
-- [ ] Preview 不产生 write；imperative Handoff 返回 exact committed Revision。
-- [ ] Server failure 与 explicit MCP write failure 可区分。
-- [ ] 上面的 Unsupported 与 **Not validated** 声明仍出现在 release notes 和 tests 中。
+只有以下结果都能直接观察时，才算完成：
+
+- `powercontext doctor claude-code` 报告插件安装/启用状态。
+- Server 存活状态/就绪状态由单独的 `powercontext doctor` 检查。
+- `/hooks` 只显示 v1 `UserPromptSubmit` 自动路径。
+- `/mcp` 显示 PowerContext Server 已连接，且不暴露凭证。
+- 召回成功时，普通提示词能收到有效 `additionalContext`。
+- 提示词 Source 存在。
+- 助手最终响应与自动 Task Outcome 不存在。
+- Claude Code 与 Codex 对同一仓库或 Workstream 解析出相同 Scope。
+- 预览不产生写入。
+- 明确命令 Handoff 返回精确已提交 Revision。
+- Server 失败与显式 MCP 写入失败可区分。
+- 上面的 Unsupported 与 **Not validated** 声明仍出现在发布 备注 和测试中。
 
 下一页是 [DeepSeek Harness](/zh/coding-agents/dsh)。

@@ -4,7 +4,7 @@ description: "Discover host capabilities, define a verifiable adapter contract, 
 ---
 
 <Warning>
-There is no unified `HostAdapter` SDK. The contract names on this page are a design checklist, not current classes or stable public APIs.
+There is no unified `HostAdapter` SDK. The contract names below are a design checklist, not current classes or stable public APIs.
 </Warning>
 
 ## Start with capability discovery
@@ -186,18 +186,20 @@ Do not merge these labels into “limited support.” One is a product boundary;
 
 ## Completion checklist
 
-- [ ] Host and Server capability discovery are recorded separately.
-- [ ] Every proposed contract role has inputs, outputs, failure policy, and observable assertions.
-- [ ] Host version gate or compatibility evidence and an activation probe exist.
-- [ ] Scope comes from stable authorized identity and strips credentials.
-- [ ] PreparedContext is validated, transient, and labeled untrusted.
-- [ ] Capture defines content, Source identity, UTF-8 size limit, and secret policy.
-- [ ] Flush retains position by Scope and clears only at `current_cursor >= position`.
-- [ ] Explicit writes have tested allow, deny, cancel, and no-UI behavior.
-- [ ] Diagnostics expose no content or credentials.
-- [ ] Setup preserves foreign config and reports rollback or partial failure.
-- [ ] Managed Skill export is **Unsupported** unless a complete projection target exists.
-- [ ] Real-host E2E covers every Supported lifecycle and permission claim.
-- [ ] **Unsupported** and **Not validated** remain separate in docs, tests, and release notes.
+Treat the integration as complete only when these results are observable:
+
+- Host and Server capability discovery are recorded separately.
+- Every proposed contract role has inputs, outputs, failure policy, and observable assertions.
+- Host version gate or compatibility evidence and an activation probe exist.
+- Scope comes from stable authorized identity and strips credentials.
+- PreparedContext is validated, transient, and labeled untrusted.
+- Capture defines content, Source identity, UTF-8 size limit, and secret policy.
+- Flush retains position by Scope and clears only at `current_cursor >= position`.
+- Explicit writes have tested allow, deny, cancel, and no-UI behavior.
+- Diagnostics expose no content or credentials.
+- Setup preserves foreign config and reports rollback or partial failure.
+- Managed Skill export is **Unsupported** unless a complete projection target exists.
+- Real-host E2E covers every Supported lifecycle and permission claim.
+- **Unsupported** and **Not validated** remain separate in docs, tests, and release notes.
 
 Only then add the host to the first-class catalog.

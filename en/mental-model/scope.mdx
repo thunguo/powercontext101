@@ -7,6 +7,8 @@ Most PowerContext operations require a `scope_id`. That value decides which set 
 
 A wrong Scope often looks like missing data: “I wrote this already, so why is search empty?” The more serious failure is using one Scope for projects or tenants that should remain separate.
 
+Resolve Scope as an application decision, not a convenience fallback. In a multi-tenant service, authentication and authorization choose the allowed tenant/project first; only then should the adapter receive the corresponding `scope_id`.
+
 ## What Scope isolates
 
 PowerContext keeps related state under the same `scope_id`:
