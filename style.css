@@ -1,1 +1,85 @@
 /* Brand tokens live in docs.json. Keep this file light so Mintlify layout hooks stay stable. */
+
+/*
+  Maple pagination paints previous and next differently.
+  Use two equal title-only cards with a visible gap.
+*/
+#pagination {
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#pagination .pagination-prev,
+#pagination .pagination-next {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  min-height: 4rem;
+  border: 1px solid rgb(15 23 42 / 0.08);
+  border-radius: 0.75rem;
+  background-color: #fff;
+  box-shadow: none;
+}
+
+#pagination:has(.pagination-prev):has(.pagination-next) .pagination-prev,
+#pagination:has(.pagination-prev):has(.pagination-next) .pagination-next {
+  max-width: calc((100% - 0.75rem) / 2);
+}
+
+html.dark #pagination .pagination-prev,
+html.dark #pagination .pagination-next {
+  border-color: rgb(255 255 255 / 0.1);
+  background-color: rgb(255 255 255 / 0.04);
+}
+
+#pagination .pagination-prev:hover,
+#pagination .pagination-next:hover {
+  border-color: rgb(11 111 244 / 0.45);
+}
+
+html.dark #pagination .pagination-prev:hover,
+html.dark #pagination .pagination-next:hover {
+  border-color: rgb(104 173 255 / 0.45);
+}
+
+#pagination .pagination-prev > div,
+#pagination .pagination-next > div {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+#pagination [data-component-part="pagination-description"] {
+  display: none !important;
+}
+
+#pagination .pagination-prev[aria-label] {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+#pagination .pagination-prev[aria-label] [data-component-part="pagination-chevron"] {
+  margin-left: 0.75rem;
+}
+
+#pagination .pagination-prev [data-pc-pagination-title] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 1.25rem 0 0.75rem;
+  padding-left: 1.25rem;
+  border-left: 1px solid rgb(15 23 42 / 0.08);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: rgb(31 41 55);
+}
+
+html.dark #pagination .pagination-prev [data-pc-pagination-title] {
+  border-left-color: rgb(255 255 255 / 0.1);
+  color: rgb(229 231 235);
+}
