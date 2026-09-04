@@ -1,45 +1,69 @@
 ---
 title: "Troubleshooting"
-description: "Match symptoms already documented on this site, then return to the original page. Do not treat 401, an empty Dashboard, or capture as a new class of failure."
+description: "Can't find what you wrote, see an empty page, or a check passed and it still fails? Start with the closest item below."
 icon: wrench
+keywords:
+  - troubleshooting
+  - Scope
+  - Memory
+  - fail-open
 ---
 
-This troubleshooting route covers only misuse already demonstrated in PowerContext 101. Each step names the symptom, then sends you back. It does not invent new cases.
+The first time you use PowerContext, you are usually not stuck on an error message. You wrote something and cannot find it, the page looks empty, or doctor passed and recall still fails. The items below are cases already shown in 101. Pick the one that looks most like what you see, then follow its link.
+
+<Info>
+Install flags, API contracts, and deploy settings follow the latest published [official docs](https://oceanbase.github.io/powercontext/). This page only helps you name which kind of problem you hit.
+</Info>
 
 <Steps titleSize="h3">
   <Step title="Scope strings do not match" icon="split">
-    The Client, Dashboard, host env, and `--scope-id` must match exactly. `project:powercontext-101` and `project:powercontext-101:<uuid>` are different Scopes. See [Scope](/en/mental-model/scope).
+    The Client, Dashboard, Agent environment variables, and `--scope-id` must match exactly. <Tooltip headline="Scope" tip="Chooses which isolated data set this request reads and writes. A mismatch usually looks like a miss, not an error." cta="Read Scope" href="/en/mental-model/scope">Scope</Tooltip> is a literal. `project:powercontext-101` and `project:powercontext-101:<uuid>` are different Scopes. See [Scope](/en/mental-model/scope).
   </Step>
-  <Step title="You changed home or the database URL" icon="database">
+  <Step title="You changed the data directory or database URL" icon="database">
     A new `POWERCONTEXT_HOME` or database URL opens another database. That looks like a lost Scope. Check the data directory on [Install and run the Server](/en/basic-usage/install-and-run), then check Scope.
   </Step>
   <Step title="You treated 401/403 as empty" icon="shield">
-    `empty` means this Scope has nothing to recall right now. 401/403 is an auth failure. The host should record a content-free outcome, inject nothing, and must not pretend there is no Memory. See [fail-open](/en/mental-model/fail-open) and [Connect with MCP](/en/basic-usage/mcp).
+    `empty` means this Scope has nothing to recall right now. 401/403 is an auth failure. Do not inject context, and do not pretend there is no <Tooltip headline="Memory" tip="Selected project knowledge you will reuse later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip>. See [fail-open](/en/mental-model/fail-open) and [Connect with MCP](/en/basic-usage/mcp).
   </Step>
   <Step title="Capture succeeded, search finds no Memory" icon="file-plus">
-    Capturing a Source records that something happened. It does not become durable Memory by itself. Without a generation model, the Source stays pending. Use `remember_memory` for a fact you already accept, or read [Source and Memory](/en/basic-usage/source-and-memory).
+    Capturing a <Tooltip headline="Source" tip="Records that something happened. Capture does not become durable knowledge by itself." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> records that something happened. It does not become durable Memory by itself. Without a generation model, the Source stays pending. Use `remember_memory` for a fact you already accept, or read [Source and Memory](/en/basic-usage/source-and-memory).
   </Step>
   <Step title="Doctor passed, recall failed" icon="stethoscope">
-    Check which command passed. `powercontext doctor` checks the package plus Server liveness and readiness. `powercontext doctor <host>` checks only that host CLI and a bounded installation or activation surface; it neither probes the Server nor sends a real prompt. Verify the Server with the first command, then complete live recall on the host page. See the [common agents overview](/en/common-agents/overview).
+    Check which command passed. `powercontext doctor` checks the package, whether the Server is up, and whether it is ready. `powercontext doctor <host>` only checks that Agent CLI and a limited install state. It does not probe the Server or send a real prompt. Verify the Server with the first command, then complete live recall on that Agent page. See the [common agents overview](/en/common-agents/overview).
   </Step>
   <Step title="The Dashboard is empty, but the data is there" icon="layout-dashboard">
-    An unconfigured Dashboard Scope shows an empty page. Configure the same `scope_id` as the Client and keep the same database URL. Steps are on [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard).
+    An unconfigured Dashboard Scope shows an empty page. Use the same `scope_id` as the Client, and keep the same database URL. Steps are on [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard).
   </Step>
   <Step title="The Preview adapter will not install" icon="triangle-alert">
     The Pydantic AI Agent adapter is **Preview**. Neither PyPI nor the current Git subdirectory install works. First integration is [LangGraph](/en/frameworks/langgraph) or [LangChain](/en/frameworks/langchain), not the Preview page.
   </Step>
-  <Step title="You treated a bundled Skill as managed export" icon="package">
-    `project-context` is host-shipped guidance. `powercontext skill export` is the managed Skill path. OpenCode, DSH, Pi, Hermes, and OpenClaw cannot export. See [Let the agent extend itself](/en/common-agents/agent-self-extension).
+  <Step title="You treated a bundled Skill as a managed export" icon="package">
+    `project-context` is built-in Agent guidance. `powercontext skill export` is the managed <Tooltip headline="Skill" tip="Reusable capability guidance. Bundled, managed, projected, and external Skills are different objects." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Skill</Tooltip> path. OpenCode, DSH, Pi, Hermes, and OpenClaw cannot export. See [Let the agent extend itself](/en/common-agents/agent-self-extension).
   </Step>
   <Step title="You reused Candidate version as Artifact Revision" icon="git-compare">
-    Candidate `version` and Artifact `Revision` are different concurrency domains. Editing a proposal bumps Candidate version. Approval creates an immutable Revision. Mixing them produces conflicts. See [Let the agent extend itself](/en/common-agents/agent-self-extension).
+    Edits to a proposal use <Tooltip headline="Candidate" tip="A proposal under review. Edits bump its own version. Approval creates an immutable Revision." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Candidate</Tooltip> `version`. Approval creates an Artifact `Revision`. These are different numbers. Mixing them produces conflicts. See [Let the agent extend itself](/en/common-agents/agent-self-extension).
   </Step>
-  <Step title="Preview and make no writes called Handoff" icon="hand">
-    `handoff_current_work` writes a boundary Source. Discussing a design, or saying “preview and make no writes,” must not call it. See [Codex](/en/coding-agents/codex) and [Connect with MCP](/en/basic-usage/mcp).
+  <Step title="You asked for a preview, then called Handoff" icon="hand">
+    `handoff_current_work` writes a boundary Source. Discussing a design, or saying `preview and make no writes`, must not call it. See [Codex](/en/coding-agents/codex) and [Connect with MCP](/en/basic-usage/mcp).
   </Step>
-  <Step title="Server down, and you expected automatic recall to error" icon="power">
-    Automatic recall, capture, and optional flush may fail open. The original task should continue. Explicit Memory writes, Handoff commit, Review, and Skill export must fail visibly. See [fail-open](/en/mental-model/fail-open).
+  <Step title="The Server is down, and you expected automatic recall to error" icon="power">
+    Automatic recall, capture, and optional flush may fail open. The original task should continue. When you explicitly ask to write Memory, commit a <Tooltip headline="Handoff" tip="Hands the current goal, verified progress, blockers, and next step to the next owner. Uncommitted work is still a temporary package." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip>, run Review, or export a Skill, the failure must be visible. See [fail-open](/en/mental-model/fail-open).
   </Step>
 </Steps>
 
-Do not branch into unrelated diagnosis. Finish the one item on your current path first.
+<Tip>
+If PowerContext fails while automatically fetching context, keep working. If you explicitly write a Memory, commit a Handoff, approve a proposal, or export a Skill, you must see the failure. Read [fail-open](/en/mental-model/fail-open) for the full rule.
+</Tip>
+
+Start with the closest match. Do not change several things at once.
+
+## Next step
+
+<Columns cols={2}>
+  <Card title="Follow the learning path" icon="route" href="/en/start/learning-path" arrow="true" cta="Open the learning path">
+    Pick one path for your goal. Finish it before you decide whether to open the next.
+  </Card>
+  <Card title="Start a local Server" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Check the data directory">
+    Confirm the local Server and data directory before you treat this as a lost Scope or a new database.
+  </Card>
+</Columns>

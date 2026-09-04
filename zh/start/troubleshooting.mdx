@@ -1,45 +1,69 @@
 ---
 title: "排错"
-description: "按已经写过的症状一条条对照，先回到原页，不要把 401、空 Dashboard 或采集当成另一套故障。"
+description: "搜不到、页面是空的，或诊断过了还是不行？先对照下面几条。"
 icon: wrench
+keywords:
+  - 排错
+  - Scope
+  - Memory
+  - fail-open
 ---
 
-这条排错路径只收录 PowerContext 101 已经演示过的误用。每条先对症状，再回原页。不要在这里发明新案例。
+第一次用 PowerContext，卡住时多半不是看不懂报错，而是明明写过却搜不到、页面是空的，或者诊断过了还是不行。下面几条都是 101 里已经出现过的情况。找和你现在最像的一条，按里面的链接继续。
+
+<Info>
+安装参数、接口说明和部署配置，以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页只帮你判断卡在哪一类问题上。
+</Info>
 
 <Steps titleSize="h3">
-  <Step title="Scope 字面值不一致" icon="split">
-    客户端、Dashboard、宿主环境变量和 `--scope-id` 必须逐字相同。`project:powercontext-101` 和 `project:powercontext-101:<uuid>` 不是同一个 Scope。对照 [Scope](/zh/mental-model/scope)。
+  <Step title="Scope 对不上" icon="split">
+    客户端、Dashboard、Agent 环境变量和 `--scope-id` 必须逐字相同。<Tooltip headline="Scope" tip="决定这次请求读写哪一组数据。设错时通常不报错，只是搜不到。" cta="阅读 Scope" href="/zh/mental-model/scope">Scope</Tooltip> 是字面值。`project:powercontext-101` 和 `project:powercontext-101:<uuid>` 不是同一个 Scope。对照 [Scope](/zh/mental-model/scope)。
   </Step>
-  <Step title="换了 home 或数据库 URL" icon="数据库">
+  <Step title="换了数据目录或数据库" icon="database">
     `POWERCONTEXT_HOME` 或数据库 URL 一变，你看到的是另一套库。这很像 Scope 丢了。先对[安装并运行 Server](/zh/basic-usage/install-and-run) 里的数据目录，再对 Scope。
   </Step>
-  <Step title="把 401/403 当成空结果" icon="shield">
-    `empty` 表示这个 Scope 当前没有可召回内容。401/403 是认证失败。宿主应留下不含内容 outcome，不能注入，也不能假装“没有 Memory”。见 [fail-open](/zh/mental-model/fail-open) 和 [MCP](/zh/basic-usage/mcp)。
+  <Step title="把 401/403 当成没有内容" icon="shield">
+    `empty` 表示这个 Scope 当前没有可召回内容。401/403 是认证失败。这时不要注入上下文，也不能假装这个 Scope 没有 <Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip>。见 [fail-open](/zh/mental-model/fail-open) 和 [MCP](/zh/basic-usage/mcp)。
   </Step>
-  <Step title="采集成功但搜索不到 Memory" icon="file-plus">
-    采集 Source 只表示“这件事发生过”。它不会自动变成长期 Memory。没有生成模型时，Source 会保持待处理。用 `remember_memory` 写你已经确认的事实，或读 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
+  <Step title="采集成功，但搜不到 Memory" icon="file-plus">
+    采集 <Tooltip headline="Source" tip="记录发生过什么。采集不会自动写成长期知识。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip> 只表示这件事发生过。它不会自动变成长期 Memory。没有生成模型时，Source 会保持待处理。用 `remember_memory` 写你已经确认的事实，或读 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
   </Step>
-  <Step title="诊断通过但召回失败" icon="stethoscope">
-    先确认你运行的是哪一个命令。`powercontext doctor` 会检查软件包、Server 存活状态和就绪状态；`powercontext doctor <host>` 只检查该宿主 CLI 与有限的安装/激活状态，不会探测 Server，也不会发送真实提示词。先用前者确认 Server，再按宿主页完成真实召回。见[通用 Agent 总览](/zh/common-agents/overview)。
+  <Step title="诊断通过，但召回失败" icon="stethoscope">
+    先确认你跑的是哪一条命令。`powercontext doctor` 检查软件包、Server 是否活着、是否就绪。`powercontext doctor <host>` 只检查该 Agent 的 CLI 和有限的安装状态，不会探测 Server，也不会发真实提示词。先用前者确认 Server，再按该 Agent 的页面做一次真实召回。见[通用 Agent 总览](/zh/common-agents/overview)。
   </Step>
   <Step title="Dashboard 是空的，数据其实在" icon="layout-dashboard">
-    未配置 Dashboard Scope 时页面就是空的。配上和客户端相同的 `scope_id`，并确认同一个数据库 URL。步骤在[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。
+    没配 Dashboard 的 Scope 时，页面就是空的。配上和客户端相同的 `scope_id`，并确认同一个数据库 URL。步骤在[用 Dashboard 核对 Scope 统计](/zh/basic-usage/dashboard)。
   </Step>
-  <Step title="预览适配器当前装不上" icon="triangle-alert">
-    Pydantic AI Agent 适配器是 **预览**。PyPI 和当前 Git 子目录安装都不可用。第一次接入走 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)，不要从预览页开始。
+  <Step title="Preview 适配器装不上" icon="triangle-alert">
+    Pydantic AI Agent 适配器是 **Preview**。PyPI 和当前 Git 子目录安装都不可用。第一次接入走 [LangGraph](/zh/frameworks/langgraph) 或 [LangChain](/zh/frameworks/langchain)，不要从 Preview 页开始。
   </Step>
-  <Step title="把内置 Skill 当成托管导出" icon="软件包">
-    `project-context` 是宿主自带说明。`powercontext skill export` 才是托管 Skill。OpenCode / DSH / Pi / Hermes / OpenClaw 不能导出。见[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
+  <Step title="把内置 Skill 当成可导出 Skill" icon="package">
+    `project-context` 是 Agent 自带说明。`powercontext skill export` 才是托管 <Tooltip headline="Skill" tip="可复用的能力说明。内置、托管、投影和外部 Skill 不是同一种对象。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip>。OpenCode、DSH、Pi、Hermes、OpenClaw 不能导出。见[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
   </Step>
   <Step title="把 Candidate 版本当成 Artifact Revision" icon="git-compare">
-    Candidate `version` 和 Artifact `Revision` 不是同一套并发域。改提案走 Candidate 版本；批准后才出现不可变 Revision。混用会出现冲突。对照[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
+    改提案看 <Tooltip headline="Candidate" tip="待审提案。改提案走它自己的 version，批准后才出现不可变 Revision。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip> 的 `version`。批准后看 Artifact 的 `Revision`。两套号不能混用，混用会出现冲突。对照[让 Agent 自己扩展能力](/zh/common-agents/agent-self-extension)。
   </Step>
-  <Step title="预览 and make no 写入却调用了 Handoff" icon="hand">
-    `handoff_current_work` 会写边界 Source。讨论设计，或说 “预览 与 make no 写入”，不要调用它。见 [Codex](/zh/coding-agents/codex) 和 [MCP](/zh/basic-usage/mcp)。
+  <Step title="只要预览，却调用了 Handoff" icon="hand">
+    `handoff_current_work` 会写一条边界 Source。讨论设计，或说 `preview and make no writes`，都不要调用它。见 [Codex](/zh/coding-agents/codex) 和 [MCP](/zh/basic-usage/mcp)。
   </Step>
-  <Step title="Server 停止 时期待自动召回报错" icon="power">
-    自动召回、采集和可选刷新可以 fail-open，原任务应继续。显式 Memory 写入、Handoff 提交、Review 和 Skill 导出必须明确失败。见 [fail-open](/zh/mental-model/fail-open)。
+  <Step title="Server 停了，却指望自动召回报错" icon="power">
+    自动召回、采集和可选刷新可以 fail-open，原任务应继续。你明确要求写 Memory、提交 <Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip>、做 Review 或导出 Skill 时，失败必须看得见。见 [fail-open](/zh/mental-model/fail-open)。
   </Step>
 </Steps>
 
-不要转向无关的故障诊断。先把当前路径上的那一条做完。
+<Tip>
+自动帮你找回上下文失败时，当前任务还应继续。你明确要求写入 Memory、提交 Handoff、批准或导出时，失败必须能看见。完整说明见 [fail-open](/zh/mental-model/fail-open)。
+</Tip>
+
+先处理最像的那一条。不要同时改好几处。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="跟着学习路径走" icon="route" href="/zh/start/learning-path" arrow="true" cta="打开学习路径">
+    按你的目标选一条路。先跑通，再决定要不要看下一条。
+  </Card>
+  <Card title="启动本地 Server" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="核对数据目录">
+    先确认本地 Server 和数据目录，再判断是不是 Scope 或库换了。
+  </Card>
+</Columns>
