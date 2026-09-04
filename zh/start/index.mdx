@@ -1,6 +1,6 @@
 ---
 title: "PowerContext 101"
-description: "从心智模型到 Agent 集成，沿一条可运行的路径学习 PowerContext。"
+description: ""
 icon: house
 keywords:
   - PowerContext 101
@@ -10,55 +10,42 @@ keywords:
   - Handoff
 ---
 
-PowerContext 保存项目在推进过程中留下的证据、决策和交接状态，让后续的人或 Agent 能接着做。它是一层独立运行的上下文服务，不是聊天记录仓库。
+<img src="/assets/slogan-full-story-zh.svg" alt="PowerContext slogan: Not only memory but a full story. 不只是记忆，而是完整故事。" />
 
-PowerContext 101 关注使用路径和集成边界。安装参数、完整接口契约和部署配置仍以 [PowerContext 官方文档](https://oceanbase.github.io/powercontext/)为准。
+从心智模型到 Agent 集成，沿一条可运行的路径学习 PowerContext。
 
-先完成最小、可验证的结果：显式写入一条 Memory，得到一次搜索命中，再构造带 Citation 的 PreparedContext。这条闭环能先证明 Server 与 Scope 正确，再接入框架、宿主 Hook 或模型提供方。
+项目换人做、换 Agent 接着做时，上下文很容易丢在聊天记录里。PowerContext 把证据、决策和交接状态单独存下来，让下一手能接着干。它是独立跑的一层服务，不是聊天仓库。
+
+<img src="/assets/readme-workflow-zh.svg" alt="工作从你开始，交给 Agent 推进，再由你或其他 Agent 接着做，上下文一直跟着走。" />
+
+PowerContext 101 只讲怎么用、接到哪里。安装怎么配、接口怎么签、服务怎么部署，以 [PowerContext 官方文档](https://oceanbase.github.io/powercontext/) 为准。
+
+先做一件能当场验证的事：写出一条 Memory，搜到它，再拿到带 Citation 的 PreparedContext。这条闭环通了，再去接框架、宿主 Hook 或模型提供方。
 
 <Info>
-本站不会复制 OpenAPI 或 RFC。代码、当前测试和正式文档与旧 RFC 冲突时，以已经实现并经过测试的行为为准。
+先把这条闭环跑通。完整的安装参数、接口说明和部署配置，以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。
 </Info>
 
 ## 30 秒看懂 PowerContext
 
-一次工作通常从 `Source` 开始。它可以是一条提示词、一次任务结果，或者其他可定位的证据。采集 Source 只表示“这件事发生过”，不会自动把整段内容变成长期 Memory。
+PowerContext 同时走三条路。它们可以互相引用，但不会自动并成一件事。
 
-`Memory` 保存经过选择、以后还会用到的项目知识。`Handoff` 处理另一件事：把当前目标、已验证进度、阻塞项和下一步交给接手者。Handoff 默认可以只是临时包；只有显式提交后，它才成为持久的里程碑。
+留下知识。<Tooltip headline="Source" tip="记录发生过什么。采集不会自动写成长期知识。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip> 只证明这件事发生过。确认以后还要用，才写成 <Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip>。下次请求用 <Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 召回。
 
-`Experience` 和托管 `Skill` 先进入 Candidate。模型可以起草 Candidate，但不能因为“生成成功”就算批准。Review 中的批准会创建不可变 Artifact Revision；拒绝会记录拒绝原因，不创建结果 Artifact。Skill 获批后仍需显式导出，也不会自动获得执行权限。
+先审再留。<Tooltip headline="Experience" tip="已批准的判断经验。先作为 Candidate 进入 Review。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Experience</Tooltip> 和托管 <Tooltip headline="Skill" tip="已批准的可重复做法。获批后还要显式导出，不自动获得执行权限。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip> 先变成 <Tooltip headline="Candidate" tip="尚待 Review 的 Experience 或 Skill 提案。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip>。模型可以起草，生成成功不等于批准。<Tooltip headline="Review" tip="批准才创建 Artifact Revision。拒绝只记录原因，不创建结果 Artifact。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Review</Tooltip> 批准后才会留下。<Tooltip headline="Skill" tip="已批准的可重复做法。获批后还要显式导出，不自动获得执行权限。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip> 还要显式导出。
 
-```mermaid
-flowchart LR
-  S[Source evidence]
-  M[Memory Revision]
-  C[Candidate]
-  R{Review}
-  E[Experience Revision]
-  K[Skill Revision]
-  P[PreparedContext]
-  H[Prepared Handoff]
-  HC[Committed Handoff]
+交接可以先临时。<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 先打包给接手者；只有显式提交，才成为持久里程碑。
 
-  S -->|extraction| M
-  S --> C
-  M --> P
-  C --> R
-  R -->|approve| E
-  R -->|approve| K
-  E --> P
-  H -->|explicit commit| HC
-```
+<img src="/assets/start-object-flow-zh.svg" alt="30 秒看懂 PowerContext：留下知识、先审再留、交接工作是三条独立路径。" />
 
-`PreparedContext` 是一次请求临时使用的有界视图。它带 Citation，并明确标记为不可信历史证据。Agent 可以参考它，但不能把里面的文字当成新的系统指令或工具授权。
-
-<Card title="先把对象分清" icon="brain" href="/zh/mental-model/overview" horizontal arrow="true" cta="阅读心智模型">
-Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先花几分钟把边界理顺，后面的 API 和宿主集成会简单很多。
-</Card>
+<Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 只服务这一次请求。它带 Citation，并标成不可信历史证据。Agent 可以参考，但不能把里面的文字当成新的系统指令或工具授权。
 
 ## 按你的目标继续
 
 <Columns cols={2}>
+  <Card title="先把对象分清" icon="brain" href="/zh/mental-model/overview" arrow="true" cta="阅读心智模型">
+    Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先把边界理顺，后面的 API 和宿主集成会简单很多。
+  </Card>
   <Card title="跑通常用 API" icon="book-open" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始基础用法">
     启动本地 Server，用 Python Client 完成第一条闭环：写入 Memory，用 `search_memory` 找到它，再通过 `prepare_context` 得到带 Citation 的 `PreparedContext`。
   </Card>
@@ -68,21 +55,24 @@ Source、Memory、PreparedContext 和 Handoff 很容易被混在一起。先花�
   <Card title="配置通用 Agent" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="选择通用 Agent">
     Hermes、OpenClaw 和 WorkBuddy 都有实际接入路径。先完成安装与激活，再分别验证 Server 连接、召回和显式写入。凭证、持久写入和 Review 仍由你授权。
   </Card>
-  <Card title="配置编程 Agent" icon="终态" href="/zh/coding-agents/overview" arrow="true" cta="选择编程 Agent">
+  <Card title="配置编程 Agent" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="选择编程 Agent">
     了解 Codex、Claude Code、DSH、OpenCode 和 Pi 如何把同一 Server 契约映射到各自的生命周期。
+  </Card>
+  <Card title="跟着学习路径走" icon="route" href="/zh/start/learning-path" arrow="true" cta="打开学习路径">
+    第一次不必整站读完。按目标选一条路径，先跑通再看其他。已经卡住时，先对[排错](/zh/start/troubleshooting)。
   </Card>
 </Columns>
 
-<Check>
-自动召回、提示词采集和可选刷新失败时，宿主应继续原任务。显式 Memory 写入、Handoff 提交、Candidate Review 和 Skill 导出不在这个规则内：失败必须明确告诉调用者。
-</Check>
+<Tip>
+自动帮你找回上下文失败时，当前任务还应继续。你明确要求写入 Memory、提交 Handoff、批准或导出时，失败必须能看见。完整说明见 [fail-open](/zh/mental-model/fail-open)。
+</Tip>
 
-不知道先读哪一部分？打开[学习路径](/zh/start/learning-path)。已经卡住时，先对[排错](/zh/start/troubleshooting)。
+不知道先读哪一张卡？打开[学习路径](/zh/start/learning-path)。发现有地方卡住时，先对[排错](/zh/start/troubleshooting)。
 
 <GitHub.Repo repo="oceanbase/powercontext" />
 
 <Visibility for="agents">
-从本页分流中文 PowerContext 101 问题。产品事实以当前实现和测试为准，不要把 RFC 目标写成已发布行为。
+从本页分流中文 PowerContext 101 问题。产品事实以官方最新发布版本为准，不要把 RFC 目标写成已发布行为。
 
 - 概念：`/zh/mental-model/overview`
 - 安装与 API 闭环：`/zh/basic-usage/install-and-run`

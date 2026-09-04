@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="360" viewBox="0 0 1080 360" role="img" aria-labelledby="title description">
+  <title id="title">30 秒看懂 PowerContext</title>
+  <desc id="description">留下知识、先审再留、交接工作是三条独立路径。</desc>
+  <defs>
+    <marker id="object-arrow-zh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="arrowhead" d="M0 0L10 5L0 10Z" />
+    </marker>
+  </defs>
+  <style>
+    .background { fill: #fbfcfe; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .secondary { fill: #626b7a; }
+    .quiet { fill: #8b94a3; }
+    .card-shadow { fill: #e8edf4; }
+    .card { fill: #ffffff; stroke: #cbd3df; }
+    .node { fill: #f7f9fc; stroke: #cbd3df; }
+    .node-accent { fill: #eef5ff; stroke: #006dff; }
+    .flow { fill: none; stroke: #9aa5b4; }
+    .arrowhead { fill: #9aa5b4; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .secondary { fill: #9aa4b2; }
+      .quiet { fill: #7d8590; }
+      .card-shadow { fill: #070a10; }
+      .card { fill: #161b22; stroke: #3b434d; }
+      .node { fill: #0d1117; stroke: #3b434d; }
+      .node-accent { fill: #122033; stroke: #58a6ff; }
+      .flow { stroke: #66707d; }
+      .arrowhead { fill: #66707d; }
+    }
+
+  </style>
+  <rect class="background" width="1080" height="360" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="359" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="heading" x="48" y="48" font-size="24" font-weight="650">30 秒看懂<tspan class="accent-text"> PowerContext</tspan></text>
+    <text class="secondary" x="48" y="74" font-size="13">留下知识 · 先审再留 · 交接工作。不要混成一件事。</text>
+    <g transform="translate(70 96)">
+      <circle class="accent-text" cx="7" cy="0" r="4" />
+      <text class="heading" x="20" y="5" font-size="15" font-weight="600">1  留下知识</text>
+    </g>
+    <g transform="translate(427 96)">
+      <circle class="accent-text" cx="7" cy="0" r="4" />
+      <text class="heading" x="20" y="5" font-size="15" font-weight="600">2  先审再留</text>
+    </g>
+    <g transform="translate(784 96)">
+      <circle class="accent-text" cx="7" cy="0" r="4" />
+      <text class="heading" x="20" y="5" font-size="15" font-weight="600">3  交接工作</text>
+    </g>
+    <g transform="rotate(-1.2 183 220)">
+      <rect class="card-shadow" x="64" y="118" width="238" height="196" rx="10" transform="translate(4 6)" />
+      <rect class="card" x="64" y="118" width="238" height="196" rx="10" />
+      <rect class="node" x="86" y="136" width="194" height="40" rx="8" />
+      <text class="heading" x="183" y="154" font-size="14" font-weight="600" text-anchor="middle">Source</text>
+      <text class="quiet" x="183" y="168" font-size="11" text-anchor="middle">发生过什么</text>
+      <path class="flow" d="M183 176V190" stroke-width="1.6" stroke-dasharray="3 4" marker-end="url(#object-arrow-zh)" />
+      <rect class="node" x="86" y="192" width="194" height="40" rx="8" />
+      <text class="heading" x="183" y="210" font-size="14" font-weight="600" text-anchor="middle">Memory</text>
+      <text class="quiet" x="183" y="224" font-size="11" text-anchor="middle">以后还要用</text>
+      <path class="flow" d="M183 232V246" stroke-width="1.6" stroke-dasharray="3 4" marker-end="url(#object-arrow-zh)" />
+      <rect class="node-accent" x="86" y="248" width="194" height="40" rx="8" />
+      <text class="heading" x="183" y="266" font-size="14" font-weight="600" text-anchor="middle">PreparedContext</text>
+      <text class="quiet" x="183" y="280" font-size="11" text-anchor="middle">这一次请求</text>
+    </g>
+    <g transform="rotate(1.1 540 220)">
+      <rect class="card-shadow" x="421" y="118" width="238" height="196" rx="10" transform="translate(4 6)" />
+      <rect class="card" x="421" y="118" width="238" height="196" rx="10" />
+      <rect class="node" x="443" y="136" width="194" height="40" rx="8" />
+      <text class="heading" x="540" y="154" font-size="14" font-weight="600" text-anchor="middle">Candidate</text>
+      <text class="quiet" x="540" y="168" font-size="11" text-anchor="middle">还没批准</text>
+      <path class="flow" d="M540 176V190" stroke-width="1.6" stroke-dasharray="3 4" marker-end="url(#object-arrow-zh)" />
+      <rect class="node" x="443" y="192" width="194" height="40" rx="8" />
+      <text class="heading" x="540" y="210" font-size="14" font-weight="600" text-anchor="middle">Review</text>
+      <text class="quiet" x="540" y="224" font-size="11" text-anchor="middle">批准或拒绝</text>
+      <path class="flow" d="M540 232V246" stroke-width="1.6" stroke-dasharray="3 4" marker-end="url(#object-arrow-zh)" />
+      <rect class="node-accent" x="443" y="248" width="194" height="40" rx="8" />
+      <text class="heading" x="540" y="266" font-size="14" font-weight="600" text-anchor="middle">Experience / Skill</text>
+      <text class="quiet" x="540" y="280" font-size="11" text-anchor="middle">批准后才留下</text>
+    </g>
+    <g transform="rotate(-0.8 897 220)">
+      <rect class="card-shadow" x="778" y="118" width="238" height="196" rx="10" transform="translate(4 6)" />
+      <rect class="card" x="778" y="118" width="238" height="196" rx="10" />
+      <rect class="node" x="800" y="150" width="194" height="44" rx="8" />
+      <text class="heading" x="897" y="170" font-size="14" font-weight="600" text-anchor="middle">Prepared Handoff</text>
+      <text class="quiet" x="897" y="186" font-size="11" text-anchor="middle">临时交接包</text>
+      <path class="flow" d="M897 198V228" stroke-width="1.6" stroke-dasharray="3 4" marker-end="url(#object-arrow-zh)" />
+      <text class="quiet" x="910" y="218" font-size="11">显式提交</text>
+      <rect class="node-accent" x="800" y="232" width="194" height="44" rx="8" />
+      <text class="heading" x="897" y="252" font-size="14" font-weight="600" text-anchor="middle">Committed Handoff</text>
+      <text class="quiet" x="897" y="268" font-size="11" text-anchor="middle">持久里程碑</text>
+    </g>
+  </g>
+</svg>

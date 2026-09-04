@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="148" viewBox="0 0 1080 148" role="img" aria-labelledby="title description">
+  <title id="title">Not only memory but a full story</title>
+  <desc id="description">PowerContext slogan: Not only memory but a full story.</desc>
+  <style>
+    .background { fill: #ffffff; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .quiet { fill: #8b94a3; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .quiet { fill: #7d8590; }
+    }
+  </style>
+  <rect class="background" width="1080" height="148" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="147" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="quiet" x="48" y="40" font-size="12" font-weight="600" letter-spacing="2.4">POWERCONTEXT</text>
+    <text class="heading" x="48" y="86" font-size="32" font-weight="650">Not only memory <tspan class="accent-text">but a full story</tspan></text>
+    <text class="quiet" x="48" y="120" font-size="14">不只是记忆，而是完整故事</text>
+  </g>
+</svg>
