@@ -1,9 +1,21 @@
 ---
 title: "Experience, Skill, and Review"
-description: "Create a Candidate from exact evidence, review the exact version, and export an approved Skill Revision explicitly."
+description: "Review first. An approved Skill still needs an explicit export."
+icon: scale-balanced
+keywords:
+  - Experience
+  - Skill
+  - Candidate
+  - Review
 ---
 
-The procedure turns completed-work evidence into Experience, then turns the approved Experience into a managed Skill. The important part is not how polished the model output sounds. Review must inspect exact evidence and the exact Candidate version.
+This page turns finished work into <Tooltip headline="Experience" tip="An approved judgment. It enters Review as a Candidate first." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Experience</Tooltip>, then turns an approved Experience into a managed <Tooltip headline="Skill" tip="Approved reusable practice. After approval you still export it explicitly. Export does not grant execution rights." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Skill</Tooltip>. The point is not how polished the model draft looks. It is whether <Tooltip headline="Review" tip="Approval creates an Artifact Revision. Rejection records a reason and creates no result Artifact." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Review</Tooltip> checked exact evidence and the <Tooltip headline="Candidate" tip="An Experience or Skill proposal still waiting for Review." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Candidate</Tooltip> version.
+
+<img src="/assets/basic-review-flow-en.svg" alt="Review first: a proposal becomes a Candidate, Review approves or rejects, Experience can be recalled, and Skill still needs export." />
+
+<Info>
+Review and export commands follow the latest published [official docs](https://oceanbase.github.io/powercontext/). This page helps you run one review path where failure stays visible.
+</Info>
 
 ## Two creation paths
 
@@ -422,16 +434,31 @@ A Review path is incomplete until its failure is visible. A stale Candidate vers
 
 A replacement Candidate cannot switch its target to another Revision during revise.
 
-## Completion check
+## How you know it worked
 
-- Typed propose creates a pending Candidate without a model.
-- Generate may return pending or no-op.
-- Review always shows the Candidate before using inspected `expected_version`.
+- A typed proposal can create a pending Candidate without a model.
+- Generate may return pending, or no change.
+- Review always shows the Candidate first, then uses the `expected_version` you inspected.
 - A stale version returns 409.
 - Approval returns an exact `result_artifact`.
 - The approved current Experience may participate in relevant recall.
-- Skill approval neither exports nor executes it.
-- The export package contains `SKILL.md` and `powercontext.json`.
-- An existing destination or local drift is never overwritten silently.
+- Approving a Skill does not export it, and does not execute it.
+- The export directory contains `SKILL.md` and `powercontext.json`.
+- An existing destination, or local drift, is never overwritten silently.
 
-Basic Usage is complete. Continue with [Framework integration](/en/frameworks/overview), [Common agents](/en/common-agents/overview), or [Coding agents](/en/coding-agents/overview) for your runtime.
+Basic usage ends here. Pick the path that matches the work you are doing now.
+
+<Tip>
+If PowerContext fails while automatically fetching context, keep working. If you explicitly write a Memory, commit a Handoff, approve a proposal, or export a Skill, you must see the failure. Read [fail-open](/en/mental-model/fail-open) for the full rule.
+</Tip>
+
+## Next step
+
+<Columns cols={2}>
+  <Card title="Connect a Python Agent" icon="boxes" href="/en/frameworks/overview" arrow="true" cta="Compare frameworks">
+    First integration is LangGraph or LangChain.
+  </Card>
+  <Card title="Configure a common or coding Agent" icon="bot" href="/en/common-agents/overview" arrow="true" cta="Pick an Agent">
+    Hermes and OpenClaw are common Agents. Codex and Claude Code are on [coding agents](/en/coding-agents/overview).
+  </Card>
+</Columns>

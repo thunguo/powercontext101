@@ -1,22 +1,37 @@
 ---
 title: "Install and run the Server"
-description: "Install the PowerContext CLI and Server, start a model-free local runtime, and inspect its actual capabilities."
+description: "Start the minimum Server first. Do not add a model on the first run."
+icon: server
+keywords:
+  - Server
+  - Memory
+  - Scope
 ---
 
-Start with the minimum Server. It has no generation or embedding model, but it can already store explicit Memory, run FTS search, and expose the same durable data through HTTP, the Python Client, and MCP.
+Start the minimum Server first. It has no generation or embedding model, but it can already store a <Tooltip headline="Memory" tip="Selected project knowledge you will reuse later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> you write, run full-text search, and expose the same data through HTTP, the Python Client, and MCP.
 
-Keeping the first run model-free is deliberate. It leaves only installation, persistence, Scope, and transport in the debugging path. Add inference after that loop works; otherwise a provider failure can look like a database or integration failure.
+Do not add a model on the first run. If something gets stuck, you only need to check install, the data directory, <Tooltip headline="Scope" tip="Chooses which isolated data set this request reads and writes. A mismatch usually looks like a miss, not an error." cta="Read Scope" href="/en/mental-model/scope">Scope</Tooltip>, and the connection. Finish this loop, then add inference. Otherwise a provider failure can look like a broken database or a broken integration.
+
+<img src="/assets/basic-first-loop-en.svg" alt="The first loop: write a Memory, find it, then get a cited PreparedContext." />
+
+<Info>
+Install flags, API contracts, and deploy settings follow the latest published [official docs](https://oceanbase.github.io/powercontext/). This page only helps you start the local Server and see what it can do now.
+</Info>
+
+<Warning>
+The documented install path is macOS or Linux, Python 3.11 or later. This tutorial does not provide an unverified Windows workaround.
+</Warning>
 
 ## Prerequisites
 
-The documented installation environment is:
+The documented environment is:
 
 - macOS or Linux;
 - Python 3.11 or later;
 - Git;
 - [`uv`](https://docs.astral.sh/uv/).
 
-PowerContext supports Python `<4.0`. This tutorial does not provide an unverified Windows installation path.
+PowerContext supports Python `<4.0`.
 
 ## Install the CLI and Server
 
@@ -67,7 +82,7 @@ On Linux, it is usually:
 ~/.local/share/powercontext/powercontext.db
 ```
 
-When `POWERCONTEXT_HOME` is set, the default database moves under that directory. Changing home or database URL reveals another data set and is easy to mistake for missing Scope data.
+When `POWERCONTEXT_HOME` is set, the default database moves under that directory. A new data directory or database URL opens another database. That looks like a lost Scope.
 
 `Ctrl-C` shuts the Server down cleanly. Starting it again reopens the same database.
 
@@ -81,7 +96,7 @@ powercontext ready
 powercontext capabilities
 ```
 
-The commands answer different questions.
+These three commands answer different questions.
 
 ### `doctor`
 
@@ -121,11 +136,11 @@ Open the Dashboard at:
 http://127.0.0.1:8000/
 ```
 
-With no Dashboard Scopes configured, it shows an empty state. A Dashboard initialization failure logs a warning while HTTP API and MCP continue serving. To see the Memory you just wrote, follow [See the Memory you just wrote](/en/basic-usage/dashboard) and configure the same `scope_id`.
+With no Dashboard Scope configured, the page is empty. A Dashboard initialization failure only logs a warning. HTTP and MCP still work. To check counts for the same Scope, follow [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard) and use the same `scope_id`.
 
-## Verify model-free behavior first
+## Check what works without a model first
 
-The minimum Server supports:
+The minimum Server still supports:
 
 - Source capture;
 - explicit Memory remember, search, revise, and retire;
@@ -141,7 +156,7 @@ It does not support:
 - vector or hybrid search;
 - model-backed reranking.
 
-The first loop therefore starts with explicit Memory: write one Memory, find it with `search_memory`, and use `prepare_context` to obtain a cited `PreparedContext`. That verifies persistence, Scope, and Citations before provider configuration becomes another variable. Model extraction from Source and Handoff generation wait for later pages.
+So the first loop starts with a Memory you already accept: write it, find it with `search_memory`, and use `prepare_context` to get a cited `PreparedContext`. Confirm the data is still there, the Scope matches, and the Citation is present before you add a provider. Extracting Memory from a Source, and generating a Handoff with a model, wait for later pages.
 
 ## Install the Client in a Python project
 
@@ -184,9 +199,9 @@ powercontext config validate --env-file .env
 powercontext server run --env-file .env
 ```
 
-Generation and scheduling are independent settings. A generation model enables extraction capability, but it does not enable the periodic scheduler automatically. You may still call `flush_memory` manually.
+Generation and scheduling are separate settings. A generation model turns extraction on. It does not start the periodic scheduler. You can still call `flush_memory` yourself.
 
-Embedding configuration requires the model, profile ID, and dimension as a complete set. Missing one should fail validation rather than starting an ambiguous partial vector setup.
+Embedding needs the model, profile ID, and dimension as one set. If any piece is missing, validation should fail. Do not start a vague half-vector mode.
 
 ## Authentication and remote access
 
@@ -206,11 +221,11 @@ It constructs:
 Authorization: Bearer replace-with-token
 ```
 
-## Common startup problems
+## Common startup stuck points
 
 ### `doctor` cannot reach the Server
 
-Confirm that `powercontext server run` is still running and that port 8000 is free. For a custom address, use the option owned by `doctor`, after the subcommand:
+Confirm that `powercontext server run` is still running and that port 8000 is free. For a custom address, put the option that belongs to `doctor` after the subcommand:
 
 ```bash
 powercontext doctor \
@@ -221,29 +236,38 @@ The root `--server-url` applies to Client content commands and does not replace 
 
 ### You created `.env`, but capabilities did not change
 
-Did the Server command include `--env-file .env`? The CLI does not load it implicitly.
+Did the Server command include `--env-file .env`? The CLI does not load it on its own.
 
 ### `capabilities` lists only `auto, fts`
 
-The Server is working in FTS-only mode. The vector and hybrid prerequisites are not complete.
+The Server is working in full-text-only mode. That is expected until vector or hybrid search is fully configured.
 
 ### `ready` is degraded
 
-Inspect the failed dependency check. Database operations that do not depend on that inference capability may still work, while operations requiring the failed provider will not.
+Inspect the failed dependency check. Database operations that do not need that inference capability may still work. Operations that need the failed provider will not.
 
 ### Data disappeared after restart
 
-Check `POWERCONTEXT_HOME`, database kind, and database URL, then check `scope_id`. Each changes which data set you see. For other recorded symptoms, see [Troubleshooting](/en/start/troubleshooting).
+Check `POWERCONTEXT_HOME`, the database kind, and the database URL, then check `scope_id`. Each one changes which data you see. If it still does not match, start with [Troubleshooting](/en/start/troubleshooting).
 
-## Completion check
+## How you know it worked
 
-Before continuing, confirm that:
+Before you continue, confirm:
 
-- `powercontext doctor` passes for the minimum setup;
-- `powercontext capabilities` lists `auto, fts`;
-- the Dashboard opens or is intentionally disabled;
-- the example Python project can import `PowerContextClient`;
-- the stable Scope for this tutorial is `project:powercontext-101`;
-- the first loop is: write a Memory → `search_memory` → `prepare_context` to obtain a cited `PreparedContext`.
+- `powercontext doctor` passes on the minimum setup.
+- `powercontext capabilities` lists `auto, fts`.
+- The Dashboard opens, or you turned it off on purpose.
+- The example Python project can import `PowerContextClient`.
+- The stable Scope for this tutorial is `project:powercontext-101`.
+- The next step is: write a Memory, find it with `search_memory`, then get a cited `PreparedContext` from `prepare_context`.
 
-Continue with the [Python Client API tour](/en/basic-usage/api-tour) to finish that loop.
+## Next step
+
+<Columns cols={2}>
+  <Card title="Common API tour" icon="book-open" href="/en/basic-usage/api-tour" arrow="true" cta="Run the first loop">
+    Use the Python Client to write one Memory, find it, and get a cited PreparedContext.
+  </Card>
+  <Card title="If you are stuck" icon="wrench" href="/en/start/troubleshooting" arrow="true" cta="Open troubleshooting">
+    Can't find what you wrote, see an empty page, or a check passed and it still fails? Start there.
+  </Card>
+</Columns>

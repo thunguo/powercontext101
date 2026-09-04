@@ -1,6 +1,12 @@
 ---
 title: "fail-open and PreparedContext"
-description: "Keep the original task running when automatic context enhancement fails, and report explicit mutation failures."
+description: "If automatic recall fails, keep working. If you explicitly ask to write, the failure must stay visible."
+icon: shield
+keywords:
+  - fail-open
+  - PreparedContext
+  - Memory
+  - Handoff
 ---
 
 PowerContext runs beside the host's primary task. A temporary Server outage should not stop coding, answering a question, or continuing the work.
@@ -26,7 +32,7 @@ Two outcomes are normal:
 
 `empty` is not a Server failure or an authentication error.
 
-PreparedContext includes exact Citations and a visible trust marker:
+<Tooltip headline="PreparedContext" tip="A bounded view for one request. It includes Citations and is not a durable asset." cta="Read the mental model overview" href="/en/mental-model/overview">PreparedContext</Tooltip> includes exact Citations and a visible trust marker:
 
 ```text
 BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
@@ -34,7 +40,7 @@ BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
 END_POWERCONTEXT_PREPARED_CONTEXT_V1
 ```
 
-The host must not promote this text to system instruction authority just because PowerContext returned it. A Citation identifies the source and version; it does not prove that the content still matches live files, capabilities, or authorization.
+The host must not promote this text to system instruction authority just because PowerContext returned it. A Citation identifies the source and version. It does not prove that the content still matches live files, capabilities, or authorization.
 
 ## Paths that may fail open
 
@@ -171,4 +177,22 @@ Ask two questions when a PowerContext operation fails:
 
 Automatic helper paths can usually continue. Any operation that changes durable state, approves content, or publishes files must return its real result.
 
+## How you know the rule holds
+
+1. Is `empty` still distinct from a fault or a 401/403?
+2. Can the original task continue when automatic recall fails?
+3. If you explicitly write Memory, commit a Handoff, approve, or export, is the failure visible?
+4. Did you treat `degraded` as a completely offline Server?
+
 Continue with [Install and run the Server](/en/basic-usage/install-and-run), then observe the difference between `ready`, `degraded`, and a completely unavailable Server.
+
+## Next
+
+<Columns cols={2}>
+  <Card title="Start a local Server" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Start the first loop">
+    Write a Memory, find it, then get a cited PreparedContext.
+  </Card>
+  <Card title="Match the closest failure" icon="wrench" href="/en/start/troubleshooting" arrow="true" cta="Open troubleshooting">
+    The Server is down and you expected automatic recall to error, or you treated 401/403 as empty content? Start with a case this site already covers.
+  </Card>
+</Columns>

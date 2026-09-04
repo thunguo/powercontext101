@@ -1,31 +1,42 @@
 ---
 title: "Common API tour"
-description: "Use the async Python Client to write, search, prepare, revise, retire, and read explicit Memory history."
+description: "Write one Memory, find it, then get a cited PreparedContext."
+icon: book-open
+keywords:
+  - Memory
+  - PreparedContext
+  - Python Client
 ---
 
 Use the minimum Server here. No generation model or vector search is needed.
 
-The goal is concrete: store one project decision, confirm that search and `PreparedContext` can use it, then revise and retire it while preserving history.
+Prove one thing you can check: write a project decision, find it, then put it into this request's <Tooltip headline="PreparedContext" tip="A bounded view for this request. It carries Citations. It is not a durable asset." cta="Read the mental model" href="/en/mental-model/overview">PreparedContext</Tooltip>. Then revise it, retire it, and confirm the history is still there.
 
-## Interface roles
+<img src="/assets/basic-first-loop-en.svg" alt="The first loop: write a Memory, find it, then get a cited PreparedContext." />
 
-Every remote PowerContext interface connects to the same Server and durable data.
+<Info>
+Field names and error codes follow the latest published [official docs](https://oceanbase.github.io/powercontext/). This page helps you run the first loop.
+</Info>
 
-| Interface | Best fit |
+## Four doors, the same data
+
+HTTP, the Python Client, MCP, and the CLI all talk to the same Server. Coverage differs.
+
+| Door | Best fit |
 |---|---|
-| HTTP | Cross-language service integration; OpenAPI is the complete contract |
-| Python Client | Typed async calls from Python applications |
-| MCP | A curated agent-facing tool surface, not the complete HTTP API |
-| CLI | Installation, diagnostics, Server management, and human Review |
+| HTTP | Cross-language service integration. Official docs own the full field list |
+| Python Client | Typed async calls from Python |
+| MCP | Tools an Agent calls explicitly, not the full HTTP API |
+| CLI | Install, diagnose, manage the Server, and do human Review |
 
-Discover the HTTP contract from the running Server:
+The local Server can also open its API notes:
 
 ```text
 http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/openapi.json
 ```
 
-`/docs` is a public API reference page. It still opens after you enable Server auth. `/openapi.json` and the API calls themselves need a Bearer header. Do not place a token in the URL.
+`/docs` is a public API notes page. It still opens after you enable Server auth. `/openapi.json` and the API calls themselves need a Bearer header. Do not put a token in the URL. The full field list still follows the [official docs](https://oceanbase.github.io/powercontext/).
 
 ## Prepare the example project
 
@@ -207,13 +218,13 @@ Run it:
 uv run python api_tour.py
 ```
 
-Each run uses a unique Scope so old tutorial data does not break duplicate, entry-count, or Revision assertions. A real project should use a stable project or tenant Scope instead of a random value.
+Each run uses a unique Scope so old tutorial data does not break duplicate, entry-count, or Revision assertions. A real project should use a stable project Scope, not a random value.
 
-## What the script verifies
+## What this script proves
 
-### Explicit Memory needs no Source
+### Writing Memory does not need a Source first
 
-`remember_memory` writes already-curated durable knowledge. `source_refs` is normally empty in this example.
+`remember_memory` writes long-term knowledge you already accept. `source_refs` is normally empty in this example.
 
 The first effective write returns:
 
@@ -224,7 +235,7 @@ The first effective write returns:
 
 Identical active content is a no-op. The response keeps the current Memory ref, but `entry` is `null`. Do not assume that every `remember_memory` response has `response.entry.citation`.
 
-### Search has two empty cases
+### Empty search has two normal cases
 
 The Scope has no Memory lifecycle:
 
@@ -242,11 +253,11 @@ mode = fts/vector/hybrid
 hits = []
 ```
 
-Both are normal domain results under HTTP 200.
+Both are normal results under HTTP 200.
 
-### PreparedContext is the final envelope
+### PreparedContext is already the final envelope
 
-`prepared.content` already contains the trust marker, boundaries, and Citations. A host may inject it into the current model request as untrusted historical evidence. It should not rebuild the value from search hits.
+`prepared.content` already contains the trust marker, boundaries, and Citations. An Agent can put it into this request as untrusted historical evidence. Do not rebuild it from search hits.
 
 When `status="empty"`:
 
@@ -257,13 +268,13 @@ content_bytes = 0
 
 When `status="ready"`, the actual UTF-8 length equals `content_bytes` and does not exceed request `max_bytes`.
 
-### Exact read and mutation use different version rules
+### Reading history and changing content use different version rules
 
-An old Citation remains valid for `get_memory_entry` historical reads.
+An old Citation can still read history through `get_memory_entry`.
 
-`revise_memory_entry` and `retire_memory_entry` accept only a current-head Citation. After any Memory mutation advances the Revision, an older Citation returns HTTP 409 `revision_conflict`.
+`revise_memory_entry` and `retire_memory_entry` accept only the current-head Citation. After a Memory change moves the Revision forward, changing with the old Citation returns HTTP 409 `revision_conflict`.
 
-Use the new Citation returned by the mutation response.
+Use the new Citation from the change response.
 
 ### Retire does not delete
 
@@ -274,7 +285,7 @@ After retirement:
 - `include_inactive=True` still supports audit;
 - exact historical read still works.
 
-## Handle Client errors
+## What to read when it fails
 
 The Python Client keeps the HTTP status, stable error code, Server message, and `X-PowerContext-Request-ID`.
 
@@ -305,26 +316,37 @@ Common statuses:
 | 422 | The request or capability violates the contract |
 | 503 | A required Runtime binding or dependency is unavailable |
 
-After a 409, read the current value before deciding whether to retry. Do not guess the Revision.
+After a 409, read the current value before you decide whether to retry. Do not guess the Revision.
 
-## MCP and HTTP have different coverage
+## MCP and HTTP do not cover the same surface
 
-MCP is a curated tool surface for agents. HTTP is the complete application contract.
+MCP is the tool set an Agent calls explicitly. HTTP is the full API.
 
-`POST /v1/context/prepare` and Python Client `prepare_context` are not MCP tools because a hook or framework adapter normally prepares final context at request time. MCP also does not reproduce every integration's automatic capture and flush lifecycle.
+`POST /v1/context/prepare` and Python Client `prepare_context` are not MCP tools. A hook or framework adapter usually prepares the final PreparedContext at request time. MCP also does not reproduce each integration's automatic recall, capture, and flush.
 
-To connect a client and see which tools it can call, open [Connect with MCP](/en/basic-usage/mcp).
+To connect a client and see which tools you can call, open [Connect with MCP](/en/basic-usage/mcp).
 
-## Completion check
+## How you know it worked
 
-The script should prove that:
+The terminal should show:
 
-- the first remember returns an exact entry Citation;
-- a duplicate is a no-op with `entry=None`;
-- FTS/auto search finds the active entry;
-- PreparedContext is `ready` with a matching byte count;
-- the old Citation remains readable after revise;
-- mutation with the old Citation returns 409;
-- default listing is empty after retire, while audit finds the inactive entry.
+- The first write returns an exact entry Citation.
+- A duplicate write is a no-op with `entry=None`.
+- Full-text search / `auto` finds the active entry.
+- PreparedContext is `ready`, and the byte count matches.
+- After revise, the old Citation still reads exactly.
+- Changing with the old Citation returns 409.
+- After retire, the default list is empty. Inactive history is still readable.
 
-To see that Memory in the UI, open [See the Memory you just wrote](/en/basic-usage/dashboard). Next, compare [explicit Memory with Source extraction](/en/basic-usage/source-and-memory).
+If this does not match, start with [Troubleshooting](/en/start/troubleshooting).
+
+## Next step
+
+<Columns cols={2}>
+  <Card title="Check the counts in Dashboard" icon="layout-dashboard" href="/en/basic-usage/dashboard" arrow="true" cta="Open the Dashboard">
+    The Dashboard does not show Memory text. Configure the Scope you just used and check `total=1`, `active=0`, and `inactive=1`.
+  </Card>
+  <Card title="Source and Memory" icon="file-plus" href="/en/basic-usage/source-and-memory" arrow="true" cta="See the other path">
+    The next path captures a Source first, then extracts Memory. A successful capture does not mean knowledge stayed.
+  </Card>
+</Columns>

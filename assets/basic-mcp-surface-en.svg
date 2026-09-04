@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="360" viewBox="0 0 1080 360" role="img" aria-labelledby="title description">
+  <title id="title">Same data, three doors</title>
+  <desc id="description">HTTP, the Python Client, and MCP reach the same Server. MCP is not the full HTTP API.</desc>
+  <defs>
+    <marker id="mcp-surface-en" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="arrowhead" d="M0 0L10 5L0 10Z" />
+    </marker>
+  </defs>
+  <style>
+    .background { fill: #fbfcfe; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .secondary { fill: #626b7a; }
+    .quiet { fill: #8b94a3; }
+    .chip { fill: #ffffff; stroke: #cbd3df; }
+    .chip-accent { fill: #eef5ff; stroke: #006dff; }
+    .soft { fill: #f7f9fc; stroke: #cbd3df; }
+    .flow { fill: none; stroke: #9aa5b4; }
+    .arrowhead { fill: #9aa5b4; }
+    .accent-fill { fill: #006dff; }
+    .track { fill: #e8edf4; }
+    .door { fill: #ffffff; stroke: #cbd3df; }
+    .vault { fill: #eef5ff; stroke: #006dff; }
+    .chrome { fill: #f7f9fc; stroke: #cbd3df; }
+    .dot-a { fill: #ff5f57; }
+    .dot-b { fill: #febc2e; }
+    .dot-c { fill: #28c840; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .secondary { fill: #9aa4b2; }
+      .quiet { fill: #7d8590; }
+      .chip { fill: #161b22; stroke: #3b434d; }
+      .chip-accent { fill: #122033; stroke: #58a6ff; }
+      .soft { fill: #0d1117; stroke: #3b434d; }
+      .flow { stroke: #66707d; }
+      .arrowhead { fill: #66707d; }
+      .accent-fill { fill: #58a6ff; }
+      .track { fill: #21262d; }
+      .door { fill: #161b22; stroke: #3b434d; }
+      .vault { fill: #122033; stroke: #58a6ff; }
+      .chrome { fill: #161b22; stroke: #3b434d; }
+    }
+</style>
+  <rect class="background" width="1080" height="360" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="359" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="heading" x="48" y="48" font-size="24" font-weight="650">Same data, <tspan class="accent-text">three doors</tspan></text>
+    <text class="secondary" x="48" y="74" font-size="13">Coverage differs. MCP only exposes tools you call explicitly.</text>
+    <rect class="vault" x="180" y="248" width="720" height="88" rx="16" />
+    <text class="heading" x="540" y="284" font-size="16" font-weight="650" text-anchor="middle">PowerContext Server</text>
+    <text class="quiet" x="540" y="306" font-size="12" text-anchor="middle">The same data</text>
+    <rect class="door" x="80" y="150" width="280" height="64" rx="8" />
+    <text class="heading" x="220" y="178" font-size="14" font-weight="600" text-anchor="middle">HTTP</text>
+    <text class="quiet" x="220" y="198" font-size="11" text-anchor="middle">Full API</text>
+    <path class="flow" d="M220 214V248" stroke-width="14" />
+    <rect class="door" x="430" y="150" width="220" height="64" rx="8" />
+    <text class="heading" x="540" y="178" font-size="14" font-weight="600" text-anchor="middle">Python Client</text>
+    <text class="quiet" x="540" y="198" font-size="11" text-anchor="middle">Typed calls</text>
+    <path class="flow" d="M540 214V248" stroke-width="10" />
+    <rect class="chip-accent" x="780" y="150" width="160" height="64" rx="8" />
+    <text class="heading" x="860" y="178" font-size="14" font-weight="600" text-anchor="middle">MCP</text>
+    <text class="quiet" x="860" y="198" font-size="11" text-anchor="middle">Explicit Agent tools</text>
+    <path class="flow" d="M860 214V248" stroke-width="6" />
+  </g>
+</svg>

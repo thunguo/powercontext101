@@ -1,15 +1,21 @@
 ---
 title: "Handoff"
-description: "A Handoff packages current work for inspection. Commit happens only when the work needs a durable milestone."
+description: "A Handoff packages current work for the next actor. It stays temporary until you commit it."
+icon: hand
+keywords:
+  - Handoff
+  - Work Contract
+  - Task Outcome
+  - Memory
 ---
 
-Memory keeps project knowledge that should matter later. Handoff handles work in progress: the objective, verified state, blockers, and what the receiver should do next.
+<Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> keeps project knowledge that should matter later. A <Tooltip headline="Handoff" tip="Packages the current objective, verified progress, blockers, and next action. It stays temporary until an explicit commit." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip> handles work in progress: the objective, verified state, blockers, and what the receiver should do next.
 
 A Memory entry is often short. A useful Handoff gives the receiver enough evidence to check the state and decide whether they have the capability and authorization to continue.
 
 ## Choose Memory or Handoff
 
-Start with the reader who needs the information. Memory preserves reusable knowledge; Handoff preserves enough current state for another actor to continue a specific task.
+Start with the reader who needs the information. Memory preserves reusable knowledge. Handoff preserves enough current state for another actor to continue a specific task.
 
 | Content | Use |
 |---|---|
@@ -209,14 +215,25 @@ Documentation and callers should report that actual state.
   </Accordion>
 </AccordionGroup>
 
-## Checklist
+## How you know the layers are separate
 
-- Are Memory and Handoff separated as durable knowledge and current task state?
-- Are Prepared and committed Handoffs separate?
-- Does the page mention the boundary Source written by `handoff_current_work`?
-- Does latest discovery become exact acknowledgement?
-- Do receiver checks cover evidence, live state, capability, and authorization?
-- Does Outcome link an accepted receipt?
-- Does Report remain a projection?
+1. Are Memory and Handoff separated as durable knowledge and current task state?
+2. Are Prepared and committed Handoffs separate?
+3. Does the page mention the boundary Source written by `handoff_current_work`?
+4. Does latest discovery become exact acknowledgement?
+5. Do receiver checks cover evidence, live state, capability, and authorization?
+6. Does Outcome link an accepted receipt?
+7. Does Report remain a projection?
 
-Continue with [Experience and Skill](/en/mental-model/experience-and-skill). Once work finishes, exact evidence may support reusable judgment, but Review still controls approval.
+When the objects are clear, run the [Handoff loop](/en/basic-usage/handoff-loop). After the work finishes, exact evidence may support reusable judgment, but Review still controls approval.
+
+## Next
+
+<Columns cols={2}>
+  <Card title="See review before retention" icon="award" href="/en/mental-model/experience-and-skill" arrow="true" cta="Read Experience and Skill">
+    After the work finishes, exact evidence may become judgment or a repeatable method. Successful generation is not approval.
+  </Card>
+  <Card title="Run a real handoff" icon="hand" href="/en/basic-usage/handoff-loop" arrow="true" cta="Start the Handoff loop">
+    Prepare a temporary package first. Commit it only when you want a durable milestone.
+  </Card>
+</Columns>

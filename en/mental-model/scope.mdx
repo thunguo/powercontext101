@@ -1,13 +1,19 @@
 ---
 title: "Scope"
-description: "A Scope selects one isolated set of data. It is not identity, authentication, or tool authorization."
+description: "A wrong Scope rarely errors. Search is just empty."
+icon: split
+keywords:
+  - Scope
+  - scope_id
+  - Memory
+  - Dashboard
 ---
 
 Most PowerContext operations require a `scope_id`. That value decides which set of data the request reads or writes.
 
-A wrong Scope often looks like missing data: “I wrote this already, so why is search empty?” The more serious failure is using one Scope for projects or tenants that should remain separate.
+A wrong <Tooltip headline="Scope" tip="Selects which data set this request reads or writes. A wrong value rarely errors. Search is just empty." cta="Read Scope" href="/en/mental-model/scope">Scope</Tooltip> often looks like missing data: “I wrote this already, so why is search empty?” The more serious failure is using one Scope for projects or tenants that should remain separate.
 
-Resolve Scope as an application decision, not a convenience fallback. In a multi-tenant service, authentication and authorization choose the allowed tenant/project first; only then should the adapter receive the corresponding `scope_id`.
+Resolve Scope as an application decision, not a convenience fallback. In a multi-tenant service, authentication and authorization choose the allowed tenant/project first. Only then should the adapter receive the corresponding `scope_id`.
 
 ## What Scope isolates
 
@@ -21,18 +27,7 @@ PowerContext keeps related state under the same `scope_id`:
 
 Another Scope cannot read this data unless the application writes it there separately.
 
-```mermaid
-flowchart LR
-  A[scope: project-a] --> AS[Sources]
-  A --> AM[Memory]
-  A --> AC[Candidates]
-  A --> AH[Handoffs]
-
-  B[scope: project-b] --> BS[Sources]
-  B --> BM[Memory]
-  B --> BC[Candidates]
-  B --> BH[Handoffs]
-```
+<img src="/assets/mental-scope-wall-en.svg" alt="Scope is a wall. What you wrote on this side stays invisible over there." />
 
 ## What Scope does not do
 
@@ -117,7 +112,7 @@ Writes in one Scope are serialized to protect head and cursor updates. Read-only
 
 ### A write succeeded, but the Dashboard is empty
 
-Check that the Dashboard and client use exactly the same Scope. Changing the database URL also reveals a different data set and can look like a Scope problem. Walk through [See the Memory you just wrote](/en/basic-usage/dashboard).
+Check that the Dashboard and client use exactly the same Scope. Changing the database URL also reveals a different data set and can look like a Scope problem. Walk through [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard).
 
 ### Two tenants see the same Memory
 
@@ -131,12 +126,23 @@ LangGraph does not fall back to a local path hash when no network Git remote is 
 
 The application probably used a session ID as Scope. Use a stable project or tenant Scope instead.
 
-## Checklist
+## How you know the boundary holds
 
-- Is the Scope stable and free of credentials?
-- Does a multi-tenant application authorize first and select Scope second?
-- Do hosts that should share data resolve to exactly the same value?
-- Did you assume that all adapters use the same fallback?
-- Did you mistake cache eviction for deletion of durable data?
+1. Is the Scope stable and free of credentials?
+2. Does a multi-tenant application authorize first and select Scope second?
+3. Do hosts that should share data resolve to exactly the same value?
+4. Did you assume that all adapters use the same fallback?
+5. Did you mistake cache eviction for deletion of durable data?
 
-Continue with [fail-open](/en/mental-model/fail-open) to decide which failures may leave the original task running and which operations must report an error.
+If any of those fail, start with [Troubleshooting](/en/start/troubleshooting). Continue with [fail-open](/en/mental-model/fail-open) to decide which failures may leave the original task running and which operations must report an error.
+
+## Next
+
+<Columns cols={2}>
+  <Card title="See which failures may continue" icon="shield" href="/en/mental-model/fail-open" arrow="true" cta="Read fail-open">
+    If automatic recall fails, keep working. If you explicitly ask to write, the failure must stay visible.
+  </Card>
+  <Card title="Match the closest failure" icon="wrench" href="/en/start/troubleshooting" arrow="true" cta="Open troubleshooting">
+    Search is empty, the page is blank, or doctor passed and it still fails? Start with a case this site already covers.
+  </Card>
+</Columns>

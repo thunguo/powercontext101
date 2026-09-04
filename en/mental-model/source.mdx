@@ -1,15 +1,25 @@
 ---
 title: "Source"
-description: "A Source keeps identifiable work evidence. Journal position, processing cursor, and Memory belong to later layers."
+description: "A successful capture is not durable knowledge. A Source only proves that something happened."
+icon: file-plus
+keywords:
+  - Source
+  - Memory
+  - flush_memory
+  - SourceWindowTrigger
 ---
 
-A Source records what happened. A user prompt, task result, or host-captured turn may all become Sources.
+Capture may succeed while <Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> search stays empty. That is usually not a failed write.
 
-It does not decide whether the content deserves long-term retention. Memory, Experience, Skill, and Handoff handle those later decisions.
+A <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> records what happened. A user prompt, task result, or host-captured turn may all become Sources. It does not decide whether the content deserves long-term retention. Memory, Experience, Skill, and Handoff handle those later decisions.
 
-That separation explains a common result: capture may succeed while Memory search remains empty. The Source is safely stored, but no extraction window has produced reusable knowledge yet. Treat those as two observable stages, not one failed write.
+Treat those as two observable stages. The Source is safely stored. No extraction window has produced reusable knowledge yet.
 
-## Stable identity
+<Info>
+For install options, interface details, and deployment, use the latest published [official docs](https://oceanbase.github.io/powercontext/). This page helps you separate evidence, journal position, and processing progress.
+</Info>
+
+## Get a stable identity first
 
 PowerContext refers to a Source with two fields:
 
@@ -36,7 +46,7 @@ For the built-in content Source, capture returns a SourceRef and a scope-local j
 
 A `source_id` should be stable and reproducible. Hosts often derive it from the Scope, session, turn, or content so a retry stays idempotent.
 
-## Captured and referenced Sources
+## Captured and referenced Sources differ
 
 A Source adapter uses one of two materialization modes.
 
@@ -67,7 +77,7 @@ content/openapi-task-2 → position 2
 
 The Source journal establishes order. It does not say which Source has been processed or whether Memory exists.
 
-## The trigger selects a window
+## The trigger only selects a window
 
 `SourceWindowTrigger` is pure policy. It compares the high watermark with the current cursor and returns the next bounded window:
 
@@ -173,7 +183,7 @@ Check four things:
 
 Then decide whether the content should remain evidence or become explicit Memory. Most Sources do not need to become long-term knowledge.
 
-## Troubleshooting order
+## If you get stuck, match these first
 
 ### Capture succeeded, but Memory did not change
 
@@ -191,13 +201,24 @@ The `source_id` was probably reused with different canonical content or metadata
 
 That is expected when they use the same Scope and Server. All adapters share the scope-local journal.
 
-## Checklist
+## How you know the layers are separate
 
-- Does Source identity include the ideas of Scope, type, and ID?
-- Are journal position and cursor sequence separate?
-- Are cursor sequence and cursor generation separate?
-- Is the window understood as `(after, through]`?
-- Did capture remain separate from Memory write?
-- Does an idempotent retry keep the original position?
+1. Does Source identity include Scope, type, and ID?
+2. Are journal position and cursor sequence separate?
+3. Are cursor sequence and cursor generation separate?
+4. Is the window understood as `(after, through]`?
+5. Did capture remain separate from Memory write?
+6. Does an idempotent retry keep the original position?
 
-Continue with [Memory](/en/mental-model/memory) to see how Sources can become durable knowledge and why an explicit Memory write does not require a Source first.
+If any of those fail, start with [Troubleshooting](/en/start/troubleshooting). To walk capture and extraction yourself, use [Source and Memory in practice](/en/basic-usage/source-and-memory).
+
+## Next
+
+<Columns cols={2}>
+  <Card title="See how durable knowledge stays" icon="library" href="/en/mental-model/memory" arrow="true" cta="Read Memory">
+    Memory answers what the project should remember later. An explicit write does not need a Source first.
+  </Card>
+  <Card title="Walk a capture yourself" icon="file-plus" href="/en/basic-usage/source-and-memory" arrow="true" cta="Start Source and Memory">
+    When the objects are clear, capture a Source and check whether it becomes Memory.
+  </Card>
+</Columns>

@@ -1,24 +1,35 @@
 ---
 title: "Source and Memory in practice"
-description: "Compare explicit Memory with Source extraction and verify real lineage through position, cursor, and source_refs."
+description: "Capture a Source first, then extract Memory. A successful capture does not mean knowledge stayed."
+icon: file-plus
+keywords:
+  - Source
+  - Memory
+  - flush_memory
 ---
 
-The previous page wrote already-curated Memory directly. Now follow the other path: capture Source first, then let a generation pipeline extract durable knowledge from the evidence.
+The previous page wrote a Memory you already accept. Now take the other path: capture a <Tooltip headline="Source" tip="Records that something happened. Capture does not become durable knowledge by itself." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> first, then let generation extract knowledge you will reuse later.
 
-Both paths may produce Memory. Their prerequisites, lineage, and failure behavior differ.
+Both paths may produce <Tooltip headline="Memory" tip="Selected project knowledge you will reuse later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip>. Their premises, lineage, and failure modes differ.
 
-## Compare the two paths
+<img src="/assets/basic-source-memory-en.svg" alt="Two paths can leave Memory: write it, or capture then extract." />
 
-Both paths end in Memory, but they establish different evidence. An explicit write records a fact you have already decided to keep; extraction starts with Source and may produce no Memory.
+<Info>
+Generation models and extraction settings follow the latest published [official docs](https://oceanbase.github.io/powercontext/). This page helps you see how the two paths differ, and how to check lineage.
+</Info>
+
+## Compare the two paths first
+
+An explicit write keeps what you already decided to keep. Extraction stores a Source first, and it may produce no Memory.
 
 | Path | Model required | Creates Source first | Best fit |
 |---|---:|---:|---|
 | `remember_memory` | No | No | A fact, decision, or constraint you already know should be retained |
 | capture → flush/scheduler → extraction | Yes | Yes | Finding reusable knowledge in a set of work evidence |
 
-When the agent already has an explicit instruction to remember a decision, direct remember is simpler. Do not manufacture a Source merely to create prettier lineage.
+If the Agent already has an explicit instruction to remember a decision, write it directly. Do not invent a Source just to make the lineage look nicer.
 
-Conversely, a prompt captured automatically by a host should usually remain Source evidence first. Whether it deserves Memory is a later decision.
+A prompt captured automatically should usually stay a Source first. Whether it deserves Memory is a later decision.
 
 ## Check extraction capability
 
@@ -319,16 +330,27 @@ The query found older similar Memory in the same Scope. Use `source_refs` and th
 
 Content or metadata bytes changed under one `source_id`. Use a new ID for a new event; reuse the original input for a retry.
 
-## Completion check
+## How you know it worked
 
-The observable result is:
+After this page, you should be able to show that:
 
-- capture creates Source, not Memory;
-- replay keeps the original position;
-- the flush cursor reaches the capture position;
-- the source-linked entry is identified through exact `source_refs`;
-- a processed window may validly produce no-op;
-- cross-process recall depends on stable Scope;
-- an inactive entry leaves default recall while history remains.
+- Capture creates a Source. It does not create Memory by itself.
+- The same input replayed keeps the original position.
+- After flush, the cursor reaches the capture position.
+- The entry linked to this Source is identified by exact `source_refs`.
+- A processed window may legally leave no Memory.
+- Finding it again in another process depends on a stable Scope.
+- An inactive entry leaves default recall. History remains.
 
-Continue with the [Handoff loop](/en/basic-usage/handoff-loop).
+If this does not match, start with [Troubleshooting](/en/start/troubleshooting).
+
+## Next step
+
+<Columns cols={2}>
+  <Card title="Handoff loop" icon="hand" href="/en/basic-usage/handoff-loop" arrow="true" cta="Run a handoff">
+    Preparing writes a boundary Source. Commit creates the milestone.
+  </Card>
+  <Card title="If you are stuck" icon="wrench" href="/en/start/troubleshooting" arrow="true" cta="Open troubleshooting">
+    Capture succeeded, but search finds no Memory. Start there.
+  </Card>
+</Columns>

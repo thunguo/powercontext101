@@ -1,22 +1,31 @@
 ---
 title: "Verify Scope statistics in the Dashboard"
-description: "Configure the same Scope as the Client and verify active, inactive, and total statistics."
+description: "The Dashboard does not show Memory text. Use the same Scope and check the counts."
+icon: layout-dashboard
+keywords:
+  - Dashboard
+  - Scope
+  - Memory
 ---
 
-The Dashboard is the Server's read-only statistics interface. It stores no second copy of data and does not discover every Scope automatically. More importantly, the current UI does not display Memory text or Citations. It can confirm that a Scope contains data, show active/inactive/total Memory counts, and expose Source, Candidate, usage, and recall statistics.
+The Dashboard is the Server's read-only statistics page. It does not store a second copy of the data, and it does not discover every <Tooltip headline="Scope" tip="Chooses which isolated data set this request reads and writes. A mismatch usually looks like a miss, not an error." cta="Read Scope" href="/en/mental-model/scope">Scope</Tooltip> automatically. More importantly, it does not show Memory text or Citations today.
 
-That changes the goal. The API tour retires its example Memory before finishing, so the Dashboard should not show “the Memory you just wrote” as active content. The correct result for that Scope is `total=1`, `active=0`, and `inactive=1`.
+You can use it to confirm that a Scope has data, see how Memory entries are split, and watch Source, Candidate, and recall counts change.
 
-## Configure the exact Scope
+<img src="/assets/basic-dashboard-scope-en.svg" alt="The Dashboard checks counts: the same Scope and the same database." />
 
-The API tour prints a UUID-bearing `scope:` value. Copy the full value. Add it to `.env`:
+The [API tour](/en/basic-usage/api-tour) retires its example Memory before it finishes. So the Dashboard should not show “the Memory you just wrote” as text. The correct result for that Scope is `total=1`, `active=0`, and `inactive=1`.
+
+## Configure the same Scope
+
+The API tour prints a `scope:` value with a UUID. Copy the full value. Do not take only the prefix. Add it to `.env`:
 
 ```bash
 POWERCONTEXT_SERVER_DASHBOARD_ENABLED=true
 POWERCONTEXT_SERVER_DASHBOARD_SCOPES=[{"scope_id":"PASTE_THE_FULL_SCOPE","display_name":"PowerContext 101 API tour"}]
 ```
 
-The CLI does not load `.env` implicitly:
+The CLI does not load `.env` on its own, so start the Server explicitly:
 
 ```bash
 powercontext server run --env-file .env
@@ -28,16 +37,31 @@ Open:
 http://127.0.0.1:8000/
 ```
 
-Select the configured Scope. Statistics should show one Memory entry, now inactive. The Dashboard reports counts only. To inspect text, use the Python Client with `list_memory_entries(include_inactive=True)` or read the exact Citation.
+Select the Scope you just configured. Statistics should show one Memory entry, now inactive. The Dashboard reports counts only. To inspect the text, go back to the Python Client and use `list_memory_entries(include_inactive=True)` or read the exact Citation.
 
-If the page opens with no Scope options, confirm that the running Server loaded `POWERCONTEXT_SERVER_DASHBOARD_SCOPES`. If the Scope exists but every count is zero, verify that Dashboard and Client use the same database URL or `POWERCONTEXT_HOME`. Changing either the database or Scope produces a similar “missing data” symptom.
+If the page opens with no Scope options, confirm that the running Server loaded `POWERCONTEXT_SERVER_DASHBOARD_SCOPES`. If the Scope is listed but every count is zero, check that the Client and Dashboard use the same database URL or `POWERCONTEXT_HOME`. Changing the data directory and changing the Scope both look like missing data.
 
 <Warning>
-Dashboard publication sends an approved managed Skill to a preconfigured target. It is unrelated to this statistics check and is not `powercontext skill export`.
+Dashboard publication sends an approved managed Skill to a preconfigured target. It is unrelated to this count check and is not `powercontext skill export`.
 </Warning>
 
-With Bearer authentication enabled, `/` still opens, but Dashboard statistics requests need the Server token. Enter it in the page prompt; never place it in the URL.
+With Bearer enabled, `/` still opens, but Dashboard statistics requests need the same Server token. Enter it in the page prompt. Never put it in the URL.
 
-The proof of success is statistical agreement between Dashboard and Client for one Scope and database, not visible Memory text. Use Client, HTTP, or MCP for exact content and history.
+## How you know it worked
 
-If the counts still disagree after Scope and database settings match, stop here. Restart the Server with the intended `--env-file`, repeat the API tour against that process, and compare the printed Scope literally. An empty or mismatched Dashboard is a configuration failure, not evidence that Memory was deleted.
+Success is matching counts between Dashboard and Client for one Scope and one database, not visible Memory text. Use the Client, HTTP, or MCP for exact content and history.
+
+If Scope and the database already match and the counts still disagree, stop here. Restart the Server with the intended `--env-file`, rerun the API tour against that process, and compare the printed Scope literally. An empty or mismatched Dashboard is a configuration failure. It is not evidence that Memory was deleted.
+
+If this does not match, start with [Troubleshooting](/en/start/troubleshooting).
+
+## Next step
+
+<Columns cols={2}>
+  <Card title="Source and Memory" icon="file-plus" href="/en/basic-usage/source-and-memory" arrow="true" cta="See the other path">
+    Capture a Source first, then extract Memory. A successful capture does not mean knowledge stayed.
+  </Card>
+  <Card title="If you are stuck" icon="wrench" href="/en/start/troubleshooting" arrow="true" cta="Open troubleshooting">
+    The page is empty, or the counts do not match. Start there.
+  </Card>
+</Columns>

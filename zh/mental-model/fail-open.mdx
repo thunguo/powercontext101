@@ -1,6 +1,12 @@
 ---
 title: "fail-open 与 PreparedContext"
-description: "自动上下文增强失败时继续原任务；显式持久操作失败时明确报错。"
+description: "自动找回失败时，手头工作还应继续。你明确要求写入时，失败必须看得见。"
+icon: shield
+keywords:
+  - fail-open
+  - PreparedContext
+  - Memory
+  - Handoff
 ---
 
 PowerContext 是宿主任务旁边的一层上下文能力。Server 暂时不可用时，写代码、回答问题或继续工作不应该一起停下。
@@ -26,7 +32,7 @@ Server 从当前启用状态 Memory 和已批准当前 Experience 中选择相�
 
 `empty` 不是 Server 故障，也不是认证失败。
 
-PreparedContext 带精确 Citation，并使用明确的信任标记：
+<Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 带精确 Citation，并使用明确的信任标记：
 
 ```text
 BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
@@ -131,7 +137,7 @@ PowerContext 客户端拒绝非本机回环地址的明文 HTTP。Server 绑定�
 
 ## `degraded` 不等于 `not_ready`
 
-就绪探测 把数据库故障和可选推理故障分开：
+就绪探测把数据库故障和可选推理故障分开：
 
 - 数据库/运行时不可用：`not_ready`，HTTP 503；
 - 已配置的生成或嵌入探测失败：`degraded`，HTTP 200；
@@ -171,4 +177,22 @@ PowerContext 客户端拒绝非本机回环地址的明文 HTTP。Server 绑定�
 
 自动辅助路径通常可以继续。任何会改变长期状态、批准内容或发布文件的动作，都必须返回真实结果。
 
-下一步可以进入[安装并运行 Server](/zh/basic-usage/install-and-run)。启动后分别观察 `ready`、`degraded` 和 Server 完全不可用时的行为。
+## 怎么知道分清了
+
+1. `empty` 是不是被当成了故障或 401/403？
+2. 自动召回失败时，原任务是否还能继续？
+3. 你明确写入 Memory、提交 Handoff、批准或导出时，失败是否看得见？
+4. `degraded` 是不是被误当成整个 Server 离线？
+
+下一步进入[安装并运行 Server](/zh/basic-usage/install-and-run)。启动后分别观察 `ready`、`degraded` 和 Server 完全不可用时的行为。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="启动本地 Server" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始第一条闭环">
+    先写出一条 Memory，搜到它，再拿到带 Citation 的 PreparedContext。
+  </Card>
+  <Card title="对上最像的那条故障" icon="wrench" href="/zh/start/troubleshooting" arrow="true" cta="打开排错">
+    Server 停了却指望自动召回报错，或把 401/403 当成没有内容？先对照已经出现过的情况。
+  </Card>
+</Columns>

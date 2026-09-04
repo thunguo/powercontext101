@@ -1,25 +1,26 @@
 ---
 title: "Handoff 闭环"
-description: "创建工作契约（Work Contract），交接当前工作，确认精确 Handoff，并记录真实 Task Outcome。"
+description: "做一次真正的交接。准备就会写 Source。提交才留下里程碑。"
+icon: hand
+keywords:
+  - Handoff
+  - Work Contract
+  - Task Outcome
 ---
 
-这一页完成一条真正的工作交接：发送方记录委托边界和当前状态，接收方检查精确 Handoff，最后把结果链接回这次交接。
+这一页做一次真正的交接。发送方记下委托边界和当前状态，接收方核对精确 <Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip>，最后把结果链回这次交接。
 
-Handoff 不要求生成模型。示例使用调用方已经检查过的类型化数据，最小 Server 就能运行。
+Handoff 这里不需要生成模型。示例用的是调用方已经核对过的类型化数据，最小 Server 就能跑。
+
+<img src="/assets/basic-handoff-loop-zh.svg" alt="一次真正的交接：工作契约、准备 Handoff、提交、精确确认，再记下 Task Outcome。" />
+
+<Info>
+工作契约（Work Contract）字段和 Handoff 接口以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页帮你把一次交接跑完，并看清哪一步会写 Source。
+</Info>
 
 ## 闭环长什么样
 
-```text
-Work Contract
-→ handoff_current_work
-→ Prepared Handoff
-→ optional commit
-→ continue exact
-→ acknowledge exact
-→ Task Outcome
-```
-
-工作契约、Handoff 边界、确认回执和 Task Outcome 都会留下 Source 回执。已提交 Handoff 另有不可变 Artifact Revision。
+工作契约、Handoff 边界、确认回执和 Task Outcome 都会留下 Source 回执。已提交 Handoff 另有不可变 Artifact Revision。准备就会写边界 Source，所以它不是只读预览。
 
 ## 完整 Python 示例
 
@@ -217,7 +218,7 @@ uv run python handoff_loop.py
 
 ### 工作契约是委托基线
 
-它记录 objective、in-scope 工作、exclusions、完成 criteria、授权信息 备注 和 consequential questions。
+它记录目标、范围内的工作、排除项、完成标准、授权备注和关键问题。
 
 契约是 `untrusted_input` Source，不会扩大当前授权。`basis="verified"` 的声明必须带精确证据；`basis="declared"` 则不能带证据。
 
@@ -235,7 +236,7 @@ PreparedWorkHandoff
 
 这一步没有创建 Handoff Revision，但已经持久化边界 Source。因此，它不是只读预览。
 
-### 已准备 transfer 不需要提交
+### 已准备交接不需要提交
 
 示例先 `continue_handoff(selection="prepared")`，证明临时交接可用。此时 `selected_revision` 是 `None`。
 
@@ -249,7 +250,7 @@ PreparedWorkHandoff
 
 ### 接受有硬性条件
 
-只有下面三项全部已确认，且证据都 可用，才能写 `accepted`：
+只有下面三项全部已确认，且证据都可用，才能写 `accepted`：
 
 ```text
 live_state
@@ -275,7 +276,7 @@ acknowledgement.receipt.source
 
 ## 结果与 Check 状态
 
-整体 `TaskTask Outcome.status` 可选：
+整体 `Task Outcome.status` 可选：
 
 ```text
 succeeded
@@ -322,14 +323,29 @@ unknown
 
 此时边界 Source 已存在，但没有新的 Handoff Revision。向用户报告这个实际状态，不能说“什么都没写”，也不能说“里程碑已保存”。
 
-## 完成检查
+## 怎么知道跑通了
 
-- 工作契约回执已保存；
-- 已准备 Handoff 可以临时继续；
-- 提交返回精确 Handoff Revision；
-- 最新版本发现转成精确确认；
-- 接受前检查证据、实时状态、能力、授权信息；
-- Task Outcome 链接确认回执 SourceRef；
-- overall outcome 与 individual 检查状态没有混用。
+- 工作契约回执已经保存。
+- 已准备 Handoff 可以先临时继续。
+- 提交返回精确 Handoff Revision。
+- 用最新版本找到之后，确认绑到精确 Revision。
+- 接受前核对证据、实时状态、能力和授权。
+- Task Outcome 链到确认回执的 SourceRef。
+- 整体结果和单项检查状态没有混用。
 
-下一页进入 [Experience、Skill 与 Review](/zh/basic-usage/experience-skill-review)。
+对不上时，先对[排错](/zh/start/troubleshooting)。
+
+<Tip>
+自动帮你找回上下文失败时，当前任务还应继续。你明确要求写入 Memory、提交 Handoff、批准或导出时，失败必须能看见。完整说明见 [fail-open](/zh/mental-model/fail-open)。
+</Tip>
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="Experience、Skill 与 Review" icon="scale-balanced" href="/zh/basic-usage/experience-skill-review" arrow="true" cta="先审再留">
+    Candidate 先进入 Review。Skill 批准后还要显式导出。
+  </Card>
+  <Card title="卡住时先对排错" icon="wrench" href="/zh/start/troubleshooting" arrow="true" cta="打开排错">
+    只要预览却调用了 Handoff，先打开排错。
+  </Card>
+</Columns>

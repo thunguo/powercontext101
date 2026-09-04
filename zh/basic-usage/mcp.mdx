@@ -1,11 +1,22 @@
 ---
 title: "用 MCP 连接 Server"
-description: "把 MCP 客户端接到同一套持久数据，并分清它和 HTTP / Python Client 的覆盖面。"
+description: "用 Agent 的工具连上刚才那套数据。MCP 不是完整 HTTP API。"
+icon: plug
+keywords:
+  - MCP
+  - Memory
+  - Handoff
 ---
 
-MCP 是给 Agent 的精选工具面。它连的是同一个 Server、同一套持久数据，**不是**完整 HTTP API。
+MCP 是给 Agent 明确调用的工具。它连的是同一个 Server、同一套数据，**不是**完整 HTTP API。
 
-自动召回、采集和刷新仍由宿主 Hook 或框架适配器负责。MCP 只暴露需要你明确调用的那些操作。
+自动召回、采集和刷新仍由宿主 Hook 或框架适配器负责。MCP 只露出你需要亲自调用的那些操作。
+
+<img src="/assets/basic-mcp-surface-zh.svg" alt="同一套数据，三个入口：HTTP、Python Client 和 MCP。覆盖面不一样。" />
+
+<Info>
+接口字段和错误码以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页只帮你连上 `/mcp`，并分清它能做什么。
+</Info>
 
 ## 默认地址
 
@@ -13,11 +24,11 @@ MCP 是给 Agent 的精选工具面。它连的是同一个 Server、同一套�
 http://127.0.0.1:8000/mcp
 ```
 
-这是 Streamable HTTP。默认只听本机回环地址，未开 Bearer。Server 没启动时，客户端应看到连接失败，而不是一套空工具。
+这是 Streamable HTTP。默认只听本机回环地址，未开 Bearer。Server 没启动时，客户端应看到连接失败，而不是一套看起来正常的空工具。
 
 ## 最小客户端配置
 
-把下面这段合并进宿主的 MCP 配置。不要写本机绝对路径，也不要把令牌放进 URL。
+把下面这段合并进 Agent 的 MCP 配置。不要写本机绝对路径，也不要把令牌放进 URL。
 
 ```json
 {
@@ -30,26 +41,26 @@ http://127.0.0.1:8000/mcp
 }
 ```
 
-有的宿主把类型写成 `streamable-http`。指向同一个 `/mcp` 即可。Codex、Claude Code、WorkBuddy 的字段名和请求头辅助程序不同，那些细节在对应宿主页。
+有的 Agent 把类型写成 `streamable-http`。指向同一个 `/mcp` 即可。Codex、Claude Code、WorkBuddy 的字段名和请求头辅助程序不同，那些细节在对应页面。
 
 ## 能做 / 不能做
 
-MCP 刻意只开放 HTTP 能力的一部分。用这张表判断下一步能否留在 Agent 宿主中完成，还是需要切换到客户端或 HTTP API。
+MCP 刻意只开放 HTTP 能力的一部分。用这张表判断下一步还能不能留在 Agent 里做，还是要换到 Python Client 或 HTTP。
 
 | 能做 | 不能做 |
 |---|---|
-| `remember_memory`、`search_memory`、精确 读取 / 列出 / 修订 / 停用 | `prepare_context`。最终 `PreparedContext` 通常由 Hook 或适配器在请求时准备 |
+| `remember_memory`、`search_memory`、精确读取 / 列出 / 修订 / 停用 | `prepare_context`。最终 `PreparedContext` 通常由 Hook 或适配器在请求时准备 |
 | `capture_content_source` | `flush_memory` |
-| 工作契约（Work Contract）、Handoff、Task Outcome | Skill 生成 / 导出 |
+| 工作契约（Work Contract）、<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip>、Task Outcome | Skill 生成 / 导出 |
 | Candidate 列出 / 读取 / 批准 / 拒绝 / 修订 | Experience 操作 |
-| 与 HTTP、Python Client 读写同一套数据 | 复现每个集成的自动召回 / 采集 / 刷新生命周期 |
+| 与 HTTP、Python Client 读写同一套数据 | 复现每个集成的自动召回 / 采集 / 刷新 |
 
-当前测试里的默认 MCP 工具名就是上表这些操作 id。Handoff report 相关只读工具只在该 feature 打开时出现，不要当成默认面。
+当前测试里的默认 MCP 工具名就是上表这些操作 id。Handoff report 相关只读工具只在该功能打开时出现，不要当成默认面。
 
-MCP 上的 `readOnlyHint` / `destructiveHint` 只给宿主做确认提示。它**不是**授权边界。提案 Agent 仍可能同时拿到批准工具，除非宿主自己撤权。
+MCP 上的 `readOnlyHint` / `destructiveHint` 只给 Agent 做确认提示。它**不是**授权边界。提案 Agent 仍可能同时拿到批准工具，除非宿主自己撤权。
 
 <Warning>
-`handoff_current_work` 会写边界 Source。讨论设计，或说 “预览 与 make no 写入”，不要调用它。
+`handoff_current_work` 会写一条边界 Source。讨论设计，或说 `preview and make no writes`，都不要调用它。
 </Warning>
 
 ## 开启 Bearer 之后
@@ -60,16 +71,29 @@ MCP 上的 `readOnlyHint` / `destructiveHint` 只给宿主做确认提示。它*
 - `/openapi.json` 同样要请求头；
 - `/docs` 仍可公开打开，那不代表 MCP 或 API 已经授权。
 
-不要把令牌放进 URL。宿主应使用它自己的请求头辅助程序或环境变量，例如 Codex 的 `POWERCONTEXT_CODEX_AUTHORIZATION`。
+不要把令牌放进 URL。用该 Agent 自己的请求头辅助程序或环境变量，例如 Codex 的 `POWERCONTEXT_CODEX_AUTHORIZATION`。
 
-401/403 不是 `empty`。工具失败必须可见，不能假装写入成功。
+401/403 不是 `empty`。工具失败必须看得见，不能假装写入成功。
 
-## 完成检查
+## 怎么知道跑通了
 
 - 客户端连上 `http://127.0.0.1:8000/mcp`，能列出 `remember_memory` 和 `search_memory`。
-- 你用 MCP 写入的 Memory，能被 [API 串讲](/zh/basic-usage/api-tour) 的 Python Client 搜到。
+- 你用 MCP 写下的 Memory，能被 [常用 API 串讲](/zh/basic-usage/api-tour) 的 Python Client 搜到。
 - 工具列表里没有 `prepare_context`。
-- 停掉 Server 后再调用 `remember_memory`，失败可见。
-- 开了 Bearer 后，不带请求头的 `/mcp` 不能当已连接。
+- 停掉 Server 后再调用 `remember_memory`，失败看得见。
+- 开了 Bearer 后，不带请求头的 `/mcp` 不能当成已连接。
 
-编程宿主怎么注册 MCP，看 [Codex](/zh/coding-agents/codex)、[Claude Code](/zh/coding-agents/claude-code) 或便携的 [Agent Plugin](/zh/common-agents/agent-plugin)。Agent Plugin 提供可复用的 Skill 与 MCP 配置，但不提供自动召回、采集或 Server 启动。
+<Tip>
+自动帮你找回上下文失败时，当前任务还应继续。你明确要求写入 Memory、提交 Handoff、批准或导出时，失败必须能看见。完整说明见 [fail-open](/zh/mental-model/fail-open)。
+</Tip>
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="用 Dashboard 核对数字" icon="layout-dashboard" href="/zh/basic-usage/dashboard" arrow="true" cta="打开 Dashboard">
+    配上和客户端相同的 Scope，核对统计是否一致。
+  </Card>
+  <Card title="编程 Agent 怎么注册 MCP" icon="terminal" href="/zh/coding-agents/overview" arrow="true" cta="选择编程 Agent">
+    Codex、Claude Code 的字段名不同。便携路径看 [Agent Plugin](/zh/common-agents/agent-plugin)。
+  </Card>
+</Columns>

@@ -1,31 +1,42 @@
 ---
 title: "常用 API 串讲"
-description: "用异步 Python Client 完成显式 Memory 的写入、搜索、准备、修订、停用和历史读取。"
+description: "写出一条 Memory，搜到它，再拿到带 Citation 的 PreparedContext。"
+icon: book-open
+keywords:
+  - Memory
+  - PreparedContext
+  - Python Client
 ---
 
-这里使用最小 Server。没有生成模型，也不需要向量搜索。
+这一页用最小 Server。没有生成模型，也不需要向量搜索。
 
-目标很具体：写入一条项目决策，确认它能被搜索和组装进 `PreparedContext`，然后修订、停用，并验证历史还在。
+先做一件能当场验证的事：写出一条项目决策，搜到它，再把它装进这一次请求的 <Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip>。然后修订、停用，并确认历史还在。
 
-## 接口怎么分工
+<img src="/assets/basic-first-loop-zh.svg" alt="第一条闭环：写出 Memory，搜到它，再拿到带 Citation 的 PreparedContext。" />
 
-PowerContext 的远程接口都连接同一个 Server 和持久数据。
+<Info>
+接口字段和错误码以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页帮你把第一条闭环跑出来。
+</Info>
 
-| 接口 | 适合什么 |
+## 四个入口，同一套数据
+
+HTTP、Python Client、MCP 和 CLI 都连同一个 Server。覆盖面不一样。
+
+| 入口 | 适合什么 |
 |---|---|
-| HTTP | 跨语言服务集成；完整契约以 OpenAPI 为准 |
-| Python Client | Python 应用的类型化异步调用 |
-| MCP | Agent-facing 的精选工具面，不等于完整 HTTP API |
-| CLI | 安装、诊断、Server 管理和人工 Review |
+| HTTP | 跨语言服务接入。完整字段以官方文档为准 |
+| Python Client | 在 Python 里做类型化异步调用 |
+| MCP | 给 Agent 明确调用的工具，不是完整 HTTP API |
+| CLI | 安装、诊断、管理 Server，以及人来做 Review |
 
-HTTP 契约可从当前 Server 查看：
+本地 Server 也可以打开接口说明：
 
 ```text
 http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/openapi.json
 ```
 
-`/docs` 是公开的 API 参考页。开启 Server 认证后它仍可打开。`/openapi.json` 和实际 API 调用需要 Bearer 请求头。不要把令牌放进 URL。
+`/docs` 是公开的接口说明页。开了认证它仍能打开。`/openapi.json` 和实际调用需要 Bearer 请求头。不要把令牌放进 URL。完整字段仍以 [官方文档](https://oceanbase.github.io/powercontext/) 为准。
 
 ## 准备示例项目
 
@@ -207,13 +218,13 @@ if __name__ == "__main__":
 uv run python api_tour.py
 ```
 
-每次运行使用唯一 Scope，避免上一次教程数据让重复写入、条目计数或 Revision 断言失效。真实项目应改用稳定的项目/租户 Scope，而不是随机值。
+每次运行使用唯一 Scope，避免上一次教程数据让重复写入、条目计数或 Revision 断言失效。真实项目应改用稳定的项目 Scope，不要用随机值。
 
-## 这段代码验证了什么
+## 这段脚本在证明什么
 
-### 显式 Memory 不需要 Source
+### 写下 Memory，不需要先有 Source
 
-`remember_memory` 直接写入已经确认的长期知识。示例中 `source_refs` 通常为空。
+`remember_memory` 直接写下你已经确认的长期知识。示例里 `source_refs` 通常是空的。
 
 首次有效写入返回：
 
@@ -222,9 +233,9 @@ uv run python api_tour.py
 - 精确 `entry_version_id`；
 - 当前条目内容和状态。
 
-完全重复的启用状态内容是无变更。它返回当前 Memory 版本引用，但 `entry` 是 `null`。因此，不要假设每次 `remember_memory` 都有 `response.entry.citation`。
+完全重复的启用状态内容是无变更。它返回当前 Memory 版本引用，但 `entry` 是 `null`。所以不要假定每次 `remember_memory` 都有 `response.entry.citation`。
 
-### 搜索的空结果有两种
+### 搜索为空，有两种正常情况
 
 Scope 从未有过 Memory：
 
@@ -242,11 +253,11 @@ mode = fts/vector/hybrid
 hits = []
 ```
 
-两者都是 HTTP 200 下的正常领域结果。
+两者都是 HTTP 200 下的正常结果。
 
 ### PreparedContext 已经是最终封装
 
-`prepared.content` 已包含信任标记、边界和 Citation。宿主可以把它作为不可信历史证据注入当前模型请求，不需要重新拼搜索命中。
+`prepared.content` 已包含信任标记、边界和 Citation。Agent 可以把它当作不可信历史证据放进这一次请求，不必再拼搜索命中。
 
 `status="empty"` 时：
 
@@ -257,15 +268,15 @@ content_bytes = 0
 
 `status="ready"` 时，实际 UTF-8 字节必须等于 `content_bytes`，并且不超过请求的 `max_bytes`。
 
-### 精确读取与修改操作的版本规则不同
+### 读取历史和改内容，用的不是同一套版本规则
 
-旧 Citation 可用于 `get_memory_entry` 读取历史。
+旧 Citation 还能用 `get_memory_entry` 读历史。
 
-`revise_memory_entry` 和 `retire_memory_entry` 只接受当前头版本 Citation。任何 Memory 修改操作推进 Revision 后，旧 Citation 会返回 HTTP 409 `revision_conflict`。
+`revise_memory_entry` 和 `retire_memory_entry` 只接受当前头版本 Citation。Memory 一改，Revision 往前走，旧 Citation 再改会返回 HTTP 409 `revision_conflict`。
 
-用修改操作响应返回的新 Citation 继续下一步。
+下一步用修改响应里的新 Citation。
 
-### 停用不删除
+### 停用不等于删除
 
 停用后：
 
@@ -274,7 +285,7 @@ content_bytes = 0
 - `include_inactive=True` 仍能审计；
 - 精确历史读取仍然有效。
 
-## 客户端错误怎么处理
+## 出错时看什么
 
 Python Client 保留 HTTP 状态、稳定错误 code、Server 消息和 `X-PowerContext-Request-ID`。
 
@@ -305,26 +316,37 @@ except InvalidResponseError as exc:
 | 422 | 请求或能力不满足契约 |
 | 503 | 必需运行时绑定 / 依赖不可用 |
 
-409 后先重新读取当前值，再决定是否重试。不要猜 Revision。
+遇到 409，先重新读取当前值，再决定要不要重试。不要猜 Revision。
 
-## MCP 与 HTTP 不是同一覆盖面
+## MCP 和 HTTP 覆盖面不一样
 
-MCP 是给 Agent 的精选工具面。HTTP 是完整应用契约。
+MCP 是给 Agent 明确调用的工具。HTTP 才是完整接口。
 
-`POST /v1/context/prepare` 和 Python Client 的 `prepare_context` 不作为 MCP 工具暴露，因为最终 PreparedContext 通常由 Hook 或框架适配器在请求时自动准备。MCP 也不等于每个集成的自动采集和刷新生命周期。
+`POST /v1/context/prepare` 和 Python Client 的 `prepare_context` 不会作为 MCP 工具出现。最终 PreparedContext 通常由 Hook 或框架适配器在请求时准备。MCP 也不等于每个集成自己的自动召回、采集和刷新。
 
-要连上客户端、核对能调哪些工具，看[用 MCP 连接 Server](/zh/basic-usage/mcp)。
+要连上客户端、核对自己能调哪些工具，看[用 MCP 连接 Server](/zh/basic-usage/mcp)。
 
-## 完成检查
+## 怎么知道跑通了
 
-脚本应证明：
+终端里应能看到这几件事：
 
-- 首次记住返回精确条目 Citation；
-- 重复写入是 `entry=None` 的无变更；
-- FTS/auto 搜索找到启用状态条目；
-- PreparedContext 是 `ready` 且字节数一致；
-- 修订后旧 Citation 仍可精确读取；
-- 旧 Citation 修改操作返回 409；
-- 停用后默认列出为空，审计仍能读取停用状态条目。
+- 第一次写入返回精确条目 Citation。
+- 重复写入是 `entry=None` 的无变更。
+- 全文搜索 / `auto` 能找到这条启用状态条目。
+- PreparedContext 是 `ready`，字节数对得上。
+- 修订后，旧 Citation 还能精确读到。
+- 用旧 Citation 再改，返回 409。
+- 停用后，默认列表是空的；带上停用状态，历史还在。
 
-要在页面上看到刚写入的 Memory，打开[用 Dashboard 看见刚写的 Memory](/zh/basic-usage/dashboard)。下一页比较[显式 Memory 与 Source 抽取](/zh/basic-usage/source-and-memory)。
+对不上时，先对[排错](/zh/start/troubleshooting)。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="用 Dashboard 核对数字" icon="layout-dashboard" href="/zh/basic-usage/dashboard" arrow="true" cta="打开 Dashboard">
+    Dashboard 不显示 Memory 正文。配上刚才那个 Scope，核对 `total=1`、`active=0`、`inactive=1`。
+  </Card>
+  <Card title="Source 与 Memory" icon="file-plus" href="/zh/basic-usage/source-and-memory" arrow="true" cta="看另一条路径">
+    下一条路是先采集 Source，再抽取 Memory。采集成功不等于留下知识。
+  </Card>
+</Columns>

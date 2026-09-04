@@ -1,22 +1,31 @@
 ---
 title: "用 Dashboard 核对 Scope 统计"
-description: "给 Dashboard 配置与客户端相同的 Scope，并核对启用状态、停用状态和总数统计。"
+description: "Dashboard 不显示 Memory 正文。配上同一个 Scope，核对数字。"
+icon: layout-dashboard
+keywords:
+  - Dashboard
+  - Scope
+  - Memory
 ---
 
-Dashboard 是 Server 自带的只读统计界面。它不会保存第二份数据，也不会自动发现所有 Scope；更重要的是，它当前不展示 Memory 正文或 Citation。你可以用它确认某个 Scope 是否有数据、Memory 条目总数如何分布，以及 Source、Candidate 和召回统计是否变化。
+Dashboard 是 Server 自带的只读统计页。它不会另存一份数据，也不会自动找出所有 <Tooltip headline="Scope" tip="决定这次请求读写哪一组数据。设错时通常不报错，只是搜不到。" cta="阅读 Scope" href="/zh/mental-model/scope">Scope</Tooltip>。更重要的是，它现在不展示 Memory 正文或 Citation。
 
-这一区别会影响本页的目标。上一页 API 串讲最后把示例 Memory 设为停用状态，所以 Dashboard 不应该显示“刚写入的 Memory 正文”。正确结果是同一 Scope 下 `total=1`、`active=0`、`inactive=1`。
+你可以用它确认这个 Scope 有没有数据，Memory 条目怎么分布，以及 Source、Candidate 和召回数字有没有变化。
 
-## 配置同一个 Scope
+<img src="/assets/basic-dashboard-scope-zh.svg" alt="Dashboard 只核对数字：同一 Scope，同一数据库。" />
 
-API 串讲会打印一个带 UUID 的 `scope:`。复制完整值，不要只取前缀。在 `.env` 中配置：
+上一页 [常用 API 串讲](/zh/basic-usage/api-tour) 结束前会把示例 Memory 停用。所以 Dashboard 不应该显示“刚写下的 Memory 正文”。正确结果是同一个 Scope 下 `total=1`、`active=0`、`inactive=1`。
+
+## 配上同一个 Scope
+
+API 串讲会打印一个带 UUID 的 `scope:`。复制完整值，不要只取前缀。写进 `.env`：
 
 ```bash
 POWERCONTEXT_SERVER_DASHBOARD_ENABLED=true
 POWERCONTEXT_SERVER_DASHBOARD_SCOPES=[{"scope_id":"PASTE_THE_FULL_SCOPE","display_name":"PowerContext 101 API tour"}]
 ```
 
-CLI 不会自动读取 `.env`，因此要显式启动：
+CLI 不会自己读 `.env`，所以要显式启动：
 
 ```bash
 powercontext server run --env-file .env
@@ -28,16 +37,31 @@ powercontext server run --env-file .env
 http://127.0.0.1:8000/
 ```
 
-选择刚配置的 Scope。统计中应看到一条 Memory，并且它已经停用状态。Dashboard 只显示统计数；需要核对正文时，回到 Python Client，使用 `list_memory_entries(include_inactive=True)` 或精确 Citation 读取。
+选刚配的 Scope。统计里应看到一条 Memory，并且它已经停用。Dashboard 只显示数字。要核对正文，回到 Python Client，用 `list_memory_entries(include_inactive=True)` 或精确 Citation 读取。
 
-如果页面能打开但 Scope 列表为空，先检查 `POWERCONTEXT_SERVER_DASHBOARD_SCOPES` 是否被当前 Server 进程加载。如果列表有 Scope、统计却全是零，再检查客户端和 Dashboard 是否连接同一个数据库 URL / `POWERCONTEXT_HOME`。更换数据目录与更换 Scope 都会产生“数据消失”的表象。
+页面能打开但 Scope 列表是空的，先检查当前 Server 进程有没有加载 `POWERCONTEXT_SERVER_DASHBOARD_SCOPES`。列表有 Scope、数字却全是零，再检查客户端和 Dashboard 是不是同一个数据库 URL / `POWERCONTEXT_HOME`。换数据目录和换 Scope，看起来都很像“数据没了”。
 
 <Warning>
-Dashboard 发布用于把已批准托管 Skill 发布到预先配置的目标，与本页的统计核对无关，也不同于 `powercontext skill export`。
+Dashboard 发布用于把已批准托管 Skill 发到预先配置的目标。和本页的数字核对无关，也不是 `powercontext skill export`。
 </Warning>
 
-开启 Bearer 后，`/` 仍可打开，但 Dashboard 请求统计时需要同一个 Server 令牌。页面会提示输入令牌；不要把它拼进 URL。
+开了 Bearer 之后，`/` 仍能打开，但 Dashboard 要统计时需要同一个 Server 令牌。页面会提示你输入；不要把它拼进 URL。
 
-成功证据不是“看见 Memory 文本”，而是 Dashboard 与客户端对同一 Scope 和数据库给出一致统计。正文与历史仍由客户端、HTTP 或 MCP 精确读取。
+## 怎么知道跑通了
 
-如果 Scope 和数据库设置已经一致，统计仍然不同，就先停在这里。使用目标 `--env-file` 重启 Server，对这个进程重新运行 API 串讲，再逐字比较脚本打印的 Scope。Dashboard 为空或统计不一致属于配置失败，不能据此判断 Memory 已被删除。
+成功不是“看见 Memory 文本”，而是 Dashboard 和客户端对同一个 Scope、同一套库给出一致数字。正文和历史仍由客户端、HTTP 或 MCP 精确读取。
+
+Scope 和数据库已经一致，数字还对不上，先停在这里。用目标 `--env-file` 重启 Server，对这个进程再跑一遍 API 串讲，再逐字比较脚本打印的 Scope。Dashboard 为空或数字不一致是配置问题，不能据此判断 Memory 被删了。
+
+对不上时，先看[排错](/zh/start/troubleshooting)。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="Source 与 Memory" icon="file-plus" href="/zh/basic-usage/source-and-memory" arrow="true" cta="看另一条路径">
+    先采集 Source，再抽取 Memory。采集成功不等于留下知识。
+  </Card>
+  <Card title="卡住时先对排错" icon="wrench" href="/zh/start/troubleshooting" arrow="true" cta="打开排错">
+    页面是空的，或数字对不上，先打开排错。
+  </Card>
+</Columns>

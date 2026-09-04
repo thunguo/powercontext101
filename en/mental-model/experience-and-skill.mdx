@@ -1,11 +1,17 @@
 ---
 title: "Experience and Skill"
-description: "Experience and managed Skill enter Review as Candidates. Approval, export, and execution are separate steps."
+description: "A well-written model draft is not shipped. Review comes first. Export and execution stay later."
+icon: award
+keywords:
+  - Experience
+  - Skill
+  - Candidate
+  - Review
 ---
 
 Completed work often yields two reusable things: judgment for a similar situation, and a repeatable procedure an agent can follow.
 
-PowerContext stores the first as Experience and the second as managed Skill. Neither may move directly from model output to an approved Artifact.
+PowerContext stores the first as <Tooltip headline="Experience" tip="Approved judgment for similar situations. It enters Review as a Candidate." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Experience</Tooltip> and the second as managed <Tooltip headline="Skill" tip="An approved repeatable method. Export is still required. PowerContext grants no execution authority." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Skill</Tooltip>. Neither may move directly from model output to an approved Artifact.
 
 The distinction changes the review question. For Experience, ask whether the lesson follows from the cited outcome and will help in a similar situation. For Skill, inspect whether another agent can execute the procedure safely, including its checks and permission boundary.
 
@@ -46,22 +52,9 @@ Skill is not ordinary Memory. It never enters PreparedContext and does not appea
 
 ## The shared Candidate lifecycle
 
-```mermaid
-flowchart LR
-  E[Exact Source or Artifact evidence]
-  P[Pending Candidate v1]
-  P2[Pending Candidate v2]
-  R{Review}
-  A[Approved Artifact Revision]
-  X[Rejected Candidate]
+A <Tooltip headline="Candidate" tip="An Experience or Skill proposal awaiting Review." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Candidate</Tooltip> enters <Tooltip headline="Review" tip="Approve creates an Artifact Revision. Reject records the reason and creates no result Artifact." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Review</Tooltip> first. Revise a proposal with `version`. Approval creates an Artifact Revision.
 
-  E -->|propose or generate| P
-  P -->|revise full proposal| P2
-  P --> R
-  P2 --> R
-  R -->|approve| A
-  R -->|reject| X
-```
+<img src="/assets/mental-review-gate-en.svg" alt="Candidates pass Review first. Revise with version. Approval creates an Artifact Revision." />
 
 A Candidate has its own lifecycle:
 
@@ -304,15 +297,26 @@ Direct CLI export does not overwrite. Inspect whether the directory is foreign, 
 
 The target Skill head may have advanced. Read the current target and Candidate again rather than changing expected versions blindly.
 
-## Checklist
+## How you know the layers are separate
 
-- Are Candidate version and Artifact Revision separate?
-- Do propose and generate stop at pending or no-op?
-- Do approve and reject bind the inspected `expected_version`?
-- Does Experience recall use only the approved current head?
-- Does Skill remain outside PreparedContext?
-- Are approval, export, and execution separate?
-- Are Codex and Claude Code the only current export targets listed?
-- Do local drift and conflict prevent overwrite?
+1. Are Candidate version and Artifact Revision separate?
+2. Do propose and generate stop at pending or no-op?
+3. Do approve and reject bind the inspected `expected_version`?
+4. Does Experience recall use only the approved current head?
+5. Does Skill remain outside PreparedContext?
+6. Are approval, export, and execution separate?
+7. Are Codex and Claude Code the only current export targets listed?
+8. Do local drift and conflict prevent overwrite?
 
 The mental model is now complete. Continue with [Install and run the Server](/en/basic-usage/install-and-run) and exercise these objects with real IDs, Citations, and Revisions.
+
+## Next
+
+<Columns cols={2}>
+  <Card title="Start a local Server" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Start the first loop">
+    Write a Memory, find it, then get a cited PreparedContext.
+  </Card>
+  <Card title="Finish one Review" icon="award" href="/en/basic-usage/experience-skill-review" arrow="true" cta="Start Experience / Skill Review">
+    Submit a Candidate from exact evidence, check the version, then approve or reject.
+  </Card>
+</Columns>

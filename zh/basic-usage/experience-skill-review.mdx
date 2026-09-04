@@ -1,9 +1,21 @@
 ---
 title: "Experience、Skill 与 Review"
-description: "从精确证据创建 Candidate，审核精确版本，再显式导出已批准 Skill Revision。"
+description: "先审再留。Skill 批准后还要显式导出。"
+icon: scale-balanced
+keywords:
+  - Experience
+  - Skill
+  - Candidate
+  - Review
 ---
 
-这一页把已完成工作的证据变成 Experience，再把已批准 Experience 写成托管 Skill。重点不在模型写得多漂亮，而在 Review 有没有检查精确证据和 Candidate 版本。
+这一页把做完的工作变成 <Tooltip headline="Experience" tip="已批准的判断经验。先作为 Candidate 进入 Review。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Experience</Tooltip>，再把已批准 Experience 写成托管 <Tooltip headline="Skill" tip="已批准的可重复做法。获批后还要显式导出，不自动获得执行权限。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip>。重点不是模型写得好不好，而是 <Tooltip headline="Review" tip="批准才创建 Artifact Revision。拒绝只记录原因，不创建结果 Artifact。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Review</Tooltip> 有没有核对精确证据和 <Tooltip headline="Candidate" tip="尚待 Review 的 Experience 或 Skill 提案。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip> 版本。
+
+<img src="/assets/basic-review-flow-zh.svg" alt="先审再留：提案进入 Candidate，Review 批准或拒绝，Experience 可召回，Skill 还要导出。" />
+
+<Info>
+Review 和导出命令以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页帮你跑通一条能看见失败的审核路径。
+</Info>
 
 ## 两条创建路径
 
@@ -126,11 +138,11 @@ powercontext candidate show \
 
 - `proposal` 四个字段；
 - 精确 `source_refs` 和 `artifact_refs`；
-- 替换内容才有的 `目标`；
+- 只有替换已有 Artifact 时才有的目标；
 - `status`、`family`、`reason`；
 - 当前 `version`。
 
-不要只读模型总结。打开证据，确认它真的支持 proposed 动作、outcome 和 lesson。
+不要只读模型总结。打开证据，确认它真的支持提案里的动作、结果和教训。
 
 ## 3. 修订是完整替换
 
@@ -159,7 +171,7 @@ powercontext candidate approve \
   CANDIDATE_ID
 ```
 
-应返回 HTTP 409 `Candidate_conflict`。不要把预期版本改成 2 就直接重试；先确认当前 v2 正是你要批准的内容。
+应返回 HTTP 409 `candidate_conflict`。不要把预期版本改成 2 就直接重试；先确认当前 v2 正是你要批准的内容。
 
 ## 4. 批准或拒绝
 
@@ -226,7 +238,7 @@ if __name__ == "__main__":
 
 将脚本里的 `SCOPE_ID` 替换成真实值。
 
-批准让当前 Experience 头版本具备召回资格，但不保证每个查询都选中它。Scope、查询 相关性 和字节预算仍然生效。待处理、已拒绝和历史 Experience Revision 不进入默认召回。
+批准让当前 Experience 头版本具备召回资格，但不保证每个查询都选中它。Scope、查询相关性和字节预算仍然生效。待处理、已拒绝和历史 Experience Revision 不进入默认召回。
 
 ## 6. 创建 Skill Candidate
 
@@ -364,7 +376,7 @@ SKILL.md
 powercontext.json
 ```
 
-检查 `powercontext.json` 是否引用精确 `skill/SKILL_ID@1`。CLI 导出是 仅创建，目标目录已存在时退出，不会覆盖。
+检查 `powercontext.json` 是否引用精确 `skill/SKILL_ID@1`。CLI 导出只创建、不覆盖。目标目录已存在时退出。
 
 当前托管 Skill 导出只支持 Codex 和 Claude Code。插件自带内置 Skill 不等于支持托管导出。
 
@@ -414,24 +426,39 @@ Review 路径只有在失败可见时才完整。Candidate 版本过期或替换
 
 | 情况 | 结果 | 处理 |
 |---|---|---|
-| `expected_version` 过期 | 409 `Candidate_conflict` | 重新显示，审阅当前版本 |
-| Candidate 已终态 | 409 `Candidate_终态` | 不再修改该 Candidate |
+| `expected_version` 过期 | 409 `candidate_conflict` | 重新显示，审阅当前版本 |
+| Candidate 已终态 | 409 `candidate_terminal` | 不再修改该 Candidate |
 | 替换内容目标头版本已推进 | 409 `artifact_conflict` | Candidate 保持待处理，重新评估目标 |
 | 证据/证据链不合法 | 422 `invalid_request` | 修正证据，不是 CAS 重试 |
-| 导出目标目录已存在 | CLI exit 2 | 检查外部/当前/发生漂移的 状态，不覆盖 |
+| 导出目标目录已存在 | CLI exit 2 | 检查外部、当前或已漂移的状态，不覆盖 |
 
 同一个替换内容 Candidate 的目标不能在修订时换成另一个 Revision。
 
-## 完成检查
+## 怎么知道跑通了
 
-- 类型化提案无模型也能创建待处理 Candidate；
-- 生成可能待处理，也可能无变更；
-- Review 始终先显示，再使用已检查的 `expected_version`；
-- 过期版本会 409；
-- 批准返回精确 `result_artifact`；
-- 已批准当前 Experience 可以参与相关召回；
-- Skill 批准不导出，也不执行；
-- 导出软件包包含 `SKILL.md` 和 `powercontext.json`；
-- 现有目标目录和本地漂移不会被静默覆盖。
+- 不接模型，类型化提案也能创建待处理 Candidate。
+- 生成可能待处理，也可能无变更。
+- Review 始终先显示，再用你核对过的 `expected_version`。
+- 过期版本返回 409。
+- 批准返回精确 `result_artifact`。
+- 已批准的当前 Experience 可以参与相关召回。
+- Skill 批准不等于导出，也不等于执行。
+- 导出目录里有 `SKILL.md` 和 `powercontext.json`。
+- 目标目录已存在，或本地已经漂移时，不会被静默覆盖。
 
-Basic Usage 到这里完成。下一步按你的运行环境进入[框架集成](/zh/frameworks/overview)、[通用 Agent](/zh/common-agents/overview)或[编程 Agent](/zh/coding-agents/overview)。
+基础用法到这里结束。按你现在的工作，进入下面其中一条路。
+
+<Tip>
+自动帮你找回上下文失败时，当前任务还应继续。你明确要求写入 Memory、提交 Handoff、批准或导出时，失败必须能看见。完整说明见 [fail-open](/zh/mental-model/fail-open)。
+</Tip>
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="接入 Python Agent" icon="boxes" href="/zh/frameworks/overview" arrow="true" cta="比较框架">
+    第一次接入选 LangGraph 或 LangChain。
+  </Card>
+  <Card title="配置通用或编程 Agent" icon="bot" href="/zh/common-agents/overview" arrow="true" cta="选择 Agent">
+    Hermes、OpenClaw 走通用 Agent。Codex、Claude Code 走[编程 Agent](/zh/coding-agents/overview)。
+  </Card>
+</Columns>

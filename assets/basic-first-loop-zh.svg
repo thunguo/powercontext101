@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="280" viewBox="0 0 1080 280" role="img" aria-labelledby="title description">
+  <title id="title">第一条闭环</title>
+  <desc id="description">写出 Memory，搜到它，再拿到带 Citation 的 PreparedContext。</desc>
+  <defs>
+    <marker id="first-loop-zh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="arrowhead" d="M0 0L10 5L0 10Z" />
+    </marker>
+  </defs>
+  <style>
+    .background { fill: #fbfcfe; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .secondary { fill: #626b7a; }
+    .quiet { fill: #8b94a3; }
+    .chip { fill: #ffffff; stroke: #cbd3df; }
+    .chip-accent { fill: #eef5ff; stroke: #006dff; }
+    .soft { fill: #f7f9fc; stroke: #cbd3df; }
+    .flow { fill: none; stroke: #9aa5b4; }
+    .arrowhead { fill: #9aa5b4; }
+    .accent-fill { fill: #006dff; }
+    .track { fill: #e8edf4; }
+    .door { fill: #ffffff; stroke: #cbd3df; }
+    .vault { fill: #eef5ff; stroke: #006dff; }
+    .chrome { fill: #f7f9fc; stroke: #cbd3df; }
+    .dot-a { fill: #ff5f57; }
+    .dot-b { fill: #febc2e; }
+    .dot-c { fill: #28c840; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .secondary { fill: #9aa4b2; }
+      .quiet { fill: #7d8590; }
+      .chip { fill: #161b22; stroke: #3b434d; }
+      .chip-accent { fill: #122033; stroke: #58a6ff; }
+      .soft { fill: #0d1117; stroke: #3b434d; }
+      .flow { stroke: #66707d; }
+      .arrowhead { fill: #66707d; }
+      .accent-fill { fill: #58a6ff; }
+      .track { fill: #21262d; }
+      .door { fill: #161b22; stroke: #3b434d; }
+      .vault { fill: #122033; stroke: #58a6ff; }
+      .chrome { fill: #161b22; stroke: #3b434d; }
+    }
+</style>
+  <rect class="background" width="1080" height="280" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="279" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="heading" x="48" y="48" font-size="24" font-weight="650">先做一件能当场<tspan class="accent-text">验证的事</tspan></text>
+    <text class="secondary" x="48" y="74" font-size="13">写出 Memory · 搜到它 · 拿到带 Citation 的 PreparedContext。</text>
+    <rect class="track" x="183" y="154" width="714" height="8" rx="4" />
+    <path class="flow" d="M220 158H500" stroke-width="2" marker-end="url(#first-loop-zh)" />
+    <path class="flow" d="M580 158H860" stroke-width="2" marker-end="url(#first-loop-zh)" />
+    <circle class="accent-fill" cx="183" cy="158" r="22" />
+    <text x="183" y="164" font-size="16" font-weight="700" text-anchor="middle" fill="#ffffff">1</text>
+    <rect class="chip" x="73" y="198" width="220" height="52" rx="8" />
+    <text class="heading" x="183" y="220" font-size="13" font-weight="600" text-anchor="middle">remember_memory</text>
+    <text class="quiet" x="183" y="238" font-size="11" text-anchor="middle">写下来</text>
+    <circle class="accent-fill" cx="540" cy="158" r="22" />
+    <text x="540" y="164" font-size="16" font-weight="700" text-anchor="middle" fill="#ffffff">2</text>
+    <rect class="chip" x="430" y="198" width="220" height="52" rx="8" />
+    <text class="heading" x="540" y="220" font-size="13" font-weight="600" text-anchor="middle">search_memory</text>
+    <text class="quiet" x="540" y="238" font-size="11" text-anchor="middle">找得到</text>
+    <circle class="accent-fill" cx="897" cy="158" r="22" />
+    <text x="897" y="164" font-size="16" font-weight="700" text-anchor="middle" fill="#ffffff">3</text>
+    <rect class="chip-accent" x="787" y="198" width="220" height="52" rx="8" />
+    <text class="heading" x="897" y="220" font-size="13" font-weight="600" text-anchor="middle">prepare_context</text>
+    <text class="quiet" x="897" y="238" font-size="11" text-anchor="middle">这一次请求</text>
+  </g>
+</svg>

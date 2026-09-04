@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="360" viewBox="0 0 1080 360" role="img" aria-labelledby="title description">
+  <title id="title">Scope is a wall</title>
+  <desc id="description">Source, Memory, Candidate, and Handoff in one Scope can see one another. The Scope on the other side of the wall cannot.</desc>
+  <style>
+    .background { fill: #fbfcfe; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .secondary { fill: #626b7a; }
+    .quiet { fill: #8b94a3; }
+    .room { fill: #ffffff; stroke: #cbd3df; }
+    .room-floor { fill: #f7f9fc; }
+    .chip { fill: #f7f9fc; stroke: #cbd3df; }
+    .chip-accent { fill: #eef5ff; stroke: #006dff; }
+    .wall { fill: #e8edf4; }
+    .wall-line { fill: none; stroke: #9aa5b4; }
+    .wall-cap { fill: #006dff; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .secondary { fill: #9aa4b2; }
+      .quiet { fill: #7d8590; }
+      .room { fill: #161b22; stroke: #3b434d; }
+      .room-floor { fill: #0d1117; }
+      .chip { fill: #0d1117; stroke: #3b434d; }
+      .chip-accent { fill: #122033; stroke: #58a6ff; }
+      .wall { fill: #21262d; }
+      .wall-line { stroke: #66707d; }
+      .wall-cap { fill: #58a6ff; }
+    }
+  </style>
+  <rect class="background" width="1080" height="360" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="359" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="heading" x="48" y="48" font-size="24" font-weight="650">Scope is a <tspan class="accent-text">wall</tspan></text>
+    <text class="secondary" x="48" y="74" font-size="13">A wrong Scope rarely errors. Search is just empty. What you wrote on this side stays invisible over there.</text>
+
+    <rect class="room" x="48" y="100" width="430" height="220" rx="12" />
+    <rect class="room-floor" x="64" y="148" width="398" height="156" rx="8" />
+    <text class="heading" x="72" y="128" font-size="15" font-weight="600">project-a</text>
+    <text class="quiet" x="454" y="128" font-size="12" text-anchor="end">You wrote here</text>
+    <rect class="chip" x="80" y="168" width="174" height="52" rx="8" />
+    <text class="heading" x="167" y="200" font-size="13" font-weight="600" text-anchor="middle">Source</text>
+    <rect class="chip-accent" x="272" y="168" width="174" height="52" rx="8" />
+    <text class="heading" x="359" y="200" font-size="13" font-weight="600" text-anchor="middle">Memory</text>
+    <rect class="chip" x="80" y="232" width="174" height="52" rx="8" />
+    <text class="heading" x="167" y="264" font-size="13" font-weight="600" text-anchor="middle">Candidate</text>
+    <rect class="chip" x="272" y="232" width="174" height="52" rx="8" />
+    <text class="heading" x="359" y="264" font-size="13" font-weight="600" text-anchor="middle">Handoff</text>
+
+    <rect class="wall" x="502" y="96" width="76" height="228" rx="8" />
+    <path class="wall-line" d="M520 112V308" stroke-width="1.4" stroke-dasharray="3 6" />
+    <path class="wall-line" d="M540 112V308" stroke-width="1.4" stroke-dasharray="3 6" />
+    <path class="wall-line" d="M560 112V308" stroke-width="1.4" stroke-dasharray="3 6" />
+    <rect class="wall-cap" x="518" y="186" width="44" height="44" rx="22" />
+    <text x="540" y="213" font-size="10" font-weight="700" text-anchor="middle" fill="#ffffff">WALL</text>
+    <text class="quiet" x="540" y="248" font-size="11" text-anchor="middle">no view</text>
+
+    <rect class="room" x="602" y="100" width="430" height="220" rx="12" />
+    <rect class="room-floor" x="618" y="148" width="398" height="156" rx="8" />
+    <text class="heading" x="626" y="128" font-size="15" font-weight="600">project-b</text>
+    <text class="quiet" x="1008" y="128" font-size="12" text-anchor="end">Empty from here</text>
+    <rect class="chip" x="634" y="168" width="174" height="52" rx="8" />
+    <text class="quiet" x="721" y="200" font-size="13" text-anchor="middle">Source</text>
+    <rect class="chip" x="826" y="168" width="174" height="52" rx="8" />
+    <text class="quiet" x="913" y="200" font-size="13" text-anchor="middle">Memory</text>
+    <rect class="chip" x="634" y="232" width="174" height="52" rx="8" />
+    <text class="quiet" x="721" y="264" font-size="13" text-anchor="middle">Candidate</text>
+    <rect class="chip" x="826" y="232" width="174" height="52" rx="8" />
+    <text class="quiet" x="913" y="264" font-size="13" text-anchor="middle">Handoff</text>
+  </g>
+</svg>

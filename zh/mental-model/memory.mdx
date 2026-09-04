@@ -1,13 +1,19 @@
 ---
 title: "Memory"
-description: "Memory 保存经过选择的长期项目知识，并用不可变 Revision 和条目版本保留历史。"
+description: "Memory 保存以后还会用的结论，不是完整聊天。"
+icon: library
+keywords:
+  - Memory
+  - PreparedContext
+  - remember_memory
+  - Revision
 ---
 
-Memory 适合保存以后还会影响判断的内容：已经做出的决策、必须遵守的约束、当前项目状态，或者明确的下一步。
+<Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 适合保存以后还会影响判断的内容：已经做出的决策、必须遵守的约束、当前项目状态，或者明确的下一步。
 
-它不适合装下完整聊天。聊天可以先成为 Source；只有值得跨任务复用的部分才进入 Memory。
+它不适合装下完整聊天。聊天可以先成为 <Tooltip headline="Source" tip="记录发生过什么。采集不会自动写成长期知识。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip>。只有值得跨任务复用的部分才进入 Memory。
 
-真正需要判断的是保留什么。一条范围清楚、结论明确的短条目，通常比对话式摘要更容易召回；项目变化时，它也更容易修订或停用。
+真正需要判断的是保留什么。一条范围清楚、结论明确的短条目，通常比对话式摘要更容易召回。项目变化时，它也更容易修订或停用。
 
 ## 什么应该进入 Memory
 
@@ -36,7 +42,7 @@ Memory Artifact Revision
 
 每次 Memory 生命周期发生有效变化，会形成新的不可变 Artifact Revision。Revision 保存当时的清单和 change set。
 
-### Logical 条目
+### 逻辑条目
 
 `entry_id` 表示同一条长期知识。修订后仍是这个逻辑条目。
 
@@ -50,7 +56,7 @@ Memory Artifact Revision
 
 某个 Memory Revision 的清单是当时的权威目录。每个条目记录：
 
-- stable `entry_id`；
+- 稳定 `entry_id`；
 - 精确 `entry_version_id`；
 - 内容哈希；
 - `active` 或 `inactive`。
@@ -59,7 +65,7 @@ Memory Artifact Revision
 
 修订也不是原地覆盖。它创建下一条目版本，再让新 Memory Revision 的清单指向它。
 
-## 两种写入路径
+## 两条写入路径
 
 ### 显式写入
 
@@ -96,7 +102,7 @@ Source window
 
 模型输出只是不可信 Candidate。它只能引用当前操作提供的证据 ID，不能凭空引用其他 Source 或 Artifact。
 
-PowerContext 在同一 事务 中提交 Memory Revision、条目版本和启用状态搜索 投影。任何一步失败，都不能留下“Revision 已提交但 索引 没更新”的半成品。
+PowerContext 在同一事务中提交 Memory Revision、条目版本和启用状态搜索投影。任何一步失败，都不能留下“Revision 已提交但索引没更新”的半成品。
 
 重复的规范形式内容可以变成无变更，不必制造一个没有语义变化的新 Revision。
 
@@ -120,9 +126,9 @@ Memory Revision + entry_id + entry_version_id
 - `include_inactive` 可用于审计；
 - 旧 Artifact Revision 和条目版本仍存在。
 
-如果其他 工作进程 已经更新了 Memory 头版本，你手里的旧 Citation 会产生冲突。重新读取当前状态，检查差异后再决定，不要机械猜下一个 Revision。
+如果其他工作进程已经更新了 Memory 头版本，你手里的旧 Citation 会产生冲突。重新读取当前状态，检查差异后再决定，不要机械猜下一个 Revision。
 
-## 搜索如何工作
+## 搜索怎么工作
 
 Memory 搜索不是把所有文本按一个相似度分数排序。它先确定当前 Memory 头版本，再根据能力和请求选择模式。
 
@@ -141,13 +147,13 @@ Memory 搜索不是把所有文本按一个相似度分数排序。它先确定�
 
 向量 admission 会把 unit-normalized L2 distance 换算为 cosine similarity，并应用最低相似度门槛。命中结果会保留 `matched_by`，说明来自 FTS、向量或两者。
 
-可选重排序在检索之后运行。它可以改变最终顺序，但不会改写 Memory 或搜索 索引。Rerank 开始后使用已选定的 Revision 快照，不应因为另一个写入推进头版本就悄悄换数据。
+可选重排序在检索之后运行。它可以改变最终顺序，但不会改写 Memory 或搜索索引。Rerank 开始后使用已选定的 Revision 快照，不应因为另一个写入推进头版本就悄悄换数据。
 
 ## PreparedContext 不是搜索响应的复制
 
-`prepare_context` 会先粗召回候选，再由 构建器 在共享 UTF-8 字节预算中选最终内容。
+`prepare_context` 会先粗召回候选，再由构建器在共享 UTF-8 字节预算中选最终内容。
 
-当前 构建器 有几个明确上限：
+当前构建器有几个明确上限：
 
 - 最多 16 个 Memory 粗候选；
 - 最多 8 个 Experience 候选；
@@ -164,7 +170,7 @@ empty → content is null, content_bytes is 0
 ready → content is nonblank, content_bytes matches UTF-8 bytes
 ```
 
-PreparedContext 是本轮输入，不会自动变成新的 Memory。
+<Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 是本轮输入，不会自动变成新的 Memory。
 
 ## 用 OpenAPI 案例推演
 
@@ -212,23 +218,34 @@ Regenerate the checked-in client, inspect the diff, and then run contract tests.
 
 ### 刷新处理了 Source，但没有新 Revision
 
-模型可能返回无变更，或者 Candidate 经过 规范化 后与现有内容重复。先检查 Source 证据链和 change set。
+模型可能返回无变更，或者 Candidate 经过规范化后与现有内容重复。先检查 Source 证据链和 change set。
 
 ### 搜索有命中，PreparedContext 却是空结果
 
-PreparedContext 还有 相关性、去重和字节预算约束。搜索命中不保证最终一定入选。
+PreparedContext 还有相关性、去重和字节预算约束。搜索命中不保证最终一定入选。
 
 ### Rerank 时 Memory 头版本已更新
 
 当前搜索保持开始时选择的 Revision 快照。下一次搜索才会读取新头版本。
 
-## 检查清单
+## 怎么知道分清了
 
-- Artifact Revision、条目 ID、条目版本 ID 是否分开？
-- 停用是否被理解成停用，而不是删除？
-- 显式写入是否保持无模型、无 Source 前提？
-- 抽取 Candidate 是否经过证据和领域校验？
-- `auto` 与显式向量/混合的降级语义是否分开？
-- PreparedContext 是否仍是临时、不可信、有预算的视图？
+1. Artifact Revision、条目 ID、条目版本 ID 是否分开？
+2. 停用是否被理解成停用，而不是删除？
+3. 显式写入是否保持无模型、无 Source 前提？
+4. 抽取 Candidate 是否经过证据和领域校验？
+5. `auto` 与显式向量/混合的降级语义是否分开？
+6. PreparedContext 是否仍是临时、不可信、有预算的视图？
 
-下一页是 [Handoff](/zh/mental-model/handoff)。Memory 回答“以后还要知道什么”，Handoff 回答“谁来接着做，以及从哪里开始”。
+对象已经清楚时，去[安装并运行 Server](/zh/basic-usage/install-and-run) 写出第一条 Memory。要看采集路径，走 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="再看谁来接着做" icon="hand" href="/zh/mental-model/handoff" arrow="true" cta="阅读 Handoff">
+    Memory 回答以后还要知道什么。Handoff 回答谁来接着做，以及从哪里开始。
+  </Card>
+  <Card title="写出第一条 Memory" icon="server" href="/zh/basic-usage/install-and-run" arrow="true" cta="开始第一条闭环">
+    先启动本地 Server，写出一条 Memory，搜到它，再拿到带 Citation 的 PreparedContext。
+  </Card>
+</Columns>

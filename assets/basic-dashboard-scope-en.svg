@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="320" viewBox="0 0 1080 320" role="img" aria-labelledby="title description">
+  <title id="title">The Dashboard checks counts</title>
+  <desc id="description">Use the same Scope and the same database. It does not show Memory text.</desc>
+  <defs>
+    <marker id="dashboard-scope-en" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="arrowhead" d="M0 0L10 5L0 10Z" />
+    </marker>
+  </defs>
+  <style>
+    .background { fill: #fbfcfe; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .secondary { fill: #626b7a; }
+    .quiet { fill: #8b94a3; }
+    .chip { fill: #ffffff; stroke: #cbd3df; }
+    .chip-accent { fill: #eef5ff; stroke: #006dff; }
+    .soft { fill: #f7f9fc; stroke: #cbd3df; }
+    .flow { fill: none; stroke: #9aa5b4; }
+    .arrowhead { fill: #9aa5b4; }
+    .accent-fill { fill: #006dff; }
+    .track { fill: #e8edf4; }
+    .door { fill: #ffffff; stroke: #cbd3df; }
+    .vault { fill: #eef5ff; stroke: #006dff; }
+    .chrome { fill: #f7f9fc; stroke: #cbd3df; }
+    .dot-a { fill: #ff5f57; }
+    .dot-b { fill: #febc2e; }
+    .dot-c { fill: #28c840; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .secondary { fill: #9aa4b2; }
+      .quiet { fill: #7d8590; }
+      .chip { fill: #161b22; stroke: #3b434d; }
+      .chip-accent { fill: #122033; stroke: #58a6ff; }
+      .soft { fill: #0d1117; stroke: #3b434d; }
+      .flow { stroke: #66707d; }
+      .arrowhead { fill: #66707d; }
+      .accent-fill { fill: #58a6ff; }
+      .track { fill: #21262d; }
+      .door { fill: #161b22; stroke: #3b434d; }
+      .vault { fill: #122033; stroke: #58a6ff; }
+      .chrome { fill: #161b22; stroke: #3b434d; }
+    }
+</style>
+  <rect class="background" width="1080" height="320" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="319" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="heading" x="48" y="48" font-size="24" font-weight="650">The Dashboard checks <tspan class="accent-text">counts</tspan></text>
+    <text class="secondary" x="48" y="74" font-size="13">It does not show Memory text. Counts only matter when Scope and the database match.</text>
+    <rect class="chrome" x="120" y="104" width="840" height="196" rx="12" />
+    <rect class="soft" x="120" y="104" width="840" height="36" rx="12" />
+    <rect class="soft" x="120" y="128" width="840" height="12" />
+    <circle class="dot-a" cx="144" cy="122" r="5" />
+    <circle class="dot-b" cx="164" cy="122" r="5" />
+    <circle class="dot-c" cx="184" cy="122" r="5" />
+    <text class="quiet" x="540" y="126" font-size="12" text-anchor="middle">Dashboard</text>
+    <rect class="chip" x="156" y="160" width="360" height="80" rx="10" />
+    <text class="heading" x="336" y="192" font-size="16" font-weight="650" text-anchor="middle">Same Scope</text>
+    <text class="quiet" x="336" y="216" font-size="12" text-anchor="middle">Exact string</text>
+    <rect class="chip-accent" x="564" y="160" width="360" height="80" rx="10" />
+    <text class="heading" x="744" y="192" font-size="16" font-weight="650" text-anchor="middle">Same database</text>
+    <text class="quiet" x="744" y="216" font-size="12" text-anchor="middle">Same POWERCONTEXT_HOME</text>
+    <text class="quiet" x="540" y="272" font-size="12" text-anchor="middle">Memory text: not shown</text>
+  </g>
+</svg>

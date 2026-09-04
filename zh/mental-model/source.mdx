@@ -1,15 +1,25 @@
 ---
 title: "Source"
-description: "Source 保存可定位的工作证据。日志位置、处理游标和 Memory 是后续的不同层。"
+description: "采集成功不等于留下知识。Source 只证明这件事发生过。"
+icon: file-plus
+keywords:
+  - Source
+  - Memory
+  - flush_memory
+  - SourceWindowTrigger
 ---
 
-Source 记录“发生过什么”。一条用户提示词、一次任务结果，或者宿主捕获的回合，都可以成为 Source。
+采集成功，但 <Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 搜索仍是空的。这多半不是写入失败。
 
-它不负责判断内容是否值得长期保留。这个判断属于 Memory、Experience、Skill 或 Handoff 的后续流程。
+<Tooltip headline="Source" tip="记录发生过什么。采集不会自动写成长期知识。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip> 记录“发生过什么”。一条用户提示词、一次任务结果，或者宿主捕获的回合，都可以成为 Source。它不负责判断内容是否值得长期保留。那个判断属于 Memory、Experience、Skill 或 Handoff。
 
-这也解释了一个常见结果：采集成功时，Memory 搜索仍可能为空。Source 已经安全保存，只是抽取窗口尚未产出可复用知识。应把它们看成两个可观察阶段，而不是一次失败的写入。
+应把它们看成两个可观察阶段。Source 已经安全保存，只是抽取窗口还没产出可复用知识。
 
-## 稳定身份
+<Info>
+安装参数、接口说明和部署配置，以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页帮你分清证据、日志位置和处理进度。
+</Info>
+
+## 先拿到稳定身份
 
 PowerContext 用两个字段引用 Source：
 
@@ -34,9 +44,9 @@ SourceRef
 }
 ```
 
-`source_id` 应稳定且可重现。宿主通常根据 scope、会话、轮次或内容生成它，以便重试时保持幂等。
+`source_id` 应稳定且可重现。宿主通常根据 Scope、会话、轮次或内容生成它，以便重试时保持幂等。
 
-## 已采集与 引用式
+## 已采集和引用式不一样
 
 Source 适配器有两种 materialization。
 
@@ -45,9 +55,9 @@ Source 适配器有两种 materialization。
 | `captured` | PowerContext 保存内容快照和元数据 | 直接从持久层读取 |
 | `referenced` | PowerContext 保存外部材料的引用 | 读取时由适配器解析 |
 
-已采集 Source 适合提示词、任务结果和事件文本。Referenced Source 适合由其他系统管理的材料。
+已采集 Source 适合提示词、任务结果和事件文本。引用式 Source 适合由其他系统管理的材料。
 
-两者的差别很实际：已采集内容是当时的快照；引用式 material 以后再次解析时，外部内容可能已经变化。
+差别很实际：已采集内容是当时的快照；引用式材料以后再次解析时，外部内容可能已经变化。
 
 ## 一条 Scope 内共用一条日志
 
@@ -67,7 +77,7 @@ content/openapi-task-2 → position 2
 
 Source 日志解决顺序问题。它不表示哪条 Source 已经被处理，也不表示已经生成 Memory。
 
-## 触发器决定处理窗口
+## 触发器只选窗口
 
 `SourceWindowTrigger` 是纯策略。它比较 high watermark 和当前游标，然后返回下一段固定窗口：
 
@@ -91,14 +101,14 @@ ProcessSourceWindow(after=1, through=2)
 
 触发器不读取模型，也不执行抽取。它只返回新状态和待执行动作。
 
-## 游标 记录消费进度
+## 游标记录消费进度
 
 这里有两个容易混淆的数字：
 
 - 游标 `序号`：业务上处理到哪个 Source 位置；
-- 已保存 游标 `generation`：保存游标时的并发控制版本。
+- 已保存游标 `generation`：保存游标时的并发控制版本。
 
-例如，游标可能表示已经处理到位置 12，同时数据库 row 的生成是 4。它们没有数值对应关系。
+例如，游标可能表示已经处理到位置 12，同时数据库行的生成是 4。它们没有数值对应关系。
 
 PowerContext 处理 Source 窗口时，会先完成抽取和 Memory apply，再保存新的游标。Memory apply 失败时不能提前推进游标，否则失败窗口会被跳过。
 
@@ -128,7 +138,7 @@ POST /v1/sources/content
 - 持久层序列化后的载荷字节完全相同：返回原来的位置；
 - 载荷字节不同：返回冲突，不覆盖旧 Source。
 
-这个比较不是语义 规范化。即使元数据表达同一组键值，键顺序导致序列化字节变化时也可能冲突。重试应复用同一序列化输入。
+这个比较不是语义规范化。即使元数据表达同一组键值，键顺序导致序列化字节变化时也可能冲突。重试应复用同一序列化输入。
 
 所以不要长期复用固定 `source_id`，却每次写入不同内容。
 
@@ -136,11 +146,11 @@ POST /v1/sources/content
 
 - 多条不同 Source 并发写入，位置保持连续，无缺口；
 - 同一 Source 的相同载荷并发重试，最终都指向同一个位置；
-- 两个 工作进程 同时更新游标时，只有符合预期生成的写入成功。
+- 两个工作进程同时更新游标时，只有符合预期生成的写入成功。
 
-## Source 可以引用什么
+## Source 不只来自聊天
 
-Source 不只来自聊天宿主。Work 连续性也把事件保存为精确 Source，例如：
+Source 不只来自聊天宿主。工作连续性也把事件保存为精确 Source，例如：
 
 - 工作契约（Work Contract）；
 - Handoff 边界；
@@ -173,7 +183,7 @@ Source 不只来自聊天宿主。Work 连续性也把事件保存为精确 Sour
 
 然后再决定：这是只需要保留的证据，还是应该显式写成 Memory。别急着把所有 Source 都变成长期知识。
 
-## 排查顺序
+## 卡住时先对这几条
 
 ### 采集成功，但 Memory 没变化
 
@@ -191,13 +201,24 @@ Source 不只来自聊天宿主。Work 连续性也把事件保存为精确 Sour
 
 只要它们使用同一 Scope 和 Server，这很正常。所有适配器共用 Scope 内部日志。
 
-## 检查清单
+## 怎么知道分清了
 
-- Source 标识是否包含 Scope、type 和 ID 的概念？
-- 日志位置与游标序号是否分开？
-- 游标序号与游标生成是否分开？
-- 窗口是否按 `(after, through]` 理解？
-- 采集是否被误写成 Memory 写入？
-- 幂等重试是否保持原位置？
+1. Source 标识是否同时包含 Scope、type 和 ID？
+2. 日志位置和游标序号是否分开？
+3. 游标序号和游标生成是否分开？
+4. 窗口是否按 `(after, through]` 理解？
+5. 采集是否被误写成 Memory 写入？
+6. 幂等重试是否保持原位置？
 
-下一页是 [Memory](/zh/mental-model/memory)。它会接着解释 Source 怎样被选成长期知识，以及显式写入为什么不需要先创建 Source。
+对不上时，先对[排错](/zh/start/troubleshooting)。要亲手走一遍采集和抽取，看 [Source 与 Memory](/zh/basic-usage/source-and-memory)。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="再看长期知识怎么留下" icon="library" href="/zh/mental-model/memory" arrow="true" cta="阅读 Memory">
+    Memory 回答以后还要知道什么。显式写入不需要先创建 Source。
+  </Card>
+  <Card title="亲手走一遍采集" icon="file-plus" href="/zh/basic-usage/source-and-memory" arrow="true" cta="开始 Source 与 Memory">
+    对象已经清楚时，先采集一条 Source，再看它会不会变成 Memory。
+  </Card>
+</Columns>

@@ -1,24 +1,35 @@
 ---
 title: "Source 与 Memory 实操"
-description: "对比显式 Memory 和 Source 抽取，并用位置、游标与 Source 引用验证真实证据链。"
+description: "先采集 Source，再抽取 Memory。采集成功不等于留下知识。"
+icon: file-plus
+keywords:
+  - Source
+  - Memory
+  - flush_memory
 ---
 
-上一页直接写入了已经确认的 Memory。现在走另一条路径：先采集 Source，再让生成流程从证据中提取长期知识。
+上一页直接写下了你已经确认的 Memory。现在走另一条路：先采集 <Tooltip headline="Source" tip="记录发生过什么。采集不会自动写成长期知识。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip>，再让生成流程从证据里抽出以后还要用的知识。
 
-两条路径都可能得到 Memory，但它们的前提、证据链和失败方式不同。
+两条路都可能得到 <Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip>。前提、证据链和失败方式不一样。
 
-## 两条路径先放在一起看
+<img src="/assets/basic-source-memory-zh.svg" alt="两条路都能留下 Memory：直接写下，或先采集再抽取。" />
 
-两条路径最终都可能得到 Memory，但证据链不同。显式写入保存你已经确认要保留的内容；抽取先保存 Source，而且可能不产生任何 Memory。
+<Info>
+生成模型和抽取配置以 [官方文档](https://oceanbase.github.io/powercontext/) 的最新发布版本为准。这页帮你看清两条路差在哪里，以及怎样核对证据链。
+</Info>
+
+## 两条路先放在一起看
+
+显式写入保存你已经确认要留的内容。抽取先保存 Source，而且可能不产生任何 Memory。
 
 | 路径 | 需要模型 | 是否先创建 Source | 适合什么 |
 |---|---:|---:|---|
 | `remember_memory` | 否 | 否 | 你已经知道要保存的事实、决策或约束 |
 | 采集 → 刷新/调度器 → 抽取 | 是 | 是 | 从一批工作证据中找出值得长期保留的内容 |
 
-如果 Agent 已经明确得到用户指令“记住这条决策”，直接记住更简单。不要为了获得漂亮证据链，先人工造一条 Source 再绕回 Memory。
+如果 Agent 已经得到明确指令“记住这条决策”，直接写下更简单。不要为了证据链好看，先人工造一条 Source 再绕回 Memory。
 
-反过来，宿主自动捕获的提示词通常只应该成为 Source。模型是否把它提炼为 Memory，是后续判断。
+反过来，自动采集到的提示词通常只应该先成为 Source。要不要提炼成 Memory，是后面的判断。
 
 ## 先检查抽取能力
 
@@ -192,9 +203,9 @@ if __name__ == "__main__":
 uv run python source_memory.py
 ```
 
-生成输出本身有不确定性。教程使用明确的持久决定，提高产生 Candidate 的概率，但不能把某段模型文本写成固定预期输出。真正稳定的断言是位置、游标、精确 SourceRef 和条目证据链。
+生成结果本身不稳定。教程用一条明确的长期决策，提高抽出内容的机会，但不能把某段模型文本写成固定答案。真正稳定的检查是位置、游标、精确 SourceRef 和条目证据链。
 
-## 每一步应该看什么
+## 每一步看什么
 
 ### 采集
 
@@ -202,11 +213,11 @@ uv run python source_memory.py
 
 - `status="accepted"`；
 - 精确内容 SourceRef；
-- Scope 内部 numeric `position`。
+- Scope 内部的数字 `position`。
 
-同标识、同序列化载荷字节的重放返回原位置。
+同一个标识、同一串序列化字节再发一次，会回到原来的位置。
 
-这个幂等比较不是语义 规范化。元数据键顺序变化可能改变序列化字节，从而返回 `source_conflict`。实际重试应复用同一序列化输入。
+这次幂等比较看的是字节，不是语义是否相同。元数据键顺序变了，序列化字节也可能变，从而返回 `source_conflict`。真正重试时，复用原来那份输入。
 
 同标识改内容一定不能覆盖旧 Source，应返回 HTTP 409。
 
@@ -307,7 +318,7 @@ Source 证据链也随条目版本保存。修订时，新的证据会加入证�
 
 这是允许的无变更。先看 Source 内容是否确实包含可复用决策，再检查生成输出和去重。
 
-### 游标 一直追不上位置
+### 游标一直追不上位置
 
 查看就绪状态、生成诊断信息和调度器/刷新错误。不要把未处理窗口误报成已生成 Memory。
 
@@ -319,16 +330,27 @@ Source 证据链也随条目版本保存。修订时，新的证据会加入证�
 
 同一 `source_id` 的内容或元数据字节发生变化。为新事件使用新 ID；真正的重试则复用原输入。
 
-## 完成检查
+## 怎么知道跑通了
 
 这一页完成后，你应能证明：
 
-- 采集创建 Source，不直接创建 Memory；
-- 重放保持原位置；
-- 刷新游标到达采集位置；
-- 关联 Source 的条目通过精确 `source_refs` 被识别；
-- 已处理窗口可以合法无变更；
-- 跨进程召回依赖稳定 Scope；
-- 停用状态条目退出默认召回，但历史仍在。
+- 采集创建 Source，不会直接创建 Memory。
+- 同样输入再发一次，位置不变。
+- 刷新后，游标到达采集位置。
+- 关联这条 Source 的条目，靠精确 `source_refs` 认出来。
+- 窗口已经处理完，也可以合法没有留下 Memory。
+- 换一个进程再找，靠的是稳定 Scope。
+- 停用后的条目退出默认召回，历史还在。
 
-下一页进入 [Handoff 循环](/zh/basic-usage/handoff-loop)。
+对不上时，先对[排错](/zh/start/troubleshooting)。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="Handoff 闭环" icon="hand" href="/zh/basic-usage/handoff-loop" arrow="true" cta="做一次交接">
+    准备就会写边界 Source。提交才留下里程碑。
+  </Card>
+  <Card title="卡住时先对排错" icon="wrench" href="/zh/start/troubleshooting" arrow="true" cta="打开排错">
+    采集成功却搜不到 Memory，先打开排错。
+  </Card>
+</Columns>

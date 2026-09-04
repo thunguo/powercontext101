@@ -1,9 +1,15 @@
 ---
 title: "Handoff"
-description: "Handoff 把当前工作整理成可检查的交接包；提交只在需要持久里程碑时发生。"
+description: "Handoff 把当前工作交给接手者。不提交就还是临时包。"
+icon: hand
+keywords:
+  - Handoff
+  - Work Contract
+  - Task Outcome
+  - Memory
 ---
 
-Memory 保存以后仍要知道的项目知识。Handoff 处理正在进行的工作：目标是什么，已经验证了什么，哪里卡住，接手者下一步做什么。
+<Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 保存以后仍要知道的项目知识。<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 处理正在进行的工作：目标是什么，已经验证了什么，哪里卡住，接手者下一步做什么。
 
 一条 Memory 往往很短。一个可用的 Handoff 必须让接手者检查证据，并判断自己是否真的有能力和权限继续。
 
@@ -22,7 +28,7 @@ Memory 保存以后仍要知道的项目知识。Handoff 处理正在进行的�
 
 ## 两层 API
 
-PowerContext 有低层 Handoff 生命周期，也有高层 Work 连续性循环。
+PowerContext 有低层 Handoff 生命周期，也有高层工作连续性循环。
 
 ### 低层生命周期
 
@@ -82,7 +88,7 @@ Work Contract
 
 ### 过期基础
 
-两个 工作进程 可以从同一个基础准备不同 Handoff。第一个提交后，第二个的基础已经过期，应返回 Revision 冲突。调用者需要读取新头版本，检查变化，再重新准备。
+两个工作进程可以从同一个基础准备不同 Handoff。第一个提交后，第二个的基础已经过期，应返回 Revision 冲突。调用者需要读取新头版本，检查变化，再重新准备。
 
 不要把冲突处理成“把 Revision 加一再试”。
 
@@ -94,11 +100,11 @@ Work Contract
 | `exact` | 指定历史 Revision | 指定 Revision，同时返回当前 |
 | `latest` | 当前已提交头版本 | 已选择等于当前 |
 
-所有 Handoff 解析结果 都是 `untrusted_history`。它会列出状态、next 动作、Citation 和无法读取的证据，但不会证明这些内容仍然新鲜。
+所有 Handoff 解析结果都是 `untrusted_history`。它会列出状态、next 动作、Citation 和无法读取的证据，但不会证明这些内容仍然新鲜。
 
 接手者应检查：
 
-- 引用式 文件和 Source 是否仍可读；
+- 引用式文件和 Source 是否仍可读；
 - 实时工作区是否符合描述；
 - 自己是否具备所需能力；
 - 当前用户是否授权它继续。
@@ -109,7 +115,7 @@ Work Contract
 
 接受确认要求：
 
-- 证据都 可用；
+- 证据都可用；
 - 实时状态已确认；
 - 能力已确认；
 - 授权信息已确认；
@@ -134,9 +140,9 @@ Task Outcome 记录整体结果，合法状态包括 `succeeded`、`partial`、`
 
 ## Handoff 报告是投影
 
-Work 连续性和 Handoff 报告从 Source 日志与已提交 Handoff 历史内容生成视图。它们不会改写底层 Source、Handoff 或结果。
+工作连续性和 Handoff 报告从 Source 日志与已提交 Handoff 历史内容生成视图。它们不会改写底层 Source、Handoff 或结果。
 
-投影 读取 格式错误的 工作 Source 时会 软失败：无效记录计入 `invalid_record_count`，其余有效历史仍可展示。
+投影读取格式错误的工作 Source 时会软失败：无效记录计入 `invalid_record_count`，其余有效历史仍可展示。
 
 当前工作连续性最多投影最近 64 个有效事件，同时保留总数和 truncated 信息。这是展示上限，不是日志数据删除。
 
@@ -180,7 +186,7 @@ handoff/HANDOFF_ID@1
 
 ### 6. 结果
 
-契约测试运行后记录 Task Outcome，并引用确认回执 SourceRef。Work 连续性应显示 transfer 接受、outcome covered。
+契约测试运行后记录 Task Outcome，并引用确认回执 SourceRef。工作连续性应显示 transfer 接受、outcome covered。
 
 ## 失败不会总是原子回滚
 
@@ -202,21 +208,32 @@ handoff/HANDOFF_ID@1
     最新版本会随头版本变化。先读取它选中的精确 Revision，再把确认绑定到那个不可变目标。
   </Accordion>
   <Accordion title="证据都能读取，为什么还不能 accepted？">
-    可读不等于当前仍正确，也不证明接手者有能力或授权。接受还需要实时状态、能力和授权信息 检查。
+    可读不等于当前仍正确，也不证明接手者有能力或授权。接受还需要实时状态、能力和授权信息检查。
   </Accordion>
   <Accordion title="提交冲突后可以复用旧 Prepared Handoff 吗？">
     先读取新头版本。旧基础已失效，直接重试会继续冲突。
   </Accordion>
 </AccordionGroup>
 
-## 检查清单
+## 怎么知道分清了
 
-- Memory 与 Handoff 是否按“长期知识”和“当前任务状态”分开？
-- 已准备与已提交是否分开？
-- `handoff_current_work` 的边界 Source 写入是否被说明？
-- 最新版本发现是否转换成精确确认？
-- 接收方检查是否包含证据、实时状态、能力、授权信息？
-- 结果是否链接接受回执？
-- 报告是否仍然只是投影？
+1. Memory 与 Handoff 是否按“长期知识”和“当前任务状态”分开？
+2. 已准备与已提交是否分开？
+3. `handoff_current_work` 的边界 Source 写入是否被说明？
+4. 最新版本发现是否转换成精确确认？
+5. 接收方检查是否包含证据、实时状态、能力、授权信息？
+6. 结果是否链接接受回执？
+7. 报告是否仍然只是投影？
 
-下一页是 [Experience 与 Skill](/zh/mental-model/experience-and-skill)。工作完成后，可以从精确证据提炼可复用判断，但仍要经过 Review。
+对象已经清楚时，去跑 [Handoff 闭环](/zh/basic-usage/handoff-loop)。工作完成后，还可以从精确证据提炼可复用判断，但仍要经过 Review。
+
+## 下一步
+
+<Columns cols={2}>
+  <Card title="再看先审再留" icon="award" href="/zh/mental-model/experience-and-skill" arrow="true" cta="阅读 Experience 与 Skill">
+    工作完成后，可以从精确证据提炼判断或做法。生成成功不等于批准。
+  </Card>
+  <Card title="跑一次真正的交接" icon="hand" href="/zh/basic-usage/handoff-loop" arrow="true" cta="开始 Handoff 闭环">
+    先准备临时交接包，再决定要不要提交成持久里程碑。
+  </Card>
+</Columns>

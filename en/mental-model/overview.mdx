@@ -1,43 +1,32 @@
 ---
 title: "Mental model overview"
-description: "Separate evidence, durable assets, request-time context, and work handoffs in PowerContext."
+description: "Separate the three paths first, then read the object pages."
+icon: brain
+keywords:
+  - mental model
+  - Source
+  - Memory
+  - Handoff
+  - PreparedContext
 ---
 
-Calling PowerContext “memory for agents” is not enough to use it correctly. Is every prompt Memory? Can a generated Skill install itself? Why does a Handoff sometimes have no latest revision?
+Calling PowerContext “memory for agents” is not enough. Is every prompt a <Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip>? Can a generated <Tooltip headline="Skill" tip="An approved repeatable method. Export is still required. PowerContext grants no execution authority." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Skill</Tooltip> install itself? Why does a <Tooltip headline="Handoff" tip="Packages the current objective, verified progress, blockers, and next action. It stays temporary until an explicit commit." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip> sometimes have no latest revision?
 
 Those questions are about object boundaries, not API syntax.
 
-## Three separate paths
+## Look at three paths first
 
-PowerContext handles three kinds of work.
+PowerContext runs three paths at once. They may cite one another. They do not collapse into one lifecycle.
 
-```mermaid
-flowchart TB
-  subgraph Recall[Durable knowledge and request-time recall]
-    S1[Source] --> M[Memory Revision]
-    M --> P[PreparedContext]
-    E[Approved Experience] --> P
-  end
+<img src="/assets/mental-three-paths-en.svg" alt="Keep knowledge, review first, and hand off work as three separate paths." />
 
-  subgraph ReviewFlow[Experience and Skill governance]
-    S2[Source or approved Artifact] --> C[Candidate]
-    C --> R{Review}
-    R -->|approve| E
-    R -->|approve| K[Skill Revision]
-    R -->|reject| X[Rejected Candidate]
-    K --> EX[Explicit export]
-  end
+Keep knowledge. A <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> only proves that something happened. Write a Memory when you will reuse it. The next request recalls it through a <Tooltip headline="PreparedContext" tip="A bounded view for one request. It includes Citations and is not a durable asset." cta="Read the mental model overview" href="/en/mental-model/overview">PreparedContext</Tooltip>.
 
-  subgraph Work[Work transfer]
-    W[Current work] --> H[Prepared Handoff]
-    H -->|optional commit| HC[Committed Handoff Revision]
-    H --> CO[Continue]
-    HC --> CO
-    CO --> A[Acknowledgement and Task Outcome]
-  end
-```
+Review first. <Tooltip headline="Experience" tip="Approved judgment for similar situations. It enters Review as a Candidate." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Experience</Tooltip> and managed Skill first become a <Tooltip headline="Candidate" tip="An Experience or Skill proposal awaiting Review." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Candidate</Tooltip>. A model may draft it. Successful generation is not approval. <Tooltip headline="Review" tip="Approve creates an Artifact Revision. Reject records the reason and creates no result Artifact." cta="Read Experience and Skill" href="/en/mental-model/experience-and-skill">Review</Tooltip> decides what stays. An approved Skill still needs an explicit export.
 
-The paths may cite one another, but they do not collapse into one lifecycle. Writing Memory does not create a Handoff. Approving a Skill does not place it in the next PreparedContext.
+A handoff can stay temporary. A Handoff is packed for the next actor. It becomes a durable milestone only after an explicit commit.
+
+Writing Memory does not create a Handoff. Approving a Skill does not place it in the next PreparedContext.
 
 ## Six values that should stay separate
 
@@ -139,6 +128,28 @@ Each step produces different IDs, Citations, or Revisions. The tutorials retain 
   </Accordion>
 </AccordionGroup>
 
+## How you know the objects are separate
+
+After this page, check these four facts:
+
+1. A successful capture is not a Memory write.
+2. PreparedContext lasts for one request. It does not become a durable asset by itself.
+3. A Prepared Handoff does not become `latest` until you commit it.
+4. An approved Skill still needs an explicit export, and it never enters PreparedContext.
+
+If any of those still blur together, read the matching object page before you install anything.
+
+<Tip>
+If PowerContext fails while automatically fetching context, keep working. If you explicitly write a Memory, commit a Handoff, approve a proposal, or export a Skill, you must see the failure. Read [fail-open](/en/mental-model/fail-open) for the full rule.
+</Tip>
+
 ## Next
 
-Continue with [Source](/en/mental-model/source) to see how evidence receives a stable identity, journal position, and processing progress. Before integrating a host, also read [Scope](/en/mental-model/scope) and [fail-open](/en/mental-model/fail-open).
+<Columns cols={2}>
+  <Card title="See how evidence is stored" icon="file-plus" href="/en/mental-model/source" arrow="true" cta="Read Source">
+    A Source only proves that something happened. Journal position, processing cursor, and Memory belong to later layers.
+  </Card>
+  <Card title="Read Scope before you integrate" icon="split" href="/en/mental-model/scope" arrow="true" cta="Read Scope">
+    A wrong Scope rarely errors. Search is just empty. Before you connect a host, also read [fail-open](/en/mental-model/fail-open).
+  </Card>
+</Columns>

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="400" viewBox="0 0 1080 400" role="img" aria-labelledby="title description">
+  <title id="title">Three paths at once</title>
+  <desc id="description">Keep knowledge, review first, and hand off work may cite one another. They do not collapse into one lifecycle.</desc>
+  <defs>
+    <marker id="three-paths-en" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="arrowhead" d="M0 0L10 5L0 10Z" />
+    </marker>
+  </defs>
+  <style>
+    .background { fill: #fbfcfe; }
+    .frame { fill: none; stroke: #d8dee8; }
+    .heading { fill: #040d2b; }
+    .accent-text { fill: #006dff; }
+    .secondary { fill: #626b7a; }
+    .quiet { fill: #8b94a3; }
+    .rail { fill: none; stroke: #9aa5b4; }
+    .rail-accent { fill: none; stroke: #006dff; }
+    .station { fill: #fbfcfe; stroke: #006dff; }
+    .chip { fill: #ffffff; stroke: #cbd3df; }
+    .chip-accent { fill: #eef5ff; stroke: #006dff; }
+    .arrowhead { fill: #9aa5b4; }
+    @media (prefers-color-scheme: dark) {
+      .background { fill: #0d1117; }
+      .frame { stroke: #30363d; }
+      .heading { fill: #f0f6fc; }
+      .accent-text { fill: #58a6ff; }
+      .secondary { fill: #9aa4b2; }
+      .quiet { fill: #7d8590; }
+      .rail { stroke: #66707d; }
+      .rail-accent { stroke: #58a6ff; }
+      .station { fill: #0d1117; stroke: #58a6ff; }
+      .chip { fill: #161b22; stroke: #3b434d; }
+      .chip-accent { fill: #122033; stroke: #58a6ff; }
+      .arrowhead { fill: #66707d; }
+    }
+  </style>
+  <rect class="background" width="1080" height="400" rx="16" />
+  <rect class="frame" x="0.5" y="0.5" width="1079" height="399" rx="15.5" />
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', Helvetica, Arial, sans-serif">
+    <text class="heading" x="48" y="48" font-size="24" font-weight="650">Three paths at once.<tspan class="accent-text"> Do not merge them.</tspan></text>
+    <text class="secondary" x="48" y="74" font-size="13">They may cite one another. Writing Memory does not create a Handoff. Approving a Skill does not put it in the next PreparedContext.</text>
+
+    <g transform="translate(48 102)">
+      <circle class="accent-text" cx="7" cy="0" r="4" />
+      <text class="heading" x="20" y="5" font-size="15" font-weight="600">1  Keep knowledge</text>
+    </g>
+    <path class="rail" d="M268 148H392" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#three-paths-en)" />
+    <path class="rail" d="M632 148H756" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#three-paths-en)" />
+    <circle class="station" cx="268" cy="148" r="5" stroke-width="2" />
+    <circle class="station" cx="632" cy="148" r="5" stroke-width="2" />
+    <circle class="station" cx="756" cy="148" r="5" stroke-width="2" />
+    <rect class="chip" x="64" y="118" width="196" height="60" rx="8" />
+    <text class="heading" x="162" y="144" font-size="14" font-weight="600" text-anchor="middle">Source</text>
+    <text class="quiet" x="162" y="162" font-size="11" text-anchor="middle">What happened</text>
+    <rect class="chip" x="428" y="118" width="196" height="60" rx="8" />
+    <text class="heading" x="526" y="144" font-size="14" font-weight="600" text-anchor="middle">Memory</text>
+    <text class="quiet" x="526" y="162" font-size="11" text-anchor="middle">Keep for later</text>
+    <rect class="chip-accent" x="792" y="118" width="224" height="60" rx="8" />
+    <text class="heading" x="904" y="144" font-size="14" font-weight="600" text-anchor="middle">PreparedContext</text>
+    <text class="quiet" x="904" y="162" font-size="11" text-anchor="middle">This request only</text>
+
+    <g transform="translate(48 202)">
+      <circle class="accent-text" cx="7" cy="0" r="4" />
+      <text class="heading" x="20" y="5" font-size="15" font-weight="600">2  Review first</text>
+    </g>
+    <path class="rail" d="M268 248H392" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#three-paths-en)" />
+    <path class="rail" d="M632 248H756" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#three-paths-en)" />
+    <circle class="station" cx="268" cy="248" r="5" stroke-width="2" />
+    <circle class="station" cx="632" cy="248" r="5" stroke-width="2" />
+    <circle class="station" cx="756" cy="248" r="5" stroke-width="2" />
+    <rect class="chip" x="64" y="218" width="196" height="60" rx="8" />
+    <text class="heading" x="162" y="244" font-size="14" font-weight="600" text-anchor="middle">Candidate</text>
+    <text class="quiet" x="162" y="262" font-size="11" text-anchor="middle">Not approved yet</text>
+    <rect class="chip" x="428" y="218" width="196" height="60" rx="8" />
+    <text class="heading" x="526" y="244" font-size="14" font-weight="600" text-anchor="middle">Review</text>
+    <text class="quiet" x="526" y="262" font-size="11" text-anchor="middle">Approve or reject</text>
+    <rect class="chip-accent" x="792" y="218" width="224" height="60" rx="8" />
+    <text class="heading" x="904" y="244" font-size="14" font-weight="600" text-anchor="middle">Experience / Skill</text>
+    <text class="quiet" x="904" y="262" font-size="11" text-anchor="middle">Stays after approval</text>
+
+    <g transform="translate(48 302)">
+      <circle class="accent-text" cx="7" cy="0" r="4" />
+      <text class="heading" x="20" y="5" font-size="15" font-weight="600">3  Hand off work</text>
+    </g>
+    <path class="rail" d="M268 348H392" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#three-paths-en)" />
+    <path class="rail-accent" d="M632 348H756" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#three-paths-en)" />
+    <circle class="station" cx="268" cy="348" r="5" stroke-width="2" />
+    <circle class="station" cx="632" cy="348" r="5" stroke-width="2" />
+    <circle class="station" cx="756" cy="348" r="5" stroke-width="2" />
+    <rect class="chip" x="64" y="318" width="196" height="60" rx="8" />
+    <text class="heading" x="162" y="344" font-size="14" font-weight="600" text-anchor="middle">Current work</text>
+    <text class="quiet" x="162" y="362" font-size="11" text-anchor="middle">Goal and progress</text>
+    <rect class="chip" x="428" y="318" width="196" height="60" rx="8" />
+    <text class="heading" x="526" y="344" font-size="14" font-weight="600" text-anchor="middle">Prepared Handoff</text>
+    <text class="quiet" x="526" y="362" font-size="11" text-anchor="middle">Temporary package</text>
+    <rect class="chip-accent" x="792" y="318" width="224" height="60" rx="8" />
+    <text class="heading" x="904" y="344" font-size="14" font-weight="600" text-anchor="middle">Committed Handoff</text>
+    <text class="quiet" x="904" y="362" font-size="11" text-anchor="middle">Durable after commit</text>
+  </g>
+</svg>

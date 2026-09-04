@@ -1,13 +1,19 @@
 ---
 title: "Memory"
-description: "Memory keeps selected project knowledge and preserves history through immutable Revisions and entry versions."
+description: "Memory keeps conclusions you will reuse. It is not the full conversation."
+icon: library
+keywords:
+  - Memory
+  - PreparedContext
+  - remember_memory
+  - Revision
 ---
 
-Memory is for information that will influence later work: a decision already made, a constraint that still applies, the current project state, or a concrete next step.
+<Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> is for information that will influence later work: a decision already made, a constraint that still applies, the current project state, or a concrete next step.
 
-It is not a container for the full conversation. A conversation may first become Source evidence. Only the parts worth reusing across tasks belong in Memory.
+It is not a container for the full conversation. A conversation may first become <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> evidence. Only the parts worth reusing across tasks belong in Memory.
 
-Selection is the useful work here. A shorter entry with a clear decision and scope will usually recall better than a transcript-shaped summary, and it is easier to revise or retire when the project changes.
+Selection is the useful work here. A shorter entry with a clear decision and scope will usually recall better than a transcript-shaped summary. It is also easier to revise or retire when the project changes.
 
 ## What belongs in Memory
 
@@ -164,7 +170,7 @@ empty → content is null, content_bytes is 0
 ready → content is nonblank, content_bytes matches UTF-8 bytes
 ```
 
-PreparedContext is input for this request. It does not become new Memory automatically.
+<Tooltip headline="PreparedContext" tip="A bounded view for one request. It includes Citations and is not a durable asset." cta="Read the mental model overview" href="/en/mental-model/overview">PreparedContext</Tooltip> is input for this request. It does not become new Memory automatically.
 
 ## Walk through the OpenAPI example
 
@@ -222,13 +228,24 @@ PreparedContext also applies relevance, deduplication, and byte-budget constrain
 
 The current search keeps the Revision snapshot selected at the start. A later search reads the new head.
 
-## Checklist
+## How you know the layers are separate
 
-- Are Artifact Revision, entry ID, and entry-version ID separate?
-- Is retire understood as deactivate rather than delete?
-- Does explicit write remain model-free and Source-free?
-- Does an extraction candidate pass evidence and domain validation?
-- Are `auto` fallback and explicit vector/hybrid failure different?
-- Is PreparedContext still temporary, untrusted, and bounded?
+1. Are Artifact Revision, entry ID, and entry-version ID separate?
+2. Is retire understood as deactivate rather than delete?
+3. Does explicit write remain model-free and Source-free?
+4. Does an extraction candidate pass evidence and domain validation?
+5. Are `auto` fallback and explicit vector/hybrid failure different?
+6. Is PreparedContext still temporary, untrusted, and bounded?
 
-Continue with [Handoff](/en/mental-model/handoff). Memory answers what the project should remember later. Handoff answers who continues the current work and where they begin.
+When the objects are clear, write the first Memory in [Install and run the Server](/en/basic-usage/install-and-run). To walk the capture path, use [Source and Memory in practice](/en/basic-usage/source-and-memory).
+
+## Next
+
+<Columns cols={2}>
+  <Card title="See who continues the work" icon="hand" href="/en/mental-model/handoff" arrow="true" cta="Read Handoff">
+    Memory answers what the project should remember later. Handoff answers who continues and where they begin.
+  </Card>
+  <Card title="Write the first Memory" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Start the first loop">
+    Start a local Server, write a Memory, find it, then get a cited PreparedContext.
+  </Card>
+</Columns>

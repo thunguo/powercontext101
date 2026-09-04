@@ -1,47 +1,36 @@
 ---
 title: "心智模型总览"
-description: "分清 PowerContext 中的证据、长期资产、临时上下文和工作交接。"
+description: "先分清三条路，再往下读对象页。"
+icon: brain
+keywords:
+  - 心智模型
+  - Source
+  - Memory
+  - Handoff
+  - PreparedContext
 ---
 
-如果把 PowerContext 只理解成“给 Agent 加记忆”，后面很快会遇到问题：一条提示词到底算不算 Memory？模型生成的 Skill 能不能直接安装？Handoff 为什么有时查不到最新版本？
+把 PowerContext 只理解成“给 Agent 加记忆”，后面很快会混。一条提示词算不算 <Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip>？模型生成的 <Tooltip headline="Skill" tip="已批准的可重复做法。获批后还要显式导出，不自动获得执行权限。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Skill</Tooltip> 能不能直接装？<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 为什么有时没有最新版本？
 
-答案不在某个 API 参数里，而在对象边界里。
+答案不在某个 API 参数里。先分清对象边界。
 
-## 先看三条路径
+## 先看三条路
 
-PowerContext 同时处理三类事情。
+PowerContext 同时走三条路。它们可以互相引用，但不会自动并成一件事。
 
-```mermaid
-flowchart TB
-  subgraph Recall[Durable knowledge and request-time recall]
-    S1[Source] --> M[Memory Revision]
-    M --> P[PreparedContext]
-    E[Approved Experience] --> P
-  end
+<img src="/assets/mental-three-paths-zh.svg" alt="留下知识、先审再留、交接工作是三条独立路径。" />
 
-  subgraph ReviewFlow[Experience and Skill governance]
-    S2[Source or approved Artifact] --> C[Candidate]
-    C --> R{Review}
-    R -->|approve| E
-    R -->|approve| K[Skill Revision]
-    R -->|reject| X[Rejected Candidate]
-    K --> EX[Explicit export]
-  end
+留下知识。<Tooltip headline="Source" tip="记录发生过什么。采集不会自动写成长期知识。" cta="阅读 Source" href="/zh/mental-model/source">Source</Tooltip> 只证明这件事发生过。确认以后还要用，才写成 Memory。下次请求用 <Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 召回。
 
-  subgraph Work[Work transfer]
-    W[Current work] --> H[Prepared Handoff]
-    H -->|optional commit| HC[Committed Handoff Revision]
-    H --> CO[Continue]
-    HC --> CO
-    CO --> A[Acknowledgement and Task Outcome]
-  end
-```
+先审再留。<Tooltip headline="Experience" tip="已批准的判断经验。先作为 Candidate 进入 Review。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Experience</Tooltip> 和托管 Skill 先变成 <Tooltip headline="Candidate" tip="尚待 Review 的 Experience 或 Skill 提案。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Candidate</Tooltip>。模型可以起草，生成成功不等于批准。<Tooltip headline="Review" tip="批准才创建 Artifact Revision。拒绝只记录原因，不创建结果 Artifact。" cta="阅读 Experience 与 Skill" href="/zh/mental-model/experience-and-skill">Review</Tooltip> 批准后才会留下。Skill 还要显式导出。
 
-这三条路径可以引用彼此的证据，但不会自动合并。写入 Memory 不会顺便创建 Handoff；批准 Skill 也不会把它塞进下一次 PreparedContext。
+交接可以先临时。Handoff 先打包给接手者；只有显式提交，才成为持久里程碑。
+
+写入 Memory 不会顺便创建 Handoff。批准 Skill 也不会把它塞进下一次 PreparedContext。
 
 ## 六种值，不要混用
 
-这些值的生命周期和权限含义不同。分清它们，才能避免把临时模型输入误当成持久状态或可执行指令。
+这些值的生命周期和权限含义不同。分清它们，才不会把这一次的模型输入当成持久状态，或当成可执行指令。
 
 | 值 | 解决什么问题 | 是否持久 | 是否可直接当成当前指令 |
 |---|---|---:|---:|
@@ -56,7 +45,7 @@ flowchart TB
 
 Source 可以保存提示词、任务结果或其他工作材料。它回答“当时发生了什么”。
 
-采集 Source 不等于把内容写进 Memory。自动抽取还需要生成流程；你也可以绕过抽取，显式写入已经确认的 Memory。
+采集 Source 不等于把内容写进 Memory。自动抽取还需要生成流程。你已经确认要留什么时，直接写 Memory 更简单。
 
 ### Artifact Revision 保存历史
 
@@ -77,7 +66,7 @@ Candidate 有自己的 `version`，它用于 Review 前的并发控制。Candida
 - `ready`：有非空内容和 Citation；
 - `empty`：没有合适内容，不是故障。
 
-PreparedContext 不会写回长期历史。宿主应把它标成 `untrusted_history`，并在当前模型请求中临时注入。
+PreparedContext 不会写回长期历史。宿主应把它标成 `untrusted_history`，并只注入当前这一次模型请求。
 
 ### Handoff 可以不提交
 
@@ -108,7 +97,7 @@ PreparedContext 和已准备 Handoff 是临时值。Source、Candidate 和 Artif
 
 Scope 只选择数据。Citation 只说明来源和版本。Review 只决定是否创建 Artifact。这些机制都不会授予工具权限，也不会证明历史内容仍然符合当前工作区状态。
 
-## 一个贯穿本站的例子
+## 本站后面都用同一件事
 
 后面的章节会反复使用同一件事：修改 PowerContext 的 OpenAPI 契约。
 
@@ -139,6 +128,28 @@ Scope 只选择数据。Citation 只说明来源和版本。Review 只决定是�
   </Accordion>
 </AccordionGroup>
 
+## 怎么知道分清了
+
+你刚读完这页时，先核这四件事：
+
+1. 采集成功，不等于已经留下 Memory。
+2. PreparedContext 只服务这一次请求，不会自动变成长期资产。
+3. 已准备 Handoff 不提交，就不会成为 `latest`。
+4. Skill 获批后还要显式导出，而且不会进入 PreparedContext。
+
+对不上时，先读对应对象页，不要直接跳进安装。
+
+<Tip>
+自动帮你找回上下文失败时，当前任务还应继续。你明确要求写入 Memory、提交 Handoff、批准或导出时，失败必须能看见。完整说明见 [fail-open](/zh/mental-model/fail-open)。
+</Tip>
+
 ## 下一步
 
-继续读 [Source](/zh/mental-model/source)，了解证据如何获得稳定身份、日志位置和处理进度。准备直接接入宿主前，还应读 [Scope](/zh/mental-model/scope) 和 [fail-open](/zh/mental-model/fail-open)。
+<Columns cols={2}>
+  <Card title="先看证据怎么留下" icon="file-plus" href="/zh/mental-model/source" arrow="true" cta="阅读 Source">
+    Source 只证明这件事发生过。日志位置、处理游标和 Memory 是后面的不同层。
+  </Card>
+  <Card title="接入前先看 Scope" icon="split" href="/zh/mental-model/scope" arrow="true" cta="阅读 Scope">
+    设错 Scope 通常不报错，只是搜不到。准备接宿主前，再读 [fail-open](/zh/mental-model/fail-open)。
+  </Card>
+</Columns>

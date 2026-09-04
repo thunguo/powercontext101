@@ -1,25 +1,26 @@
 ---
 title: "Handoff loop"
-description: "Create a Work Contract, transfer current work, acknowledge an exact Handoff, and record the real Task Outcome."
+description: "Run a real handoff. Preparing writes a Source. Commit creates the milestone."
+icon: hand
+keywords:
+  - Handoff
+  - Work Contract
+  - Task Outcome
 ---
 
-The next procedure completes a real work transfer. The sender records the delegation boundary and current state, the receiver inspects an exact Handoff, and the final result links back to that transfer.
+This page runs a real handoff. The sender records the delegation boundary and current state. The receiver inspects an exact <Tooltip headline="Handoff" tip="Hands the current goal, verified progress, blockers, and next step to the next owner. Uncommitted work is still a temporary package." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip>. The result links back to that transfer.
 
-Handoff does not require a generation model here. The caller supplies inspected typed data, so the minimum Server is enough.
+Handoff does not need a generation model here. The caller supplies typed data already inspected, so the minimum Server is enough.
 
-## The loop
+<img src="/assets/basic-handoff-loop-en.svg" alt="A real handoff: Work Contract, prepare, commit, acknowledge exactly, then record a Task Outcome." />
 
-```text
-Work Contract
-→ handoff_current_work
-→ Prepared Handoff
-→ optional commit
-→ continue exact
-→ acknowledge exact
-→ Task Outcome
-```
+<Info>
+Work Contract fields and Handoff APIs follow the latest published [official docs](https://oceanbase.github.io/powercontext/). This page helps you finish one handoff and see which step writes a Source.
+</Info>
 
-Work Contract, Handoff boundary, acknowledgement receipt, and Task Outcome each produce a Source receipt. A committed Handoff also has an immutable Artifact Revision.
+## What the loop looks like
+
+The Work Contract, Handoff boundary, acknowledgement receipt, and Task Outcome each leave a Source receipt. A committed Handoff also has an immutable Artifact Revision. Preparing writes a boundary Source, so it is not a read-only preview.
 
 ## Complete Python example
 
@@ -322,14 +323,29 @@ Prepare two Handoffs, commit the first, then commit the second. The second retur
 
 The boundary Source remains, but no new Handoff Revision exists. Report both facts. Do not say that nothing was written or that the milestone was saved.
 
-## Completion check
+## How you know it worked
 
-- A Work Contract receipt exists.
-- Prepared Handoff works for temporary continuation.
+- The Work Contract receipt is saved.
+- Prepared Handoff can continue temporarily.
 - Commit returns an exact Handoff Revision.
-- Latest discovery becomes exact acknowledgement.
-- Accepted checks evidence, live state, capability, and authorization.
+- After you find the latest version, acknowledgement binds to that exact Revision.
+- Before accept, you check evidence, live state, capability, and authorization.
 - Task Outcome links the acknowledgement receipt SourceRef.
-- Overall outcome and individual check statuses remain separate.
+- Overall outcome and individual check statuses stay separate.
 
-Continue with [Experience, Skill, and Review](/en/basic-usage/experience-skill-review).
+If this does not match, start with [Troubleshooting](/en/start/troubleshooting).
+
+<Tip>
+If PowerContext fails while automatically fetching context, keep working. If you explicitly write a Memory, commit a Handoff, approve a proposal, or export a Skill, you must see the failure. Read [fail-open](/en/mental-model/fail-open) for the full rule.
+</Tip>
+
+## Next step
+
+<Columns cols={2}>
+  <Card title="Experience, Skill, and Review" icon="scale-balanced" href="/en/basic-usage/experience-skill-review" arrow="true" cta="Review first">
+    A Candidate enters Review first. An approved Skill still needs an explicit export.
+  </Card>
+  <Card title="If you are stuck" icon="wrench" href="/en/start/troubleshooting" arrow="true" cta="Open troubleshooting">
+    You asked for a preview, then called Handoff. Start there.
+  </Card>
+</Columns>
