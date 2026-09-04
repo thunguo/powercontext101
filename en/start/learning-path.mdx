@@ -1,6 +1,6 @@
 ---
 title: "Learning path"
-description: "Learn the minimum mental model, then complete one verifiable path for your framework or host."
+description: "Separate a few objects first, then finish one path that matches your goal."
 icon: route
 keywords:
   - learning path
@@ -10,22 +10,22 @@ keywords:
   - fail-open
 ---
 
-You do not need to read the whole site in order. Learn the object boundaries first, then finish the path that matches the work in front of you.
+You do not need to read the whole site first. Separate a few objects, then pick the path that matches the work in front of you.
 
-Do not combine paths on the first pass. A local API loop, a framework adapter, and a host plugin answer different questions. Finish one, record its observable success and failure behavior, then use the next tab only when the work requires it.
+Do not walk several paths at once. A local API loop, a Python framework, and an agent plugin answer different questions. Finish one, then decide whether you need the next.
 
 <Steps titleSize="h3">
-  <Step title="Understand the object boundaries" icon="brain">
-    Start with the [mental model overview](/en/mental-model/overview), then read [Scope](/en/mental-model/scope) and [fail-open](/en/mental-model/fail-open). At minimum, separate Source, Memory, PreparedContext, and Handoff.
+  <Step title="Separate the objects first" icon="brain">
+    Start with the [mental model overview](/en/mental-model/overview), then read [Scope](/en/mental-model/scope) and [fail-open](/en/mental-model/fail-open). At minimum, keep <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip>, <Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip>, <Tooltip headline="PreparedContext" tip="A bounded view for one request. It includes Citations and is not a durable asset." cta="Read the mental model overview" href="/en/mental-model/overview">PreparedContext</Tooltip>, and <Tooltip headline="Handoff" tip="Packages the current objective, verified progress, blockers, and next action. It stays temporary until an explicit commit." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip> apart.
   </Step>
   <Step title="Start a local Server" icon="server">
-    Follow [Install and run the Server](/en/basic-usage/install-and-run) with the minimum configuration. Explicit Memory and FTS do not require an inference provider.
+    Follow [Install and run the Server](/en/basic-usage/install-and-run) with the minimum setup. Writing Memory and using full-text search do not need an inference provider.
   </Step>
   <Step title="Choose one path" icon="route">
-    Continue by goal below. Finish one working loop before comparing other frameworks and hosts.
+    Pick one goal below. Finish that loop before comparing other frameworks or agents.
   </Step>
-  <Step title="Use official docs for contracts" icon="book-open">
-    OpenAPI, complete configuration, deployment, and command references belong in the [official PowerContext docs](https://oceanbase.github.io/powercontext/). PowerContext 101 explains how to use those interfaces and verify the result.
+  <Step title="Use official docs for details" icon="book-open">
+    For install options, interface details, and deployment, use the latest published [official docs](https://oceanbase.github.io/powercontext/). PowerContext 101 helps you choose a path and verify the result.
   </Step>
 </Steps>
 
@@ -33,7 +33,7 @@ Do not combine paths on the first pass. A local API loop, a framework adapter, a
 The documented installation targets are macOS and Linux with Python 3.11 or later. This tutorial does not provide an unverified Windows workaround.
 </Warning>
 
-## Choose by goal
+## Choose by your goal
 
 <Tabs>
   <Tab title="I am new to PowerContext">
@@ -45,87 +45,93 @@ The documented installation targets are macOS and Linux with Python 3.11 or late
     4. [Install and run the Server](/en/basic-usage/install-and-run)
     5. [API tour](/en/basic-usage/api-tour)
 
-    You are done when you finish the first loop: write one Memory, find it with `search_memory`, and use `prepare_context` to obtain a cited `PreparedContext`.
+    How do you know it worked? Follow steps 4 and 5 above. Start the local Server on [Install and run the Server](/en/basic-usage/install-and-run), then open the [API tour](/en/basic-usage/api-tour) and run the script to write one Memory.
 
-    Skip framework pages, host pages, and the later Source / Handoff tutorials for now.
+    The terminal should show three things: `search_memory` hits that Memory, `prepare_context` returns non-empty content, and the result includes a Citation. If it does not match, start with [Troubleshooting](/en/start/troubleshooting).
 
-    **Longer path (optional, not a completion check)**
+    Skip framework pages, agent-host pages, and the later Source / Handoff tutorials for now.
 
-    If the objects still blur, read [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill). After the first loop, continue only if you need [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), or [Experience / Skill Review](/en/basic-usage/experience-skill-review). To connect an MCP client to the same data, read [Connect with MCP](/en/basic-usage/mcp). To verify active and inactive counts for the same Scope, read [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard). Use Client, HTTP, or MCP for Memory text.
+    If you want a little more (optional)
+
+    If the objects still blur, read [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill). After the first loop, continue only if you need [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), or [Experience / Skill Review](/en/basic-usage/experience-skill-review). To connect an MCP client to the same data, read [Connect with MCP](/en/basic-usage/mcp). To check active and inactive counts for the same Scope, read [Verify Scope statistics in the Dashboard](/en/basic-usage/dashboard). Read Memory text through the Client, HTTP, or MCP.
   </Tab>
   <Tab title="I write Python agents">
-    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [API tour](/en/basic-usage/api-tour) → [Framework integration](/en/frameworks/overview).
+    Separate the objects, then [install and run the Server](/en/basic-usage/install-and-run), finish the [API tour](/en/basic-usage/api-tour), and open [Framework integration](/en/frameworks/overview).
 
-    First run `remember_memory`, `search_memory`, and `prepare_context` with the Python Client. Then open the [framework integration overview](/en/frameworks/overview). The next step from that page is LangGraph or LangChain, not Server inference and not the Preview adapter. The Pydantic AI agent adapter is a Preview and has no working standalone installation path, so it is not a good first integration.
+    How do you know it worked? First run the [API tour](/en/basic-usage/api-tour) script until you see a write, a search hit, and a cited `prepare_context` result. Then open the [framework integration overview](/en/frameworks/overview) and connect that same Memory in the LangGraph or LangChain page. A new session should still find the conclusion you just wrote.
 
-    If you only need automatic recall, you can skip Handoff and Skill for now.
+    For a first integration, choose LangGraph or LangChain. Do not start with Server inference or a Preview adapter. The Pydantic AI Agent adapter is **Preview** and has no working standalone install path, so it is not a first integration.
 
-    **Longer path (optional, not a completion check)**
+    If you only need automatic recall, you can leave Handoff and Skill for later.
+
+    If you want a little more (optional)
 
     After LangGraph or LangChain works, read [framework tricks](/en/frameworks/tricks). Add [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review) only when you need extraction, Handoff, or Skill. Read Server inference and the Preview adapter later, not first.
   </Tab>
   <Tab title="I use Hermes / OpenClaw">
-    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Common agents overview](/en/common-agents/overview) → [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
+    Separate the objects, then [install and run the Server](/en/basic-usage/install-and-run). Open the [common agents overview](/en/common-agents/overview), then [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw).
 
-    You are done when the plugin is installed and active, `powercontext doctor <host>` passes, and a new session can recall a Memory you stored explicitly.
+    How do you know it worked? Open the [Hermes](/en/common-agents/hermes) or [OpenClaw](/en/common-agents/openclaw) page and finish its install plus `powercontext doctor <host>`. A passing `doctor` only means the plugin is installed. Open a new session and ask for the Memory you stored explicitly. If the session can find it, the path works.
 
-    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, verify that the plugin owns the memory slot. WorkBuddy uses its separate `setup workbuddy` path. The portable Agent Plugin has no setup command; load its package directory and verify explicit MCP operations. Installation, credentials, and durable writes still require your authorization.
+    After `powercontext setup hermes`, run `hermes memory setup` and select PowerContext. For OpenClaw, confirm that the plugin owns the Memory slot. WorkBuddy uses its own `setup workbuddy` path. The portable Agent Plugin has no setup command; load its package directory and verify explicit MCP operations. Installation, credentials, and durable writes still require your authorization.
 
-    **Longer path (optional, not a completion check)**
+    If you want a little more (optional)
 
     After recall works, read [Handoff](/en/mental-model/handoff), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review). [Agent self-extension](/en/common-agents/agent-self-extension) covers managed Skill export only. Hermes and OpenClaw cannot export; switch to Codex or Claude Code for that step.
   </Tab>
   <Tab title="I use a coding agent">
-    Read in this order: mental model → [Install and run the Server](/en/basic-usage/install-and-run) → [Coding agents overview](/en/coding-agents/overview) → the selected host page.
+    Separate the objects, then [install and run the Server](/en/basic-usage/install-and-run). Open the [coding agents overview](/en/coding-agents/overview), then the host page you need.
 
-    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They connect to the same Server, but their hook events, injection channels, capture behavior, flush behavior, and permission gates differ.
+    Choose Codex, Claude Code, DSH, OpenCode, or Pi. They share the same Server. Their lifecycles, injection points, and permission checks differ.
 
-    You are done when normal coding still works with automatic recall unavailable, while a failed explicit Memory or Handoff operation remains visible to you.
+    How do you know it worked? Open the [coding agents overview](/en/coding-agents/overview), pick a host, and follow that page's install and checks. After you stop the Server, ordinary coding should still continue. If an explicit Memory write or Handoff commit fails, the page or terminal must show the error. Each host page rewrites these steps with its own tools.
 
-    **Longer path (optional, not a completion check)**
+    If you want a little more (optional)
 
-    After the host page works, read [Hooks and plugins](/en/coding-agents/hooks-and-plugins) and [Extend hooks](/en/coding-agents/extend-hooks). Use [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill) for object detail. The runnable extras are [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review).
+    After the host page works, read [Hooks and plugins](/en/coding-agents/hooks-and-plugins) and [Extend hooks](/en/coding-agents/extend-hooks). Use [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill) for object detail. The extra runnable pages are [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), and [Experience / Skill Review](/en/basic-usage/experience-skill-review).
   </Tab>
   <Tab title="I am building an integration">
-    Complete [Hooks and plugins](/en/coding-agents/hooks-and-plugins), compare at least two existing hosts, then read [Extend hooks](/en/coding-agents/extend-hooks).
+    Finish [Hooks and plugins](/en/coding-agents/hooks-and-plugins), compare at least two existing hosts, then read [Extend hooks](/en/coding-agents/extend-hooks).
 
-    The deliverable is not merely code that calls `/v1/context/prepare`. Write a verifiable adapter contract covering Scope, transient injection, Source capture, permissions, diagnostics, installation, and real-host end-to-end tests.
+    The deliverable is not a snippet that can call `prepare_context`. Write a verifiable integration note. Scope, temporary injection, Source capture, permissions, diagnostics, installation, and real-host end-to-end checks all need explicit behavior.
 
-    You can postpone the Basic Usage Handoff and Skill tutorials until the adapter's recall and capture path is stable.
+    You can leave the Handoff and Skill tutorials until recall and capture are stable.
 
-    **Longer path (optional, not a completion check)**
+    If you want a little more (optional)
 
-    After the main chain is stable, add [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), [Experience / Skill Review](/en/basic-usage/experience-skill-review), and [framework tricks](/en/frameworks/tricks). The object pages [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill) help you check the contract. They are not a gate for starting the integration.
+    After the main chain is stable, add [Source and Memory](/en/basic-usage/source-and-memory), the [Handoff loop](/en/basic-usage/handoff-loop), [Experience / Skill Review](/en/basic-usage/experience-skill-review), and [framework tricks](/en/frameworks/tricks). The object pages help you check behavior. They are not a gate for starting: [Source](/en/mental-model/source), [Memory](/en/mental-model/memory), [Handoff](/en/mental-model/handoff), and [Experience and Skill](/en/mental-model/experience-and-skill).
   </Tab>
 </Tabs>
 
-## Run this check first
+## Check it with the same question
 
-Use one question to verify any path:
+Whatever path you pick, use this to see if it actually works. On the first-contact path, do it in the [API tour](/en/basic-usage/api-tour). After you connect an agent, redo it on that host page with its own tools.
 
-> What should happen after the OpenAPI contract changes?
+You just wrote a conclusion you will need later. Can the next request find it?
 
-1. Store the answer explicitly in a stable Scope.
+1. Write it explicitly in a fixed Scope.
 2. Ask again in a new request or session.
-3. Confirm that the recalled content has a Citation and enters the current model input through the adapter's documented channel; durable message-history storage remains a host or application decision.
-4. Stop the Server and ask again. Automatic recall may fail, but the original task should continue.
-5. Attempt an explicit write. It must report failure rather than pretend the data was saved.
+3. Check that the recalled content has a Citation and enters only this model request.
+4. Stop the Server and ask again. Automatic recall may fail. The original task should continue.
+5. Try one explicit write. The failure must be visible. It cannot pretend the save succeeded.
 
-Hermes, OpenClaw, and the five coding-agent host pages rewrite these five steps in that host's own tools. Finish them on the page you chose. Do not treat this list as a checkbox by itself.
+Do not treat this list as a checkbox by itself. If the symptom does not match, start with [Troubleshooting](/en/start/troubleshooting).
 
-If the symptom does not match, start with [Troubleshooting](/en/start/troubleshooting).
+<Tip>
+If PowerContext fails while automatically fetching context, keep working. If you explicitly write a Memory, commit a Handoff, approve a proposal, or export a Skill, you must see the failure. Read [fail-open](/en/mental-model/fail-open) for the full rule.
+</Tip>
 
 <Info>
-Bub is currently documented mainly in its integration-local README. PowerContext 101 does not maintain a separate path for it, and it is not one of the 12 official configure how-tos.
+PowerContext 101 does not keep a separate Bub path. Its notes live mainly in the integration README.
 </Info>
 
 ## Next step
 
 <Columns cols={2}>
-  <Card title="Read the mental model" icon="brain" href="/en/mental-model/overview" arrow="true" cta="Separate the objects">
-    Start here if Source, Memory, and PreparedContext still sound interchangeable.
+  <Card title="Separate the objects first" icon="brain" href="/en/mental-model/overview" arrow="true" cta="Read the mental model">
+    Start here if Source, Memory, and PreparedContext still blur together.
   </Card>
   <Card title="Start a local Server" icon="server" href="/en/basic-usage/install-and-run" arrow="true" cta="Run the first loop">
-    If the boundaries are clear, complete the first loop: write a Memory, search it, and obtain a cited `PreparedContext`.
+    If the objects are already clear, write one Memory, find it, and get a cited `PreparedContext`.
   </Card>
 </Columns>
