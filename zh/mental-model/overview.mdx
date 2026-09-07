@@ -97,19 +97,25 @@ PreparedContext 和已准备 Handoff 是临时值。Source、Candidate 和 Artif
 
 Scope 只选择数据。Citation 只说明来源和版本。Review 只决定是否创建 Artifact。这些机制都不会授予工具权限，也不会证明历史内容仍然符合当前工作区状态。
 
-## 本站后面都用同一件事
+## 后面都用同一道例题
 
-后面的章节会反复使用同一件事：修改 PowerContext 的 OpenAPI 契约。
+后面讲 Source、Memory、Handoff、Experience 和 Skill 时，不会换故事，大家都围着同一道例题。这样就能对照：同一件工作会留下哪些不同对象。
 
-1. 捕获一条 Source：契约已修改，需要重新生成客户端并运行契约测试。
-2. 显式保存 Memory：运行契约测试前先重新生成并检查签入仓库的客户端。
-3. 新请求通过 PreparedContext 召回这条 Memory。
-4. 把当前进度整理为 Handoff，交给下一位 Agent。
-5. 根据结果提交 Experience Candidate。
-6. Review 批准后，再从 Experience 生成 Skill Candidate。
-7. Skill 获批后显式导出到支持的宿主。
+例题是：PowerContext 的 OpenAPI 契约改了。接下来要重新生成签入仓库的客户端，再跑契约测试。
 
-每一步都会留下不同的 ID、Citation 或 Revision。本站会保留这些值，让你看到系统真正做了什么。
+同一件事会分开留下这些东西，而且不会自动串起来：
+
+| 做的事 | 留下什么 | 不会自动变成 |
+|---|---|---|
+| 记下契约已改，客户端和契约测试都要跟上 | Source | Memory |
+| 确认以后还要用，写下“跑测试前先重新生成并检查客户端” | Memory | Handoff |
+| 下一轮问“改完契约下一步做什么” | PreparedContext | 长期资产 |
+| 把当前进度交给下一位 Agent | 已准备 Handoff | 已提交的 `latest` |
+| 根据结果提交一条判断经验 | Experience Candidate | 已批准 Experience |
+| Experience 获批后，再起草可重复做法 | Skill Candidate | 已批准 Skill |
+| 把已批准 Skill 导出到支持的宿主 | Skill 投影 | 执行权限或召回结果 |
+
+对照后面的推演时，看每一步返回的 ID、Citation 或 Revision。
 
 ## 常见误解
 
