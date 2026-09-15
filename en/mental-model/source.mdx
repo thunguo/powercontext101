@@ -11,9 +11,9 @@ keywords:
 
 Capture may succeed while <Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> search stays empty. That is usually not a failed write.
 
-A <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> records what happened. A user prompt, task result, or host-captured turn may all become Sources. It does not decide whether the content deserves long-term retention. Memory, Experience, Skill, and Handoff handle those later decisions.
+A <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> records what happened. A user prompt, a task result, or a host-captured turn may all become a Source. It does not decide whether the content deserves long-term retention. Memory, Experience, Skill, and Handoff handle those later decisions.
 
-Treat those as two observable stages. The Source is safely stored. No extraction window has produced reusable knowledge yet.
+Treat those as two separate stages. The Source is already stored safely. Reusable knowledge appears only after an extraction window finishes.
 
 <Info>
 For install options, interface details, and deployment, use the latest published [official docs](https://oceanbase.github.io/powercontext/). This page helps you separate evidence, journal position, and processing progress.
@@ -21,7 +21,7 @@ For install options, interface details, and deployment, use the latest published
 
 ## Get a stable identity first
 
-PowerContext refers to a Source with two fields:
+PowerContext refers to a Source with `source_type` and `source_id`.
 
 ```text
 SourceRef
@@ -31,7 +31,7 @@ SourceRef
 
 The full identity also includes `scope_id`. The same `source_type` and `source_id` may exist independently in different Scopes.
 
-For the built-in content Source, capture returns a SourceRef and a scope-local journal position:
+For the built-in content Source, a successful capture returns a SourceRef and a scope-local journal position.
 
 ```json
 {
@@ -48,7 +48,7 @@ A `source_id` should be stable and reproducible. Hosts often derive it from the 
 
 ## Captured and referenced Sources differ
 
-A Source adapter uses one of two materialization modes.
+Once the identity is stable, decide whether this Source stores a snapshot or only an external reference. A Source adapter stores content in one of two ways.
 
 | Mode | What PowerContext stores | How it is read |
 |---|---|---|
@@ -57,29 +57,24 @@ A Source adapter uses one of two materialization modes.
 
 Captured Sources suit prompts, task results, and event text. Referenced Sources suit material owned by another system.
 
-The distinction is practical. Captured content is a snapshot. Material behind a referenced Source may have changed by the next resolution.
+The distinction is practical. Captured content is a snapshot from that moment. Material behind a referenced Source may have changed by the next resolution.
 
 ## One journal per Scope
 
-A persisted Source receives a monotonically increasing position. A position:
+After a Source is persisted in the current Scope, it also receives a position that only has meaning there. The position starts at 1 and increases monotonically. Distinct Source adapters share one sequence, and an idempotent retry does not consume a new position.
 
-- starts at 1;
-- has meaning only within its Scope;
-- shares one sequence across Source adapters;
-- is not consumed again by an idempotent retry.
-
-Suppose two content Sources arrive in order:
+Suppose two content Sources arrive in order.
 
 ```text
 content/openapi-task-1 → position 1
 content/openapi-task-2 → position 2
 ```
 
-The Source journal establishes order. It does not say which Source has been processed or whether Memory exists.
+The Source journal only establishes order. It does not say which Source has been processed, and it does not say whether Memory exists.
 
 ## The trigger only selects a window
 
-`SourceWindowTrigger` is pure policy. It compares the high watermark with the current cursor and returns the next bounded window:
+Processing progress is not the position itself. It is the window the trigger selects. `SourceWindowTrigger` only selects a window. It compares the current high position with the cursor and returns the next bounded window.
 
 ```text
 state.sequence = 0
@@ -89,7 +84,7 @@ limit = 1
 ProcessSourceWindow(after=0, through=1)
 ```
 
-The next activation returns:
+The next activation returns the following window.
 
 ```text
 ProcessSourceWindow(after=1, through=2)
@@ -97,16 +92,13 @@ ProcessSourceWindow(after=1, through=2)
 
 Once the cursor reaches 2, there is no action.
 
-The window is `(after, through]`: exclusive at `after`, inclusive at `through`. `source_window_limit` limits one processing batch, not the total journal length.
+The window is written as `(after, through]`. It excludes `after` and includes `through`. `source_window_limit` limits one processing batch, not the total journal length.
 
-The trigger does not call a model or perform extraction. It returns state and actions.
+The trigger does not call a model or perform extraction. It returns new state and the actions still to run.
 
 ## The cursor tracks consumption
 
-Two numbers are easy to confuse:
-
-- cursor `sequence`: the Source position processed by the application;
-- stored cursor `generation`: the concurrency-control version of the cursor row.
+After a window is selected, the cursor is what remembers how far processing has gone. Two numbers are easy to mix up. Cursor `sequence` is the Source position the application has processed. Stored cursor `generation` is the concurrency-control version of that cursor row.
 
 A cursor may say that processing reached position 12 while the row generation is 4. The numbers are unrelated.
 
@@ -114,16 +106,13 @@ PowerContext applies extraction and Memory changes before saving the next cursor
 
 ## Capture does not create Memory
 
-This operation creates a Source only:
+This operation creates a Source only.
 
 ```http
 POST /v1/sources/content
 ```
 
-Memory follows one of two paths:
-
-1. If you already know what to retain, write Memory explicitly.
-2. Configure a generation pipeline and let the scheduler or `flush_memory` process pending Source windows.
+Memory follows one of two paths. If you already know what to retain, write Memory explicitly. Or configure a generation pipeline and let the scheduler or `flush_memory` process pending Source windows.
 
 Even when extraction runs successfully, the model may find nothing worth adding or revising. Processing a Source does not guarantee a new Memory Revision.
 
@@ -133,35 +122,23 @@ Even when extraction runs successfully, the model may find nothing worth adding 
 
 ## Idempotency and conflict
 
-Capturing the same Source identity again in one Scope has two outcomes:
+Capturing the same Source identity again in one Scope has two outcomes. If the serialized payload bytes are identical, PowerContext returns the original position. If the payload bytes differ, it reports a conflict and leaves the old Source intact.
 
-- the serialized payload bytes are identical, so PowerContext returns the original position;
-- the payload bytes differ, so PowerContext reports a conflict and leaves the old Source intact.
-
-This comparison is not semantic canonicalization. Even metadata with the same keys and values may conflict when key order changes the serialized bytes. A retry should reuse the same serialized input.
+The comparison looks at serialized bytes, not whether the meaning is the same. Even metadata with the same keys and values may conflict when key order changes the serialized bytes. A retry should reuse the same serialized input.
 
 Do not keep reusing one fixed `source_id` for changing content.
 
-Concurrency has explicit guarantees too:
-
-- distinct concurrent Sources receive a contiguous sequence of positions;
-- concurrent retries of the same Source and payload resolve to one position;
-- when two workers update a cursor, only the write with the expected generation succeeds.
+Concurrency has explicit guarantees too. Distinct concurrent Sources receive a contiguous sequence of positions. Concurrent retries of the same Source and payload resolve to one position. When two workers update a cursor, only the write with the expected generation succeeds.
 
 ## Sources beyond chat capture
 
-Sources do not come only from agent prompts. Work continuity also records exact Sources, including:
+Sources do not come only from chat hosts. Work continuity also records exact Sources, including Work Contracts, Handoff boundaries, Handoff acknowledgement receipts, and Task Outcomes.
 
-- Work Contracts;
-- Handoff boundaries;
-- Handoff acknowledgement receipts;
-- Task Outcomes.
-
-Handoff Report can therefore project work history from the journal without rewriting Handoff Artifacts.
+That lets Handoff Report project work history from the journal without rewriting Handoff Artifacts.
 
 ## Walk through the OpenAPI example
 
-Capture the first piece of evidence:
+Capture the first piece of evidence.
 
 ```json
 {
@@ -174,12 +151,7 @@ Capture the first piece of evidence:
 }
 ```
 
-Check four things:
-
-1. The response SourceRef is `content/openapi-task-1`.
-2. The position is greater than zero.
-3. Retrying the same request returns the same position.
-4. Reusing the ID with changed content returns a conflict.
+Then check these four facts. The response SourceRef should be `content/openapi-task-1`. The position should be greater than zero. Retrying the same request should return the same position. Reusing the ID with changed content should return a conflict.
 
 Then decide whether the content should remain evidence or become explicit Memory. Most Sources do not need to become long-term knowledge.
 
@@ -203,12 +175,12 @@ That is expected when they use the same Scope and Server. All adapters share the
 
 ## How you know the layers are separate
 
-1. Does Source identity include Scope, type, and ID?
-2. Are journal position and cursor sequence separate?
-3. Are cursor sequence and cursor generation separate?
-4. Is the window understood as `(after, through]`?
-5. Did capture remain separate from Memory write?
-6. Does an idempotent retry keep the original position?
+1. Source identity includes Scope, type, and ID.
+2. Journal position and cursor sequence are different numbers.
+3. Cursor sequence and cursor generation are also different numbers.
+4. The window is understood as `(after, through]`.
+5. A successful capture is not a Memory write.
+6. An idempotent retry keeps the original position.
 
 If any of those fail, start with [Troubleshooting](/en/start/troubleshooting). To walk capture and extraction yourself, use [Source and Memory in practice](/en/basic-usage/source-and-memory).
 

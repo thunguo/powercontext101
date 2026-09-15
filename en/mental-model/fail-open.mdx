@@ -11,19 +11,15 @@ keywords:
 
 PowerContext runs beside the host's primary task. A temporary Server outage should not stop coding, answering a question, or continuing the work.
 
-That is the purpose of fail-open behavior. It applies to automatic, auxiliary paths. When a user explicitly asks to save, approve, commit, or export something, the failure must remain visible.
+If automatic recall fails, keep working. fail-open covers those helper paths. When a user explicitly asks to save, approve, commit, or export something, the failure must remain visible.
 
 ## PreparedContext is temporary
 
-A host calls `prepare_context` with:
-
-- a `scope_id`;
-- the current query;
-- a `max_bytes` budget.
+A host calls `prepare_context` with a `scope_id`, the current query, and a `max_bytes` budget.
 
 The Server selects relevant content from active Memory and the approved current Experience heads, then returns a `PreparedContext`.
 
-Two outcomes are normal:
+Two outcomes are normal.
 
 | status | Meaning | Host behavior |
 |---|---|---|
@@ -32,7 +28,7 @@ Two outcomes are normal:
 
 `empty` is not a Server failure or an authentication error.
 
-<Tooltip headline="PreparedContext" tip="A bounded view for one request. It includes Citations and is not a durable asset." cta="Read the mental model overview" href="/en/mental-model/overview">PreparedContext</Tooltip> includes exact Citations and a visible trust marker:
+<Tooltip headline="PreparedContext" tip="A bounded view for one request. It includes Citations and is not a durable asset." cta="Read the mental model overview" href="/en/mental-model/overview">PreparedContext</Tooltip> includes exact Citations and a visible trust marker.
 
 ```text
 BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
@@ -82,7 +78,7 @@ Do not tell the user that data was saved and hide the failure in a log. The visi
 
 ## A comparison experiment
 
-Suppose Claude Code receives:
+Suppose Claude Code receives this question.
 
 ```text
 What should I do after changing the OpenAPI contract?
@@ -92,24 +88,15 @@ The hook attempts recall and prompt capture independently.
 
 ### Recall fails and capture succeeds
 
-- No PreparedContext is injected.
-- Claude Code still receives the original prompt.
-- The prompt Source may still be stored.
-- Diagnostics record `server_unavailable` or the applicable failure category.
+No PreparedContext is injected. Claude Code still receives the original prompt. The prompt Source may still be stored. Diagnostics record `server_unavailable` or the applicable failure category.
 
 ### Recall succeeds and capture fails
 
-- The validated `additionalContext` is still injected.
-- The capture error does not erase the recall result.
-- The task continues.
+The validated `additionalContext` is still injected. The capture error does not erase the recall result. The task continues.
 
 ### An explicit retire fails
 
-The user then asks an MCP tool to retire an exact Memory entry after the Server has stopped:
-
-- the MCP operation returns unavailable or an error;
-- the host cannot claim that the Memory was retired;
-- the user may continue other work and retry after recovery.
+The user then asks an MCP tool to retire an exact Memory entry after the Server has stopped. The MCP operation returns unavailable or an error. The host cannot claim that the Memory was retired. The user may continue other work and retry after recovery.
 
 All three cases leave the host running. Only the first two are automatic fail-open paths.
 
@@ -137,17 +124,13 @@ The PowerContext Client rejects plaintext HTTP to non-loopback hosts. The Server
 
 ## `degraded` is not `not_ready`
 
-Readiness separates database failures from optional inference failures:
-
-- a database or runtime failure returns `not_ready` with HTTP 503;
-- a failed configured generation or embedding probe returns `degraded` with HTTP 200;
-- database operations that do not depend on the failed inference capability remain available; an operation that needs that generation or embedding provider may still fail.
+Readiness separates database failures from optional inference failures. A database or runtime failure returns `not_ready` with HTTP 503. A failed configured generation or embedding probe returns `degraded` with HTTP 200. Database operations that do not depend on the failed inference capability remain available. An operation that needs that generation or embedding provider may still fail.
 
 When readiness says `degraded`, inspect the affected capability instead of treating the entire Server as offline.
 
 ## What diagnostics should contain
 
-A useful automatic-path diagnostic contains only the metadata needed to troubleshoot:
+A useful automatic-path diagnostic contains only the metadata needed to troubleshoot.
 
 ```json
 {
@@ -160,29 +143,20 @@ A useful automatic-path diagnostic contains only the metadata needed to troubles
 
 It should not contain the prompt, Scope, Memory text, Citation, token, or provider response body.
 
-Common outcomes include:
-
-- `empty`
-- `authentication_failed`
-- `version_mismatch`
-- `server_unavailable`
-- `invalid_response`
+Common outcomes include `empty`, `authentication_failed`, `version_mismatch`, `server_unavailable`, and `invalid_response`.
 
 ## A practical rule
 
-Ask two questions when a PowerContext operation fails:
-
-1. Was this an automatic helper action or a durable action requested by the user?
-2. Would skipping it make the user believe that state changed when it did not?
+Ask two questions when a PowerContext operation fails. Was this an automatic helper action, or a durable action requested by the user? Would skipping it make the user believe that state changed when it did not?
 
 Automatic helper paths can usually continue. Any operation that changes durable state, approves content, or publishes files must return its real result.
 
 ## How you know the rule holds
 
-1. Is `empty` still distinct from a fault or a 401/403?
-2. Can the original task continue when automatic recall fails?
-3. If you explicitly write Memory, commit a Handoff, approve, or export, is the failure visible?
-4. Did you treat `degraded` as a completely offline Server?
+1. `empty` is still distinct from a fault or a 401 or 403.
+2. The original task can continue when automatic recall fails.
+3. If you explicitly write Memory, commit a Handoff, approve, or export, the failure is visible.
+4. `degraded` is not a completely offline Server.
 
 Continue with [Install and run the Server](/en/basic-usage/install-and-run), then observe the difference between `ready`, `degraded`, and a completely unavailable Server.
 

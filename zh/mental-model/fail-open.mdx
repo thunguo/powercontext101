@@ -11,19 +11,15 @@ keywords:
 
 PowerContext 是宿主任务旁边的一层上下文能力。Server 暂时不可用时，写代码、回答问题或继续工作不应该一起停下。
 
-这就是 fail-open 的用途。但它只适用于自动、辅助性的路径。用户明确要求保存、批准、提交或导出时，失败不能被藏起来。
+自动找回上下文失败时，手头工作还应继续。fail-open 只覆盖这类辅助路径。用户明确要求保存、批准、提交或导出时，失败不能被藏起来。
 
 ## PreparedContext 是一次请求的临时值
 
-宿主调用 `prepare_context` 时会提供：
-
-- `scope_id`；
-- 当前查询；
-- `max_bytes` 字节预算。
+宿主调用 `prepare_context` 时会带上 `scope_id`、当前查询和 `max_bytes` 字节预算。
 
 Server 从当前启用状态 Memory 和已批准当前 Experience 中选择相关内容，再返回一个 `PreparedContext`。
 
-正常结果有两种：
+正常结果有两种。
 
 | 状态 | 含义 | 宿主行为 |
 |---|---|---|
@@ -32,7 +28,7 @@ Server 从当前启用状态 Memory 和已批准当前 Experience 中选择相�
 
 `empty` 不是 Server 故障，也不是认证失败。
 
-<Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 带精确 Citation，并使用明确的信任标记：
+<Tooltip headline="PreparedContext" tip="这一次请求用的有界视图。带 Citation，不是长期资产。" cta="阅读心智模型总览" href="/zh/mental-model/overview">PreparedContext</Tooltip> 带精确 Citation，并使用明确的信任标记。
 
 ```text
 BEGIN_POWERCONTEXT_PREPARED_CONTEXT_V1
@@ -52,7 +48,7 @@ Server 停止、超时、模式不认识或响应过大时，宿主跳过注入�
 
 采集失败不应中止宿主任务。它也不能删除已经准备好的有效上下文。
 
-反过来也一样：召回失败时，支持采集的宿主仍可尝试保存 Source。这两条路径不是一个事务。
+反过来也一样。召回失败时，支持采集的宿主仍可尝试保存 Source。这两条路径不是一个事务。
 
 ### 可选边界刷新
 
@@ -68,10 +64,10 @@ Server 停止、超时、模式不认识或响应过大时，宿主跳过注入�
 
 | 操作 | 为什么不能静默继续 |
 |---|---|
-| `remember` / 修订 / 停用 | 调用者明确要求改变长期 Memory |
+| `remember`、修订或停用 | 调用者明确要求改变长期 Memory |
 | Handoff 提交 | 失败后不存在新的持久里程碑 |
-| Candidate 修订 / 批准 / 拒绝 | Review 必须绑定已检查的 Candidate 版本 |
-| Skill 导出 / 发布 | 冲突或本地漂移时不能覆盖宿主目录 |
+| Candidate 修订、批准或拒绝 | Review 必须绑定已检查的 Candidate 版本 |
+| Skill 导出或发布 | 冲突或本地漂移时不能覆盖宿主目录 |
 | 鉴权与传输层检查 | fail-open 不能绕过访问控制或把令牌发给其他地址 |
 
 显式操作失败后，宿主的对话本身可以继续，但必须说明这次动作没有完成。
@@ -82,7 +78,7 @@ Server 停止、超时、模式不认识或响应过大时，宿主跳过注入�
 
 ## 一次对照实验
 
-假设 Claude Code 收到：
+假设 Claude Code 收到下面这条问题。
 
 ```text
 What should I do after changing the OpenAPI contract?
@@ -92,36 +88,27 @@ Hook 会分别尝试召回和提示词采集。
 
 ### 召回失败，采集成功
 
-- 不注入 PreparedContext；
-- 原提示词继续交给 Claude Code；
-- 提示词 Source 仍可能保存成功；
-- 诊断标记 `server_unavailable` 或对应的失败类别。
+这时不注入 PreparedContext。原提示词继续交给 Claude Code。提示词 Source 仍可能保存成功。诊断标记 `server_unavailable` 或对应的失败类别。
 
 ### 召回成功，采集失败
 
-- 已验证的 `additionalContext` 仍然注入；
-- 采集错误不会抹掉召回结果；
-- 当前任务继续。
+已验证的 `additionalContext` 仍然注入。采集错误不会抹掉召回结果。当前任务继续。
 
 ### 显式停用失败
 
-用户随后通过 MCP 要求停用一条精确 Memory。此时 Server 已停止：
+用户随后通过 MCP 要求停用一条精确 Memory。此时 Server 已停止。MCP 操作返回不可用或错误。宿主不能声称 Memory 已停用。用户可以继续其他工作，等 Server 恢复后重试。
 
-- MCP 操作返回不可用/错误；
-- 宿主不能声称 Memory 已停用；
-- 用户可以继续其他工作，等 Server 恢复后重试。
-
-这三种情况都“不中断宿主”，但只有前两种属于自动 fail-open。
+这三种情况都不中断宿主，但只有前两种属于自动 fail-open。
 
 ## 安全边界仍然失败时关闭
 
 ### 认证失败不是空召回
 
-401/403 表示配置或授权有问题。把它当成 `empty` 会掩盖故障，也可能让用户误以为当前 Scope 没有历史。
+401 或 403 表示配置或授权有问题。把它当成 `empty` 会掩盖故障，也可能让用户误以为当前 Scope 没有历史。
 
 ### 不跟随重定向
 
-Hook 不应携带授权信息请求头跟随 30x 到另一个宿主。重定向目标拿不到凭证比“尽量完成召回”更重要。
+Hook 不应携带授权信息请求头跟随 30x 到另一个宿主。重定向目标拿不到凭证，比尽量完成召回更重要。
 
 ### 不接受未知模式
 
@@ -133,21 +120,17 @@ Hook 对响应大小和总墙钟时间设上限。超过限制就中止自动路
 
 ### 不放行不安全传输层
 
-PowerContext 客户端拒绝非本机回环地址的明文 HTTP。Server 绑定非本机回环地址时，默认也要求认证；否则必须显式启用不安全选项。fail-open 不能取消这些检查。
+PowerContext 客户端拒绝非本机回环地址的明文 HTTP。Server 绑定非本机回环地址时，默认也要求认证。否则必须显式启用不安全选项。fail-open 不能取消这些检查。
 
 ## `degraded` 不等于 `not_ready`
 
-就绪探测把数据库故障和可选推理故障分开：
+就绪探测把数据库故障和可选推理故障分开。数据库或运行时不可用时返回 `not_ready`，HTTP 503。已配置的生成或嵌入探测失败时返回 `degraded`，HTTP 200。不依赖故障推理能力的数据库操作仍可继续。需要该生成或嵌入模型提供方的具体操作仍可能失败。
 
-- 数据库/运行时不可用：`not_ready`，HTTP 503；
-- 已配置的生成或嵌入探测失败：`degraded`，HTTP 200；
-- 不依赖故障推理能力的数据库操作仍可继续；需要该生成或嵌入模型提供方的具体操作仍可能失败。
-
-因此，看到 `degraded` 时先检查具体能力，不要把整个 Server 当成离线。
+看到 `degraded` 时先检查具体能力，不要把整个 Server 当成离线。
 
 ## 诊断应告诉你什么
 
-好的自动路径诊断只包含排错所需的元数据，例如：
+好的自动路径诊断只包含排错所需的元数据。
 
 ```json
 {
@@ -160,29 +143,20 @@ PowerContext 客户端拒绝非本机回环地址的明文 HTTP。Server 绑定�
 
 它不应包含提示词、Scope、Memory 文本、Citation、令牌或模型提供方响应体。
 
-常见 outcome 包括：
-
-- `empty`
-- `authentication_failed`
-- `version_mismatch`
-- `server_unavailable`
-- `invalid_response`
+常见 outcome 包括 `empty`、`authentication_failed`、`version_mismatch`、`server_unavailable` 和 `invalid_response`。
 
 ## 判断规则
 
-遇到失败时，问两个问题：
-
-1. 这是宿主自动尝试的辅助操作，还是用户明确要求的持久动作？
-2. 跳过它会不会让用户误以为状态已经改变？
+遇到失败时，先问两个问题。这是宿主自动尝试的辅助操作，还是用户明确要求的持久动作？跳过它会不会让用户误以为状态已经改变？
 
 自动辅助路径通常可以继续。任何会改变长期状态、批准内容或发布文件的动作，都必须返回真实结果。
 
 ## 怎么知道分清了
 
-1. `empty` 是不是被当成了故障或 401/403？
-2. 自动召回失败时，原任务是否还能继续？
-3. 你明确写入 Memory、提交 Handoff、批准或导出时，失败是否看得见？
-4. `degraded` 是不是被误当成整个 Server 离线？
+1. `empty` 不是故障，也不是 401 或 403。
+2. 自动召回失败时，原任务还能继续。
+3. 你明确写入 Memory、提交 Handoff、批准或导出时，失败看得见。
+4. `degraded` 不是整个 Server 离线。
 
 下一步进入[安装并运行 Server](/zh/basic-usage/install-and-run)。启动后分别观察 `ready`、`degraded` 和 Server 完全不可用时的行为。
 

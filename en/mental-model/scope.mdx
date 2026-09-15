@@ -11,19 +11,13 @@ keywords:
 
 Most PowerContext operations require a `scope_id`. That value decides which set of data the request reads or writes.
 
-A wrong <Tooltip headline="Scope" tip="Selects which data set this request reads or writes. A wrong value rarely errors. Search is just empty." cta="Read Scope" href="/en/mental-model/scope">Scope</Tooltip> often looks like missing data: “I wrote this already, so why is search empty?” The more serious failure is using one Scope for projects or tenants that should remain separate.
+A wrong <Tooltip headline="Scope" tip="Selects which data set this request reads or writes. A wrong value rarely errors. Search is just empty." cta="Read Scope" href="/en/mental-model/scope">Scope</Tooltip> often looks like missing data. You wrote something already, yet search stays empty. The more serious failure is using one Scope for projects or tenants that should remain separate.
 
-Resolve Scope as an application decision, not a convenience fallback. In a multi-tenant service, authentication and authorization choose the allowed tenant/project first. Only then should the adapter receive the corresponding `scope_id`.
+Resolve Scope as an application decision, not a convenience fallback. In a multi-tenant service, authentication and authorization choose the allowed tenant and project first. Only then should the adapter receive the corresponding `scope_id`.
 
 ## What Scope isolates
 
-PowerContext keeps related state under the same `scope_id`:
-
-- the Source journal and processing cursor;
-- the Memory lifecycle and active search projections;
-- the Experience and Skill Candidate Inbox;
-- Handoff history and Work continuity;
-- scope-local runtime cache entries, locks, and statistics.
+PowerContext keeps related state under the same `scope_id`. That set includes the Source journal and processing cursor, the Memory lifecycle and active search projections, the Experience and Skill Candidate Inbox, Handoff history and Work continuity, and scope-local runtime cache entries, locks, and statistics.
 
 Another Scope cannot read this data unless the application writes it there separately.
 
@@ -48,7 +42,7 @@ A useful Scope survives the work. It should not change with every session.
 | Scenario | Prefer | Avoid |
 |---|---|---|
 | One code repository | A normalized Git remote or explicit project ID | A temporary worktree path |
-| Multi-tenant service | An explicit Scope mapped from an authenticated tenant/project | The service process working directory |
+| Multi-tenant service | An explicit Scope mapped from an authenticated tenant or project | The service process working directory |
 | Local project without Git | A stable path hash when the adapter supports it, or an explicit Scope | A new random ID on every run |
 | Sharing across hosts | The same stable value on each host | Each host's session ID |
 
@@ -60,17 +54,17 @@ Integrations derive Scope from the information their host provides. Their rules 
 
 | Integration | Current derivation |
 |---|---|
-| Pydantic AI agent adapter | Constructor string/callback → environment → normalized Git remote → local path hash |
-| LangGraph | Invocation Scope/environment → normalized network Git remote → error if missing |
-| LangChain | Invocation Scope/environment → normalized network Git remote → error if missing |
-| Codex / Claude Code | Workstream binding where applicable, Git remote, or project path; see each host page for exact precedence |
-| OpenClaw | Trusted agent identity; project mode adds a project hash but retains the agent dimension |
+| Pydantic AI agent adapter | Constructor string or callback, then environment, a normalized Git remote, and a local path hash |
+| LangGraph | Invocation Scope or environment, then a normalized network Git remote. It errors if that is missing |
+| LangChain | Invocation Scope or environment, then a normalized network Git remote. It errors if that is missing |
+| Codex / Claude Code | Workstream binding where applicable, Git remote, or project path. See each host page for exact precedence |
+| OpenClaw | Trusted agent identity. Project mode adds a project hash but retains the agent dimension |
 
-The mental model therefore gives selection rules rather than one fictional precedence list. Keep adapter-specific fallback behavior on the adapter page.
+The mental model gives selection rules rather than one fictional precedence list. Keep adapter-specific fallback behavior on the adapter page.
 
 ### Git remotes are normalized
 
-Integrations remove credentials from a remote URL before deriving Scope. These URLs should identify the same repository, and the token must not appear in the Scope:
+Integrations remove credentials from a remote URL before deriving Scope. These URLs should identify the same repository, and the token must not appear in the Scope.
 
 ```text
 https://user:token@example.com/org/repo.git
@@ -83,11 +77,7 @@ LangGraph and LangChain detect Windows drive-letter paths so they are not mistak
 
 Codex and Claude Code can derive the same project Scope for one repository. Memory stored explicitly in one host can then be recalled in the other.
 
-Sharing requires all three conditions:
-
-1. Both hosts connect to the same PowerContext Server.
-2. They resolve to exactly the same `scope_id`.
-3. Their reads and writes use the required access authorization.
+Sharing requires all three conditions. Both hosts connect to the same PowerContext Server. They resolve to exactly the same `scope_id`. Their reads and writes use the required access authorization.
 
 Similar-looking directories are not enough. When sharing fails, inspect the final Scope before debugging search.
 
@@ -99,12 +89,7 @@ OpenClaw project mode currently keeps the agent ID in its Scope. Two agents in t
 
 The Server caches runtime composition and one scope-local write lock for active Scopes. Its default capacity is 128 inactive entries.
 
-This is not a data cache:
-
-- eviction does not delete Sources, Memory, or Handoffs from the database;
-- an entry with active operations or lock waiters cannot be evicted;
-- the cache may temporarily exceed capacity when every entry is active;
-- after operations finish, the Server trims the least recently used inactive entries.
+This is not a data cache. Eviction does not delete Sources, Memory, or Handoffs from the database. An entry with active operations or lock waiters cannot be evicted. The cache may temporarily exceed capacity when every entry is active. After operations finish, the Server trims the least recently used inactive entries.
 
 Writes in one Scope are serialized to protect head and cursor updates. Read-only search and an in-progress rerank should not all be serialized behind that write lock.
 
@@ -116,7 +101,7 @@ Check that the Dashboard and client use exactly the same Scope. Changing the dat
 
 ### Two tenants see the same Memory
 
-Make sure the application did not use the service process working directory or one fixed string for every tenant. Resolve Scope from an authorized tenant/project mapping.
+Make sure the application did not use the service process working directory or one fixed string for every tenant. Resolve Scope from an authorized tenant or project mapping.
 
 ### LangGraph raises MissingScope in a local directory
 
@@ -128,11 +113,11 @@ The application probably used a session ID as Scope. Use a stable project or ten
 
 ## How you know the boundary holds
 
-1. Is the Scope stable and free of credentials?
-2. Does a multi-tenant application authorize first and select Scope second?
-3. Do hosts that should share data resolve to exactly the same value?
-4. Did you assume that all adapters use the same fallback?
-5. Did you mistake cache eviction for deletion of durable data?
+1. The Scope is stable and free of credentials.
+2. A multi-tenant application authorizes first and selects Scope second.
+3. Hosts that should share data resolve to exactly the same value.
+4. Adapters do not all share the same fallback.
+5. Cache eviction is not deletion of durable data.
 
 If any of those fail, start with [Troubleshooting](/en/start/troubleshooting). Continue with [fail-open](/en/mental-model/fail-open) to decide which failures may leave the original task running and which operations must report an error.
 

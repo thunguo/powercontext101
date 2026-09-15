@@ -9,13 +9,13 @@ keywords:
   - Memory
 ---
 
-<Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 保存以后仍要知道的项目知识。<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 处理正在进行的工作：目标是什么，已经验证了什么，哪里卡住，接手者下一步做什么。
+<Tooltip headline="Memory" tip="经过选择、以后还会用到的项目知识。" cta="阅读 Memory" href="/zh/mental-model/memory">Memory</Tooltip> 保存以后仍要知道的项目知识。<Tooltip headline="Handoff" tip="把当前目标、已验证进度、阻塞项和下一步交给接手者。不提交就还是临时包。" cta="阅读 Handoff" href="/zh/mental-model/handoff">Handoff</Tooltip> 处理正在进行的工作。它要说清目标是什么、已经验证了什么、哪里卡住、接手者下一步做什么。
 
 一条 Memory 往往很短。一个可用的 Handoff 必须让接手者检查证据，并判断自己是否真的有能力和权限继续。
 
 ## 先选 Memory 还是 Handoff
 
-先看谁需要这些信息。Memory 保存可复用知识；Handoff 保存另一位执行者继续当前任务所需的状态。
+先看谁需要这些信息。Memory 保存可复用知识。Handoff 保存另一位执行者继续当前任务所需的状态。
 
 | 你要保存的内容 | 选择 |
 |---|---|
@@ -28,7 +28,7 @@ keywords:
 
 ## 两层 API
 
-PowerContext 有低层 Handoff 生命周期，也有高层工作连续性循环。
+选对对象之后，再看调用走哪一层。PowerContext 有低层 Handoff 生命周期，也有高层工作连续性循环。
 
 ### 低层生命周期
 
@@ -59,14 +59,11 @@ Work Contract
 
 ## 已准备 Handoff 先于提交
 
-`finalize` 把 draft 变成 `PreparedHandoff`。它会验证内容和直接证据，并读取当前 Handoff 头版本，设置 `base`：
-
-- 当前没有头版本：`base=None`；
-- 已经有已提交头版本：`base` 是当前精确 Handoff 版本引用。
+`finalize` 把 draft 变成 `PreparedHandoff`。它会验证内容和直接证据，并读取当前 Handoff 头版本，再设置 `base`。当前没有头版本时，`base=None`。已经有已提交头版本时，`base` 是当前精确 Handoff 版本引用。
 
 这一步不写 Handoff Artifact。
 
-已准备 Handoff 可以序列化并交给另一个进程或会话。接手者可以直接从它继续。只要调用方保留这个值，Server 重启并不会使它失效；但没有提交，它不会成为 `latest`。
+已准备 Handoff 可以序列化并交给另一个进程或会话。接手者可以直接从它继续。只要调用方保留这个值，Server 重启并不会使它失效。但没有提交，它不会成为 `latest`。
 
 <Note>
 `handoff_current_work` 也不会自动提交。不过它会采集一条 Handoff 边界 Source，所以它不是零写入的预览 API。
@@ -76,11 +73,7 @@ Work Contract
 
 只有用户明确需要持久里程碑时才提交。
 
-提交会检查：
-
-1. 已准备 Handoff 的 Scope 与请求一致；
-2. `base` 仍然等于当前头版本；
-3. 内容和证据链合法。
+提交会检查三件事。已准备 Handoff 的 Scope 必须与请求一致。`base` 必须仍然等于当前头版本。内容和证据链必须合法。
 
 第一次提交创建 Revision 1。以后同一生命周期的里程碑创建下一 Revision。
 
@@ -90,9 +83,11 @@ Work Contract
 
 两个工作进程可以从同一个基础准备不同 Handoff。第一个提交后，第二个的基础已经过期，应返回 Revision 冲突。调用者需要读取新头版本，检查变化，再重新准备。
 
-不要把冲突处理成“把 Revision 加一再试”。
+不要把冲突处理成把 Revision 加一再试。
 
 ## 继续有三种选择
+
+接手者拿到包以后，可以用三种方式继续。
 
 | 选择方式 | 读取什么 | 已选择 Revision |
 |---|---|---|
@@ -102,24 +97,13 @@ Work Contract
 
 所有 Handoff 解析结果都是 `untrusted_history`。它会列出状态、next 动作、Citation 和无法读取的证据，但不会证明这些内容仍然新鲜。
 
-接手者应检查：
-
-- 引用式文件和 Source 是否仍可读；
-- 实时工作区是否符合描述；
-- 自己是否具备所需能力；
-- 当前用户是否授权它继续。
+接手者还应检查引用式文件和 Source 是否仍可读，实时工作区是否符合描述，自己是否具备所需能力，以及当前用户是否授权它继续。
 
 ## 确认绑定精确目标
 
 接手者从 `latest` 发现 Handoff 后，应取返回的精确已选择 Revision，再用精确选择方式确认。
 
-接受确认要求：
-
-- 证据都可用；
-- 实时状态已确认；
-- 能力已确认；
-- 授权信息已确认；
-- 选择方式是 `prepared` 或 `exact`，不是 `latest`。
+接受确认要求证据都可用，实时状态已确认，能力已确认，授权信息已确认，并且选择方式是 `prepared` 或 `exact`，不是 `latest`。
 
 如果任何检查没通过，结果应该是 needs clarification、declined 或其他真实状态，不能为了闭环好看就写接受。
 
@@ -127,14 +111,9 @@ Work Contract
 
 ## Task Outcome 关闭工作循环
 
-Task Outcome 记录整体结果，合法状态包括 `succeeded`、`partial`、`blocked`、`failed`、`cancelled` 和 `unknown`。单项检查的 `skipped` 或 `timed_out` 属于 TaskCheck，不是 Task Outcome 状态。两层都应原样保存真实状态。
+工作做完以后，用 Task Outcome 记录整体结果。合法状态包括 `succeeded`、`partial`、`blocked`、`failed`、`cancelled` 和 `unknown`。单项检查的 `skipped` 或 `timed_out` 属于 TaskCheck，不是 Task Outcome 状态。两层都应原样保存真实状态。
 
-要让一个已提交 Handoff 显示为 covered，结果必须：
-
-1. 链接一个接受确认回执；
-2. 回执绑定精确已提交 Handoff Revision；
-3. 结果在回执之后出现；
-4. 位于同一 Scope。
+要让一个已提交 Handoff 显示为 covered，结果必须链接一个接受确认回执，回执必须绑定精确已提交 Handoff Revision，结果必须在回执之后出现，并且位于同一 Scope。
 
 同 Scope 下随便一条结果不会自动覆盖 Handoff。
 
@@ -142,7 +121,7 @@ Task Outcome 记录整体结果，合法状态包括 `succeeded`、`partial`、`
 
 工作连续性和 Handoff 报告从 Source 日志与已提交 Handoff 历史内容生成视图。它们不会改写底层 Source、Handoff 或结果。
 
-投影读取格式错误的工作 Source 时会软失败：无效记录计入 `invalid_record_count`，其余有效历史仍可展示。
+投影读取格式错误的工作 Source 时会软失败。无效记录计入 `invalid_record_count`，其余有效历史仍可展示。
 
 当前工作连续性最多投影最近 64 个有效事件，同时保留总数和 truncated 信息。这是展示上限，不是日志数据删除。
 
@@ -170,11 +149,11 @@ Next action: run contract tests
 
 `handoff_current_work` 返回已准备 Handoff。先把它交给接手者继续，不提交。
 
-检查：`latest` 仍然为空。这是预期行为。
+检查 `latest` 仍然为空。这是预期行为。
 
 ### 4. 持久里程碑
 
-用户要求保留后，提交已准备 Handoff：
+用户要求保留后，提交已准备 Handoff。
 
 ```text
 handoff/HANDOFF_ID@1
@@ -190,11 +169,7 @@ handoff/HANDOFF_ID@1
 
 ## 失败不会总是原子回滚
 
-高层工作循环跨越多个持久操作。`handoff_current_work` 先采集边界 Source，再返回已准备 Handoff。后续提交失败时：
-
-- 边界 Source 仍存在；
-- 没有新的已提交 Handoff Revision；
-- 连续性可以看到边界事件，但不能把它当成持久里程碑。
+高层工作循环跨越多个持久操作。`handoff_current_work` 先采集边界 Source，再返回已准备 Handoff。后续提交失败时，边界 Source 仍存在，没有新的已提交 Handoff Revision。连续性可以看到边界事件，但不能把它当成持久里程碑。
 
 文档和调用方都要报告这个实际状态。
 
@@ -217,13 +192,13 @@ handoff/HANDOFF_ID@1
 
 ## 怎么知道分清了
 
-1. Memory 与 Handoff 是否按“长期知识”和“当前任务状态”分开？
-2. 已准备与已提交是否分开？
-3. `handoff_current_work` 的边界 Source 写入是否被说明？
-4. 最新版本发现是否转换成精确确认？
-5. 接收方检查是否包含证据、实时状态、能力、授权信息？
-6. 结果是否链接接受回执？
-7. 报告是否仍然只是投影？
+1. Memory 保存长期知识，Handoff 保存当前任务状态。
+2. 已准备 Handoff 和已提交 Handoff 是两步。
+3. `handoff_current_work` 会写入一条边界 Source。
+4. 从最新版本发现之后，确认要绑到精确 Revision。
+5. 接手者要检查证据、实时状态、能力和授权信息。
+6. 结果要链接接受回执。
+7. 报告仍然只是投影。
 
 对象已经清楚时，去跑 [Handoff 闭环](/zh/basic-usage/handoff-loop)。工作完成后，还可以从精确证据提炼可复用判断，但仍要经过 Review。
 

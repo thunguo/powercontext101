@@ -9,15 +9,15 @@ keywords:
   - Revision
 ---
 
-<Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> is for information that will influence later work: a decision already made, a constraint that still applies, the current project state, or a concrete next step.
+Write a <Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> when the content will still influence later work. A decision already made, a constraint that still applies, the current project state, or a concrete next step all belong here.
 
-It is not a container for the full conversation. A conversation may first become <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> evidence. Only the parts worth reusing across tasks belong in Memory.
+Do not pour the full conversation into Memory. A conversation may first become <Tooltip headline="Source" tip="Records what happened. Capture does not write durable knowledge." cta="Read Source" href="/en/mental-model/source">Source</Tooltip> evidence. Only the parts worth reusing across tasks belong in Memory.
 
-Selection is the useful work here. A shorter entry with a clear decision and scope will usually recall better than a transcript-shaped summary. It is also easier to revise or retire when the project changes.
+What you keep is the useful work. A shorter entry with a clear decision and scope usually recalls better than a transcript-shaped summary. It is also easier to revise or retire when the project changes.
 
 ## What belongs in Memory
 
-These are reasonable Memory entries:
+These are reasonable Memory entries.
 
 - “Regenerate the checked-in client after the public HTTP contract changes.”
 - “This project requires Python 3.11 or later.”
@@ -30,7 +30,7 @@ Temporary debug output, greetings, and one-off tool progress usually should not 
 
 ## Memory is not an overwritable text row
 
-PowerContext Memory has three identity layers:
+A Memory entry looks like one conclusion, but it has three identity layers.
 
 ```text
 Memory Artifact Revision
@@ -50,16 +50,11 @@ An effective change to the Memory lifecycle creates another immutable Artifact R
 
 `entry_version_id` identifies the exact content version. A revision creates a new entry version and retains its `previous_version_id`, evidence, and creating Memory Revision.
 
-An `entry_id` alone is therefore not an exact citation. Maintenance operations also need the relevant Memory Revision and entry-version ID.
+An `entry_id` alone is not an exact citation. Maintenance operations also need the relevant Memory Revision and entry-version ID.
 
 ## The manifest defines current state
 
-The manifest in a Memory Revision is the authoritative directory for that Revision. Each item records:
-
-- a stable `entry_id`;
-- an exact `entry_version_id`;
-- the content hash;
-- `active` or `inactive` state.
+The manifest in a Memory Revision is the authoritative directory for that Revision. Each item records a stable `entry_id`, an exact `entry_version_id`, the content hash, and an `active` or `inactive` state.
 
 `retire` changes an entry to inactive so default recall stops selecting it. The content and historical Revisions remain available.
 
@@ -67,9 +62,11 @@ Revision is not in-place replacement either. It creates the next entry version, 
 
 ## Two write paths
 
+Once identity and the manifest are clear, look at how content gets in.
+
 ### Explicit write
 
-When you know what should be retained, call `remember_memory` directly:
+When you know what should be retained, call `remember_memory` directly.
 
 ```json
 {
@@ -79,16 +76,11 @@ When you know what should be retained, call `remember_memory` directly:
 }
 ```
 
-This path:
-
-- needs no model;
-- needs no Source first;
-- may include `expected_revision` for concurrency control;
-- returns a Memory ref and exact entry Citation when content changes; a canonical duplicate no-op may return the current Memory ref with `entry=null`.
+This path needs no model and no Source first. It may include `expected_revision` for concurrency control. If the content actually changes, it returns a Memory ref and an exact entry Citation. If the canonical form matches an existing entry, the write is no-op and may return the current Memory ref with `entry=null`.
 
 ### Extraction from Source
 
-The automatic path captures Source first, then lets the scheduler or `flush_memory` process a Source window:
+The automatic path captures Source first, then lets the scheduler or `flush_memory` process a Source window.
 
 ```text
 Source window
@@ -112,25 +104,21 @@ Explicit writes and Source extraction can both produce Memory, but their lineage
 
 ## Revise and retire
 
-A revision targets the current exact Citation. New content creates another entry version, while the old version remains readable.
+An entry that already exists can still change, or it can be retired first. A revision targets the current exact Citation. New content creates another entry version, while the old version remains readable.
 
-Retirement also needs an exact target:
+Retirement also needs an exact target.
 
 ```text
 Memory Revision + entry_id + entry_version_id
 ```
 
-After retirement:
-
-- default active listing and recall stop returning the entry;
-- `include_inactive` supports audit;
-- old Artifact Revisions and entry versions still exist.
+After retirement, default active listing and recall stop returning the entry. `include_inactive` supports audit. Old Artifact Revisions and entry versions still exist.
 
 If another worker advanced the Memory head, an older Citation conflicts. Read the current state and inspect the difference before deciding what to do. Do not guess the next Revision.
 
 ## How search works
 
-Memory search does more than rank every text by one similarity score. It selects the current Memory head, then chooses a mode from the request and available capabilities.
+After a write, the next request has to find the entry again. Memory search does more than rank every text by one similarity score. It selects the current Memory head, then chooses a mode from the request and available capabilities.
 
 | mode | Requirement | Behavior |
 |---|---|---|
@@ -139,7 +127,7 @@ Memory search does more than rank every text by one similarity score. It selects
 | `hybrid` | FTS and vector available | Merge both result sets |
 | `auto` | Runtime selection | Prefer hybrid, otherwise use FTS |
 
-If query embedding is temporarily unavailable or times out, `auto` may fall back to FTS when FTS is available. An explicit `vector` or `hybrid` request must not silently change modes; the caller receives a capability error.
+If query embedding is temporarily unavailable or times out, `auto` may fall back to FTS when FTS is available. An explicit `vector` or `hybrid` request must not silently change modes. The caller receives a capability error.
 
 ### Fusion and reranking
 
@@ -151,19 +139,13 @@ Optional reranking runs after retrieval. It may change final order, but it does 
 
 ## PreparedContext is not a copied search response
 
-`prepare_context` retrieves coarse candidates, then a builder selects final content under one shared UTF-8 byte budget.
+A search hit does not mean this request will inject the whole entry. `prepare_context` retrieves coarse candidates, then a builder selects final content under one shared UTF-8 byte budget.
 
-The current builder uses several explicit limits:
-
-- up to 16 coarse Memory candidates;
-- up to 8 Experience candidates;
-- up to 8 final items in total;
-- at most 2 final Experience items;
-- up to 2000 bytes per item.
+The current builder uses several explicit limits. It takes up to 16 coarse Memory candidates and up to 8 Experience candidates. The final set has at most 8 items, and at most 2 of those may be Experience. Each item is capped at 2000 bytes.
 
 These are current implementation details and may change. The stable contract is that final content fits `max_bytes`, includes exact Citations, and is labeled `untrusted_history`.
 
-The result states are:
+Two result states are normal.
 
 ```text
 empty → content is null, content_bytes is 0
@@ -174,7 +156,7 @@ ready → content is nonblank, content_bytes matches UTF-8 bytes
 
 ## Walk through the OpenAPI example
 
-Write Memory explicitly:
+Write Memory explicitly.
 
 ```json
 {
@@ -184,7 +166,7 @@ Write Memory explicitly:
 }
 ```
 
-Search it:
+Search it.
 
 ```json
 {
@@ -195,14 +177,9 @@ Search it:
 }
 ```
 
-Inspect the response:
+Inspect the response for these four facts. The hit `memory_ref` should identify the current exact Revision. The result should include `entry_id` and `entry_version_id`. `matched_by` should match the requested mode. The Citation from `prepare_context` should point to the same entry version.
 
-1. Does `memory_ref` identify the current exact Revision?
-2. Are `entry_id` and `entry_version_id` present?
-3. Does `matched_by` match the requested mode?
-4. Does the Citation from `prepare_context` point to the same entry version?
-
-Then revise the content:
+Then revise the content.
 
 ```text
 Regenerate the checked-in client, inspect the diff, and then run contract tests.
@@ -230,12 +207,12 @@ The current search keeps the Revision snapshot selected at the start. A later se
 
 ## How you know the layers are separate
 
-1. Are Artifact Revision, entry ID, and entry-version ID separate?
-2. Is retire understood as deactivate rather than delete?
-3. Does explicit write remain model-free and Source-free?
-4. Does an extraction candidate pass evidence and domain validation?
-5. Are `auto` fallback and explicit vector/hybrid failure different?
-6. Is PreparedContext still temporary, untrusted, and bounded?
+1. Artifact Revision, entry ID, and entry-version ID are three separate identities.
+2. Retire means deactivate, not delete.
+3. An explicit write needs no model and no Source first.
+4. An extraction candidate must pass evidence and domain validation.
+5. `auto` may fall back, but an explicit vector or hybrid request must not silently change modes.
+6. PreparedContext is still temporary, untrusted, and bounded.
 
 When the objects are clear, write the first Memory in [Install and run the Server](/en/basic-usage/install-and-run). To walk the capture path, use [Source and Memory in practice](/en/basic-usage/source-and-memory).
 

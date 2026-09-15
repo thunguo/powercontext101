@@ -9,7 +9,7 @@ keywords:
   - Memory
 ---
 
-<Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> keeps project knowledge that should matter later. A <Tooltip headline="Handoff" tip="Packages the current objective, verified progress, blockers, and next action. It stays temporary until an explicit commit." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip> handles work in progress: the objective, verified state, blockers, and what the receiver should do next.
+<Tooltip headline="Memory" tip="Selected project knowledge that should matter later." cta="Read Memory" href="/en/mental-model/memory">Memory</Tooltip> keeps project knowledge that should matter later. A <Tooltip headline="Handoff" tip="Packages the current objective, verified progress, blockers, and next action. It stays temporary until an explicit commit." cta="Read Handoff" href="/en/mental-model/handoff">Handoff</Tooltip> handles work in progress. It names the objective, the verified state, the blockers, and what the receiver should do next.
 
 A Memory entry is often short. A useful Handoff gives the receiver enough evidence to check the state and decide whether they have the capability and authorization to continue.
 
@@ -22,13 +22,13 @@ Start with the reader who needs the information. Memory preserves reusable knowl
 | “Regenerate the client before running contract tests.” | Memory |
 | “The client is generated, tests have not run, and command X is next.” | Handoff |
 | “The project requires Python 3.11 or later.” | Memory |
-| “This session changed files A and B; file C still needs inspection.” | Handoff |
+| “This session changed files A and B. File C still needs inspection.” | Handoff |
 
 A durable conclusion may become Memory. The full current state of one task belongs in Handoff rather than one oversized Memory entry.
 
 ## Two API layers
 
-PowerContext has a low-level Handoff lifecycle and a higher-level Work continuity loop.
+After you pick the object, decide which API layer you are calling. PowerContext has a low-level Handoff lifecycle and a higher-level Work continuity loop.
 
 ### Low-level lifecycle
 
@@ -59,14 +59,11 @@ The higher-level operations store Work Contracts, boundaries, receipts, and outc
 
 ## Prepared Handoff comes before commit
 
-`finalize` turns a draft into `PreparedHandoff`. It validates content and direct evidence, reads the current Handoff head, and sets `base`:
-
-- no current head means `base=None`;
-- an existing committed head becomes the exact base ref.
+`finalize` turns a draft into `PreparedHandoff`. It validates content and direct evidence, reads the current Handoff head, and then sets `base`. If there is no current head, `base=None`. If a committed head already exists, `base` is the current exact Handoff version ref.
 
 This operation does not write a Handoff Artifact.
 
-A Prepared Handoff may be serialized and passed to another process or session. The receiver may continue directly from it. A Server restart does not invalidate the value while the caller still has it, but it never becomes `latest` without a commit.
+A Prepared Handoff may be serialized and passed to another process or session. The receiver may continue directly from it. A Server restart does not invalidate the value while the caller still has it. It never becomes `latest` without a commit.
 
 <Note>
 `handoff_current_work` does not commit automatically either. It does capture a Handoff boundary Source, so it is not a zero-write preview API.
@@ -76,11 +73,7 @@ A Prepared Handoff may be serialized and passed to another process or session. T
 
 Commit only when the user wants a durable milestone.
 
-The operation checks that:
-
-1. the Prepared Handoff Scope matches the request;
-2. `base` still equals the current head;
-3. content and lineage are valid.
+The operation checks three facts. The Prepared Handoff Scope must match the request. `base` must still equal the current head. Content and lineage must be valid.
 
 The first commit creates Revision 1. Later milestones in the same lifecycle create subsequent Revisions.
 
@@ -94,6 +87,8 @@ Do not resolve this conflict by incrementing a guessed revision number.
 
 ## Three continue selections
 
+After the receiver has the package, they can continue in three ways.
+
 | selection | What it reads | Selected Revision |
 |---|---|---|
 | `prepared` | A Prepared Handoff supplied by the caller | No committed Revision |
@@ -102,24 +97,13 @@ Do not resolve this conflict by incrementing a guessed revision number.
 
 Every Handoff resolution is `untrusted_history`. It lists state, next action, Citations, and unavailable evidence, but it does not prove that the content remains fresh.
 
-The receiver checks:
-
-- whether referenced files and Sources remain readable;
-- whether the live workspace matches the description;
-- whether the required capability is available;
-- whether the current user authorizes continuation.
+The receiver also checks whether referenced files and Sources remain readable, whether the live workspace matches the description, whether the required capability is available, and whether the current user authorizes continuation.
 
 ## Acknowledgement binds an exact target
 
 After discovering a Handoff through `latest`, take the exact selected Revision from the response and acknowledge that exact target.
 
-An accepted acknowledgement requires:
-
-- all evidence available;
-- live state confirmed;
-- capability confirmed;
-- authorization confirmed;
-- `prepared` or `exact` selection, not `latest`.
+An accepted acknowledgement requires that all evidence is available, live state is confirmed, capability is confirmed, authorization is confirmed, and the selection is `prepared` or `exact`, not `latest`.
 
 If any check fails, record needs clarification, declined, or the actual state. Do not mark accepted merely to complete the workflow.
 
@@ -127,14 +111,9 @@ Acknowledgement does not grant permission. It records what the receiver checked 
 
 ## Task Outcome closes the loop
 
-Task Outcome records the overall result with one of `succeeded`, `partial`, `blocked`, `failed`, `cancelled`, or `unknown`. `skipped` and `timed_out` belong to individual TaskCheck records, not Task Outcome status. Both layers should preserve the actual state.
+When the work is done, Task Outcome records the overall result. Legal statuses include `succeeded`, `partial`, `blocked`, `failed`, `cancelled`, and `unknown`. `skipped` and `timed_out` belong to individual TaskCheck records, not Task Outcome status. Both layers should preserve the actual state.
 
-For a committed Handoff to appear covered, the Outcome must:
-
-1. link an accepted acknowledgement receipt;
-2. bind that receipt to an exact committed Handoff Revision;
-3. appear after the receipt;
-4. use the same Scope.
+For a committed Handoff to appear covered, the Outcome must link an accepted acknowledgement receipt, bind that receipt to an exact committed Handoff Revision, appear after the receipt, and use the same Scope.
 
 An unrelated Outcome in the same Scope does not cover the Handoff.
 
@@ -174,7 +153,7 @@ Check that `latest` is still empty. That is expected.
 
 ### 4. Durable milestone
 
-After the user asks to keep the milestone, commit the Prepared Handoff:
+After the user asks to keep the milestone, commit the Prepared Handoff.
 
 ```text
 handoff/HANDOFF_ID@1
@@ -190,11 +169,7 @@ After contract tests run, record Task Outcome and cite the acknowledgement recei
 
 ## Failure does not always roll everything back
 
-The higher-level work loop spans several durable operations. `handoff_current_work` captures a boundary Source before returning the Prepared Handoff. If a later commit fails:
-
-- the boundary Source remains;
-- there is no new committed Handoff Revision;
-- continuity may show the boundary event, but it is not a durable milestone.
+The higher-level work loop spans several durable operations. `handoff_current_work` captures a boundary Source before returning the Prepared Handoff. If a later commit fails, the boundary Source remains and there is no new committed Handoff Revision. Continuity may show the boundary event, but it is not a durable milestone.
 
 Documentation and callers should report that actual state.
 
@@ -217,13 +192,13 @@ Documentation and callers should report that actual state.
 
 ## How you know the layers are separate
 
-1. Are Memory and Handoff separated as durable knowledge and current task state?
-2. Are Prepared and committed Handoffs separate?
-3. Does the page mention the boundary Source written by `handoff_current_work`?
-4. Does latest discovery become exact acknowledgement?
-5. Do receiver checks cover evidence, live state, capability, and authorization?
-6. Does Outcome link an accepted receipt?
-7. Does Report remain a projection?
+1. Memory keeps durable knowledge. Handoff keeps current task state.
+2. Prepared and committed Handoffs are two steps.
+3. `handoff_current_work` writes a boundary Source.
+4. Discovery through latest becomes an exact acknowledgement.
+5. Receiver checks cover evidence, live state, capability, and authorization.
+6. Outcome links an accepted receipt.
+7. Report remains a projection.
 
 When the objects are clear, run the [Handoff loop](/en/basic-usage/handoff-loop). After the work finishes, exact evidence may support reusable judgment, but Review still controls approval.
 
