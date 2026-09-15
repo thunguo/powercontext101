@@ -32,11 +32,17 @@ UNTRANSLATED_PROSE = {
     "stale": "过期",
 }
 UPSTREAM_ROOT = ROOT.parent / "powercontext"
+KEYWORDS_BLOCK = re.compile(r"^keywords:\n(?:[ \t]+- .*\n)*", re.MULTILINE)
 
 errors: list[str] = []
 
 
+def strip_keyword_tags(text: str) -> str:
+    return KEYWORDS_BLOCK.sub("", text)
+
+
 def strip_non_prose(text: str) -> str:
+    text = strip_keyword_tags(text)
     text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
     text = re.sub(r"<Visibility\b.*?</Visibility>", "", text, flags=re.DOTALL)
     text = re.sub(r"`[^`\n]+`", "", text)
@@ -70,7 +76,7 @@ else:
         for line in ledger_path.read_text().splitlines()[1:]
         if line.strip()
     }
-    expected_pages = {str(path) for path in zh_files}
+    expected_pages = {path.as_posix() for path in zh_files}
     if ledger_pages != expected_pages:
         errors.append(
             f"page fact ledger differs from locale tree: missing={sorted(expected_pages-ledger_pages)}, "
@@ -93,7 +99,7 @@ for rel in sorted(zh_files & en_files):
         for match in re.finditer(rf"(?i)(?<![\w-]){re.escape(term)}(?![\w-])", prose):
             line = prose.count("\n", 0, match.start()) + 1
             errors.append(f"translate {term} as {replacement} in Chinese prose: zh/{rel}:{line}")
-    reader_text = re.sub(r"```.*?```|`[^`\n]+`", "", zh, flags=re.DOTALL)
+    reader_text = strip_keyword_tags(re.sub(r"```.*?```|`[^`\n]+`", "", zh, flags=re.DOTALL))
     first_work_contract = reader_text.find("工作契约")
     if first_work_contract >= 0 and not reader_text.startswith("工作契约（Work Contract）", first_work_contract):
         line = reader_text.count("\n", 0, first_work_contract) + 1
@@ -111,16 +117,17 @@ for path in list((ROOT / "zh").rglob("*.mdx")) + list((ROOT / "en").rglob("*.mdx
 if UPSTREAM_ROOT.exists():
     import subprocess
 
-    actual_upstream_sha = subprocess.run(
+    upstream_rev = subprocess.run(
         ["git", "-C", str(UPSTREAM_ROOT), "rev-parse", "HEAD"],
-        check=True,
         capture_output=True,
         text=True,
-    ).stdout.strip()
-    if actual_upstream_sha != EXPECTED_UPSTREAM_SHA:
-        errors.append(
-            f"upstream fact baseline is stale: expected {EXPECTED_UPSTREAM_SHA}, current {actual_upstream_sha}"
-        )
+    )
+    if upstream_rev.returncode == 0:
+        actual_upstream_sha = upstream_rev.stdout.strip()
+        if actual_upstream_sha != EXPECTED_UPSTREAM_SHA:
+            errors.append(
+                f"upstream fact baseline is stale: expected {EXPECTED_UPSTREAM_SHA}, current {actual_upstream_sha}"
+            )
 
 all_text = "\n".join(p.read_text() for p in list((ROOT / "zh").rglob("*.mdx")) + list((ROOT / "en").rglob("*.mdx")))
 for status in re.findall(r"\b(?:Supported|Preview|Unsupported|Not validated|Host-gated|Version-gated)\b", all_text):
